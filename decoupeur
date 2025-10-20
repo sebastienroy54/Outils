@@ -1,0 +1,37 @@
+import pandas as pd
+import streamlit as st
+import io
+import zipfile
+
+st.title("Découpage Excel par chirurgien")
+
+# Récupération du fichier
+uploaded_file = st.file_uploader("Téléversez votre fichier Excel ici", type=["xlsx"])
+
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
+
+    # Récupération des noms des chirurgiens
+    nom_chir = df['Chirurgien'].str.lower().str.strip().unique()
+
+    zip_buffer = io.BytesIO()
+    # Création des fichiers excel pour chaque chirurgien
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for chirurgien in nom_chir:
+            df_chir = df[df['Chirurgien'].str.lower().str.strip() == chirurgien]
+
+            excel_buffer = io.BytesIO()
+            df_chir.to_excel(excel_buffer, index=False)
+            excel_buffer.seek(0)
+
+            nom_fichier = f"{chirurgien.replace(' ', '_')}.xlsx"
+            zf.writestr(nom_fichier, excel_buffer.read())
+    zip_buffer.seek(0)
+
+    # Création d'un bouton pour télécharger
+    st.download_button(
+        label="Télécharger les fichiers Excel",
+        data=zip_buffer.getvalue(),
+        file_name="Excels_Chirurgiens.zip",
+        mime="applications/zip"
+    )
