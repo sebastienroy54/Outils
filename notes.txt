@@ -1,20 +1,84 @@
-streamlit run app.py
-Traceback (most recent call last):
-  File "C:\Users\4251352\AppData\Local\Programs\Python\Python310-32\lib\runpy.py", line 196, in _run_module_as_main
-    return _run_code(code, main_globals, None,
-  File "C:\Users\4251352\AppData\Local\Programs\Python\Python310-32\lib\runpy.py", line 86, in _run_code
-    exec(code, run_globals)
-  File "C:\Users\4251352\Portail_outils\venv\Scripts\streamlit.exe\__main__.py", line 2, in <module>
-  File "C:\Users\4251352\Portail_outils\venv\lib\site-packages\streamlit\__init__.py", line 49, in <module>
-    from streamlit.proto.RootContainer_pb2 import RootContainer
-  File "C:\Users\4251352\Portail_outils\venv\lib\site-packages\streamlit\proto\RootContainer_pb2.py", line 33, in <module>   
-    _descriptor.EnumValueDescriptor(
-  File "C:\Users\4251352\Portail_outils\venv\lib\site-packages\google\protobuf\descriptor.py", line 1038, in __new__
-    _message.Message._CheckCalledFromGeneratedFile()
-TypeError: Descriptors cannot be created directly.
-If this call came from a _pb2.py file, your generated code is out of date and must be regenerated with protoc >= 3.19.0.     
-If you cannot immediately regenerate your protos, some other possible workarounds are:
- 1. Downgrade the protobuf package to 3.20.x or lower.
- 2. Set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python (but this will use pure-Python parsing and will be much slower).       
+import subprocess
+import getpass
+import os
+from openpyxl import Workbook
+import re
+import code_decoupage
 
-More information: https://developers.google.com/protocol-buffers/docs/news/2022-05-06#python-updates
+# Identification pour accès à la base de données
+user = input("Veuillez entrer le nom d'utilisateur : ")
+password = getpass.getpass("Mot de passe : ")
+tns_alias = "SIP1CCH.WORLD"
+
+# Chemin de la requête SQL à modifier si nécessaire
+sql_file = r"C:\Users\4251352\Documents\Requetes_du_lundi\monouhcd\MONO_UHCD_CCH.sql"
+
+# Exécution de la requête SQL
+cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
+subprocess.run(
+    cmd,
+    shell=True
+)
+
+# Chemin du fichier texte contenant le résultat de la requête à modifier si nécessaire
+txt_file = r"C:\Users\4251352\Documents\MONO_UHCD_CCH_2025_old.txt"
+
+# Ouverture du fichier texte
+with open(txt_file, "r", encoding="cp1252") as f:
+    lines = [line.rstrip("\n") for line in f if line.strip()]
+
+header_idx = None
+for i, line in enumerate(lines):
+    if re.match(r"^-{2,}", line.strip()):
+        header_idx = i
+        break
+
+dash_line = lines[header_idx]
+columns = []
+in_dash = False
+start = 0
+
+# Détection des différentes colonnes du fichier texte
+for idx, char in enumerate(dash_line + " "):
+    if not in_dash and char == "-":
+        in_dash = True
+        start = idx
+    elif in_dash and char != "-":
+        in_dash = False
+        columns.append((start, idx))
+
+print(f"Colonnes détectées : {len(columns)}")
+
+# Récupération des noms des colonnes
+header_line = lines[header_idx - 1]
+headers = [header_line[start:end].strip() for start, end in columns]
+
+# Création du fichier Excel
+excel_file = os.path.splitext(txt_file)[0] + ".xlsx"
+wb = Workbook()
+ws = wb.active
+ws.title = "Résultats"
+
+for col_idx, header in enumerate(headers, start=1):
+    ws.cell(row=1, column=col_idx, value=header)
+
+# Remplissage du fichier Excel
+excel_row = 2
+for line in lines[header_idx + 1:]:
+    if (
+        not line.strip()
+        or set(line.strip()) <= {"-"} 
+        or re.search(r"ligne\(s\)\s+sélectionnée\(s\)", line)
+        or re.search(r"ligne\s+sélectionnée", line)
+    ):
+        continue
+
+    values = [line[start:end].strip() for start, end in columns]
+    for col_idx, value in enumerate(values, start=1):
+        ws.cell(row=excel_row, column=col_idx, value=value)
+    excel_row += 1
+
+wb.save(excel_file)
+
+excel_final = r"C:\Users\4251352\Documents\MONO_UHCD_CCH.xlsx"
+code_decoupage.decouper_excel(excel_file, excel_final)
