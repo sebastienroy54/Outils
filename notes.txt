@@ -1,28 +1,21 @@
-SELECT 
-    RSM.CDURM_P AS UNITE_MEDICALE,
-    TO_CHAR(RSM.D8EEUE, 'YYYY') AS ANNEE,
-    COUNT(RSM.KYRES) AS NB_RUM,
-    SUM(CASE WHEN RSM.NBJREA_R > 0 THEN 1 ELSE 0 END) AS NB_RUM_SUPPL,
-    SUM(NVL(RSM.NBJRUM, 0)) AS NB_JOURNEES,
-    SUM(CASE WHEN RSM.NBJREA_R > 0 THEN NVL(RSM.NBJRUM, 0) ELSE 0 END) AS NB_JOURNEES_SUPPL,
-    ROUND(
-        CASE WHEN COUNT(RSM.KYRES) = 0 THEN 0
-             ELSE (SUM(CASE WHEN RSM.NBJREA_R > 0 THEN 1 ELSE 0 END) / COUNT(RSM.KYRES)) * 100
-        END, 1
-    ) AS PCT_RUM_SUPPL,
-    ROUND(
-        CASE WHEN SUM(NVL(RSM.NBJRUM, 0)) = 0 THEN 0
-             ELSE (SUM(CASE WHEN RSM.NBJREA_R > 0 THEN NVL(RSM.NBJREA_R, 0) ELSE 0 END)
-                   / SUM(NVL(RSM.NBJRUM, 0))) * 100
-        END, 1
-    ) AS PCT_JOURNEES_SUPPL
-FROM RSM, RUM
-WHERE RSM.KYRES = RUM.NORES
-  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
-  AND (
-        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
-        OR
-        (RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY') AND RSM.D8EEUE <= SYSDATE)
-      )
-GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE, 'YYYY')
-ORDER BY RSM.CDURM_P, ANNEE;
+
+UNIT ANNE     NB_RUM NB_RUM_SUPPL NB_JOURNEES NB_JOURNEES_SUPPL PCT_RUM_SUPPL PCT_JOURNEES_SUPPL                                                                                                                                                                                                            
+---- ---- ---------- ------------ ----------- ----------------- ------------- ------------------                                                                                                                                                                                                            
+021  2024       1279            0        3684                 0             0                  0                                                                                                                                                                                                            
+021  2025        968            0        2646                 0             0                  0                                                                                                                                                                                                            
+091  2024        431            0        5936                 0             0                  0                                                                                                                                                                                                            
+091  2025        321            0        3869                 0             0                  0                                                                                                                                                                                                            
+092  2024        547            0        3343                 0             0                  0                                                                                                                                                                                                            
+092  2025        361            0        1815                 0             0                  0                                                                                                                                                                                                            
+103  2024        392          252        2650              2171          64,3               83,5                                                                                                                                                                                                            
+103  2025        140           96        1761              1644          68,6               94,5                                                                                                                                                                                                            
+104  2024        128            0         375                 0             0                  0                                                                                                                                                                                                            
+104  2025        101            0         496                 0             0                  0                                                                                                                                                                                                            
+340  2024       1283          692        5596              4349          53,9               81,2                                                                                                                                                                                                            
+340  2025        552          477        2926              2679          86,4                 97                                                                                                                                                                                                            
+341  2024          3            0           8                 0             0                  0                                                                                                                                                                                                            
+341  2025        330            0         745                 0             0                  0                                                                                                                                                                                                            
+451  2024        180            0        1735                 0             0                  0                                                                                                                                                                                                            
+451  2025        203            0        1766                 0             0                  0                                                                                                                                                                                                            
+
+16 ligne(s) s lectionn e(s).
