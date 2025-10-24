@@ -1,47 +1,57 @@
-21	2024	1279	0	3684	0	0
-0						
-						
-21	2025	968	0	2646	0	0
-0						
-						
-91	2024	431	0	5936	0	0
-0						
-						
-91	2025	321	0	3869	0	0
-0						
-						
-92	2024	547	0	3343	0	0
-0						
-						
-92	2025	361	0	1815	0	0
-0						
-						
-103	2024	392	252	2650	2171	64,3
-83,5						
-						
-103	2025	140	96	1761	1644	68,6
-94,5						
-						
-104	2024	128	0	375	0	0
-0						
-						
-104	2025	101	0	496	0	0
-0						
-						
-340	2024	1283	692	5596	4349	53,9
-81,2						
-						
-340	2025	552	477	2926	2679	86,4
-97						
-						
-341	2024	3	0	8	0	0
-0						
-						
-341	2025	330	0	745	0	0
-0						
-						
-451	2024	180	0	1735	0	0
-0						
-						
-451	2025	203	0	1766	0	0
-0						
+import streamlit as st
+import subprocess
+import getpass
+import os
+import re
+import pandas as pd
+
+def main():
+    st.title("Dashboard d'évolution des RUMs")
+
+    annee1 = 2024
+    annee2 = 2025
+
+    user = st.text_input("Nom d'utilisateur")
+    password = st.text_input("Mot de passe", type="password")
+    tns_alias = st.text_input("TNS alias", value="SIP1CCH.WORLD")
+
+    sql_file = r"C:\Users\4251352\Portail_outils\SQL\Requete_RUM.sql"
+
+    if st.button("Actualiser le tableau"):
+        if not user or not password:
+            st.error("Merci de renseigner le nom d'utilisateur et le mot de passe")
+        else:
+            try:
+                cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
+                result = subprocess.run(
+                    cmd,
+                    shell=True,
+                    capture_output=True,
+                    text=True
+                )
+
+                if result.returncode != 0:
+                    st.error("Erreur SQL*Plus : " + result.stderr)
+                else:
+                    output = result.stdout.strip()
+                    st.text_area("Sortie brute SQLPlus", output[:1000])
+                    df = parse_sqlplus_output(output)
+                    if df is not None:
+                        st.dataframe(df)
+                    else:
+                        st.warning("impossible de convertir la sortie SQLPlus en tableau")
+            except Exception as e:
+                st.error(f"Erreur lors de l'exécution : {e}")
+    #csv_file = r"C:\Users\4251352\Portail_outils\dashboard.csv"
+    #df = pd.read_csv(csv_file, sep=";")
+
+def parse_sqlplus_output(output):
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if len(lines) < 2:
+        return None
+    try:
+        data = [line.strip() for line in lines]
+        df = pd.DataFrame(data[1:], columns=data[0])
+        return df
+    except Exception:
+        return None
