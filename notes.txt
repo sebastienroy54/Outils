@@ -1,38 +1,86 @@
-.table-grouped {
-  border-collapse: separate !important;
-  border-spacing: 0;
-  width: 100%;
-  text-align: center;
-  overflow: hidden;
-  border-radius: 6px;
-  border: 2px solid black;
-}
-.table-grouped th,
-.table-grouped td {
-  border: none !important;
-  padding: 6px 10px;
-  color: black;
-  vertical-align: middle;
-  position: relative;
-}
-.table-grouped thead tr:first-child th {
-  border-bottom: 2px solid black !important;
-}
-.table-grouped .group-border-right::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 2px;
-  height: 100%;
-  background: #000;
-  display: block;
-  z-index: 2;
-}
-.th-rum { background-color:#fff3cd; color:black; }
-.th-jours { background-color:#cce5ff; color:black; }
-.th-evol { background-color:#d4edda; color:black; }
-.th-unit { background-color:#e2e3e5; color:black; }
-.table-grouped td.group-border-right {
-    white-space: nowrap;
-}
+def afficher_tableau(df, annee1, annee2):
+    units = sorted(df['UNIT'].unique())
+    rows = []
+
+    for unit in units:
+        d1 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee1)]
+        d2 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee2)]
+
+        d1 = d1.iloc[0] if not d1.empty else None
+        d2 = d2.iloc[0] if not d2.empty else None
+
+        nb_rum1 = d1['NB_RUM'] if d1 is not None else 0
+        nb_rum_sup1 = d1['NB_RUM_SUPPL'] if d1 is not None else 0
+        pct_rum1 = d1['PCT_RUM_SUPPL'] if d1 is not None else 0
+        nb_journees1 = d1['NB_JOURNEES'] if d1 is not None else 0
+        nb_journees_sup1 = d1['NB_JOURNEES_SUPPL'] if d1 is not None else 0
+        pct_journees1 = d1['PCT_JOURNEES_SUPPL'] if d1 is not None else 0
+
+        nb_rum2 = d2['NB_RUM'] if d2 is not None else 0
+        nb_rum_sup2 = d2['NB_RUM_SUPPL'] if d2 is not None else 0
+        pct_rum2 = d2['PCT_RUM_SUPPL'] if d2 is not None else 0
+        nb_journees2 = d2['NB_JOURNEES'] if d2 is not None else 0
+        nb_journees_sup2 = d2['NB_JOURNEES_SUPPL'] if d2 is not None else 0
+        pct_journees2 = d2['PCT_JOURNEES_SUPPL'] if d2 is not None else 0
+
+        evol_rum = round(pct_rum2 - pct_rum1, 1)
+        evol_journees = round(pct_journees2 - pct_journees1, 1)
+
+        rows.append(f"""
+        <tr>
+            <td class="group-border-right">UM {unit}</td>
+            <td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>
+            <td>{nb_journees1}</td><td class="group-border-right">{nb_journees_sup1}</td>
+            <td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td class="group-border-right">{pct_rum2}%</td>
+            <td>{nb_journees2}</td><td class="group-border-right">{nb_journees_sup2}</td>
+            <td>{'+' if evol_rum > 0 else ''}{evol_rum}%</td>
+            <td>{'+' if evol_journees > 0 else ''}{evol_journees}%</td>
+        </tr>
+        """)
+
+    tableau_html = f"""
+    <h2>Évolution {annee1} vs {annee2}</h2>
+    <table class="table-grouped">
+      <thead>
+        <tr>
+          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
+          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
+          <th colspan="2" class="group-border-right th-jours">{annee1} Journées</th>
+          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
+          <th colspan="2" class="group-border-right th-jours">{annee2} Journées</th>
+          <th colspan="2" class="th-evol">Évolution</th>
+        </tr>
+        <tr>
+          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
+          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
+          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(rows)}
+      </tbody>
+    </table>
+    """
+    st.markdown(tableau_html, unsafe_allow_html=True)
+
+# === Graphique ===
+def afficher_graphique(df, annee1, annee2):
+    fig = go.Figure()
+    df1 = df[df['ANNEE'] == annee1]
+    df2 = df[df['ANNEE'] == annee2]
+
+    fig.add_trace(go.Bar(x=df1['UNIT'], y=df1['PCT_RUM_SUPPL'], name=f"% RUM {annee1}"))
+    fig.add_trace(go.Bar(x=df2['UNIT'], y=df2['PCT_RUM_SUPPL'], name=f"% RUM {annee2}"))
+    fig.add_trace(go.Bar(x=df1['UNIT'], y=df1['PCT_JOURNEES_SUPPL'], name=f"% Journées {annee1}"))
+    fig.add_trace(go.Bar(x=df2['UNIT'], y=df2['PCT_JOURNEES_SUPPL'], name=f"% Journées {annee2}"))
+
+    fig.update_layout(
+        title="Évolution % RUM et % Journées par unité",
+        barmode="group",
+        xaxis_title="Unité médicale",
+        yaxis_title="%",
+        height=500
+    )
+    st.plotly_chart(fig, use_container_width=True)
