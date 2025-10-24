@@ -1,84 +1,28 @@
-import subprocess
-import getpass
-import os
-from openpyxl import Workbook
-import re
-import code_decoupage
-
-# Identification pour accès à la base de données
-user = input("Veuillez entrer le nom d'utilisateur : ")
-password = getpass.getpass("Mot de passe : ")
-tns_alias = "SIP1CCH.WORLD"
-
-# Chemin de la requête SQL à modifier si nécessaire
-sql_file = r"C:\Users\4251352\Documents\Requetes_du_lundi\monouhcd\MONO_UHCD_CCH.sql"
-
-# Exécution de la requête SQL
-cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
-subprocess.run(
-    cmd,
-    shell=True
-)
-
-# Chemin du fichier texte contenant le résultat de la requête à modifier si nécessaire
-txt_file = r"C:\Users\4251352\Documents\MONO_UHCD_CCH_2025_old.txt"
-
-# Ouverture du fichier texte
-with open(txt_file, "r", encoding="cp1252") as f:
-    lines = [line.rstrip("\n") for line in f if line.strip()]
-
-header_idx = None
-for i, line in enumerate(lines):
-    if re.match(r"^-{2,}", line.strip()):
-        header_idx = i
-        break
-
-dash_line = lines[header_idx]
-columns = []
-in_dash = False
-start = 0
-
-# Détection des différentes colonnes du fichier texte
-for idx, char in enumerate(dash_line + " "):
-    if not in_dash and char == "-":
-        in_dash = True
-        start = idx
-    elif in_dash and char != "-":
-        in_dash = False
-        columns.append((start, idx))
-
-print(f"Colonnes détectées : {len(columns)}")
-
-# Récupération des noms des colonnes
-header_line = lines[header_idx - 1]
-headers = [header_line[start:end].strip() for start, end in columns]
-
-# Création du fichier Excel
-excel_file = os.path.splitext(txt_file)[0] + ".xlsx"
-wb = Workbook()
-ws = wb.active
-ws.title = "Résultats"
-
-for col_idx, header in enumerate(headers, start=1):
-    ws.cell(row=1, column=col_idx, value=header)
-
-# Remplissage du fichier Excel
-excel_row = 2
-for line in lines[header_idx + 1:]:
-    if (
-        not line.strip()
-        or set(line.strip()) <= {"-"} 
-        or re.search(r"ligne\(s\)\s+sélectionnée\(s\)", line)
-        or re.search(r"ligne\s+sélectionnée", line)
-    ):
-        continue
-
-    values = [line[start:end].strip() for start, end in columns]
-    for col_idx, value in enumerate(values, start=1):
-        ws.cell(row=excel_row, column=col_idx, value=value)
-    excel_row += 1
-
-wb.save(excel_file)
-
-excel_final = r"C:\Users\4251352\Documents\MONO_UHCD_CCH.xlsx"
-code_decoupage.decouper_excel(excel_file, excel_final)
+SELECT 
+    RSM.CDURM_P AS UNITE_MEDICALE,
+    TO_CHAR(RSM.D8EEUE, 'YYYY') AS ANNEE,
+    COUNT(RSM.KYRES) AS NB_RUM,
+    SUM(CASE WHEN RSM.NBJREA_R > 0 THEN 1 ELSE 0 END) AS NB_RUM_SUPPL,
+    SUM(NVL(RSM.NBJRUM, 0)) AS NB_JOURNEES,
+    SUM(CASE WHEN RSM.NBJREA_R > 0 THEN NVL(RSM.NBJRUM, 0) ELSE 0 END) AS NB_JOURNEES_SUPPL,
+    ROUND(
+        CASE WHEN COUNT(RSM.KYRES) = 0 THEN 0
+             ELSE (SUM(CASE WHEN RSM.NBJREA_R > 0 THEN 1 ELSE 0 END) / COUNT(RSM.KYRES)) * 100
+        END, 1
+    ) AS PCT_RUM_SUPPL,
+    ROUND(
+        CASE WHEN SUM(NVL(RSM.NBJRUM, 0)) = 0 THEN 0
+             ELSE (SUM(CASE WHEN RSM.NBJREA_R > 0 THEN NVL(RSM.NBJREA_R, 0) ELSE 0 END)
+                   / SUM(NVL(RSM.NBJRUM, 0))) * 100
+        END, 1
+    ) AS PCT_JOURNEES_SUPPL
+FROM RSM
+JOIN RUM ON RSM.KYRES = RUM.NORES
+WHERE RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND (
+        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
+        OR
+        (RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY') AND RSM.D8EEUE <= SYSDATE)
+      )
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE, 'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
