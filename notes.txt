@@ -1,25 +1,38 @@
-            for metric in ["PCT_RUM_SUPPL", "PCT_JOURNEES_SUPPL"]:
-                if f"{metric}_{annee1}" in pivot.columns and f"{metric}_{annee2}" in pivot.columns:
-                    pivot[f"EVOL_{metric}"] = (
-                        pivot[f"{metric}_{annee2}"] - pivot[f"{metric}_{annee1}"]
-                    ).round(1)
-
-            # --- Affichage du tableau formaté ---
-            st.subheader(f"Évolution {annee1} → {annee2}")
-            st.markdown("""
-                <style>
-                .dataframe th, .dataframe td {
-                    text-align: center !important;
-                    padding: 6px 10px;
-                }
-                </style>
-            """, unsafe_allow_html=True)
-
-            st.dataframe(pivot)
-
-            # --- Graphiques comparatifs ---
-            st.markdown("### 📈 Pourcentage de RUMs avec supplément")
-            st.bar_chart(pivot.set_index("UNIT")[[f"PCT_RUM_SUPPL_{annee1}", f"PCT_RUM_SUPPL_{annee2}"]])
-
-            st.markdown("### 📊 Pourcentage de journées avec supplément")
-            st.bar_chart(pivot.set_index("UNIT")[[f"PCT_JOURNEES_SUPPL_{annee1}", f"PCT_JOURNEES_SUPPL_{annee2}"]])
+.table-grouped {
+  border-collapse: separate !important;
+  border-spacing: 0;
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  border-radius: 6px;
+  border: 2px solid black;
+}
+.table-grouped th,
+.table-grouped td {
+  border: none !important;
+  padding: 6px 10px;
+  color: black;
+  vertical-align: middle;
+  position: relative;
+}
+.table-grouped thead tr:first-child th {
+  border-bottom: 2px solid black !important;
+}
+.table-grouped .group-border-right::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 100%;
+  background: #000;
+  display: block;
+  z-index: 2;
+}
+.th-rum { background-color:#fff3cd; color:black; }
+.th-jours { background-color:#cce5ff; color:black; }
+.th-evol { background-color:#d4edda; color:black; }
+.th-unit { background-color:#e2e3e5; color:black; }
+.table-grouped td.group-border-right {
+    white-space: nowrap;
+}
