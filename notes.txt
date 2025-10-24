@@ -1,26 +1,10 @@
-    tableau_html = f"""
-    <h2>Évolution {annee1} vs {annee2}</h2>
-    <table class="table-grouped">
-        <thead>
-        <tr>
-          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
-          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee1} Journées</th>
-          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee2} Journées</th>
-          <th colspan="2" class="th-evol">Évolution</th>
-        </tr>
-        <tr>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
-          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
-        </tr>
-      </thead>
-      <tbody>
-        {''.join(rows)}
-      </tbody>
-    </table>
-    """
-    st.markdown(tableau_html, unsafe_allow_html=True)
+Unité médicale	2024 RUM	2024 Journées	2025 RUM	2025 Journées	Évolution
+Nb RUM	Nb RUM sup	% RUM	Nb journées	Nb journées sup	Nb RUM	Nb RUM sup	% RUM	Nb journées	Nb journées sup	% RUM	% Journées
+UM 103 - REA CHIR	392	252	64.3%	2650	2171	140	96	68.6%	1761	1644	+4.3%	+11.0%
+UM 104 - USC	128	0	0.0%	375	0	101	0	0.0%	496	0	0.0%	0.0%
+UM 21 - SI Cardiologie	1279	0	0.0%	3684	0	968	0	0.0%	2646	0	0.0%	0.0%
+UM 340 - Med Intensive Rea	1283	692	53.9%	5596	4349	552	477	86.4%	2926	2679	+32.5%	+15.8%
+UM 341 - USIP MIR	3	0	0.0%	8	0	330	0	0.0%	745	0	0.0%	0.0%
+UM 451 - SI Hématologie	180	0	0.0%	1735	0	203	0	0.0%	1766	0	0.0%	0.0%
+UM 91 - Réa Néonat	431	0	0.0%	5936	0	321	0	0.0%	3869	0	0.0%	0.0%
+UM 92 - SI Néonat	547	0	0.0%	3343	0	361	0	0.0%	1815	0	0.0%	0.0%
