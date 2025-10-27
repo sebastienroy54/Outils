@@ -24,192 +24,70 @@ BEGIN
 END;
 /
 
-import streamlit as st
-import subprocess
-import getpass
-import os
-import pandas as pd
-import plotly.graph_objects as go
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
 
-# Chargement du fichier CSS
-def load_css(file_path):
-    with open(file_path) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
+SET TERMOUT OFF
 
-# Exécution de la requête SQL
-def run_sqlplus(user, password, tns_alias, sql_file):
-    cmd = f'sqlplus -S {user}/{password}@{tns_alias} @{sql_file}'
-    result = subprocess.run(
-        cmd,
-        shell=True,
-    )
-    if result.returncode != 0:
-        st.error("Erreur SQL*Plus : " + result.stderr)
+SELECT 
+    RSM.CDURM_P AS UNITE_MEDICALE,
+    TO_CHAR(RSM.D8EEUE, 'YYYY') AS ANNEE,
+    COUNT(RSM.KYRES) AS NB_RUM,
 
-# Chargement et nettoyage des données
-def load_data(csv_file):
-    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL", "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-    df = pd.read_csv(csv_file, sep=";", engine='python', names=cols, header=None, encoding="cp1252")
-    df = df.dropna(subset=["UNIT"])
-    df["ANNEE"] = df["ANNEE"].astype(int)
-    df["UNIT"] = df["UNIT"].astype(str).str.strip()
-    df = df.sort_values(["UNIT", "ANNEE"])
+    -- RUM avec supplément (REA, USC ou SI)
+    SUM(CASE WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0) 
+             THEN 1 ELSE 0 END) AS NB_RUM_SUPPL,
 
-    for col in ["%_RUM_SUPPL", "%_JOURNEES_SUPPL"]:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(",", ".").astype(float)
+    SUM(NVL(RUM.NBJRUM, 0)) AS NB_JOURNEES,
 
-    return df
+    -- Journées avec supplément (REA, USC ou SI)
+    SUM(
+        CASE 
+            WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0) 
+            THEN NVL(RUM.NBJRUM, 0) 
+            ELSE 0 
+        END
+    ) AS NB_JOURNEES_SUPPL,
 
-# Fonction pour afficher le tableau de données
-def afficher_tableau(df, annee1, annee2):
+    -- % de RUM avec supplément
+    ROUND(
+        CASE WHEN COUNT(RSM.KYRES) = 0 THEN 0
+             ELSE (SUM(CASE WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0)
+                            THEN 1 ELSE 0 END) / COUNT(RSM.KYRES)) * 100
+        END, 1
+    ) AS PCT_RUM_SUPPL,
 
-    um_names = {
-        "103": "Réa CHIR",
-        "104": "USC",
-        "21": "SI Cardiologie",
-        "340": "Med Intensive Rea",
-        "341": "USIP MIR",
-        "451": "SI Hématologie",
-        "91": "Réa Néonat",
-        "92": "SI Néonat"
-    }
+    -- % de journées avec supplément
+    ROUND(
+        CASE WHEN SUM(NVL(RUM.NBJRUM, 0)) = 0 THEN 0
+             ELSE (
+                 SUM(
+                     CASE WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0)
+                          THEN NVL(RUM.NBJREA_R,0) + NVL(RUM.NBJUSC_R,0) + NVL(RUM.NBJSI_R,0)
+                          ELSE 0
+                     END
+                 ) / SUM(NVL(RUM.NBJRUM, 0))
+             ) * 100
+        END, 1
+    ) AS PCT_JOURNEES_SUPPL
 
-    st.markdown("""
-    <style>
-    .block-container {
-                max-width : 95% !important;
-    }
-    .table-grouped {                
-                width : 100% !important;
-                margin-left: auto;
-                margin-right: auto;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+FROM RSM, RUM
+WHERE RSM.KYRES = RUM.NORES
+  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND (
+        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
+        OR
+        (RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY') AND RSM.D8EEUE <= SYSDATE)
+      )
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE, 'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
 
-    df["UNIT_NOM"] = df["UNIT"].map(um_names).fillna(df["UNIT"])
+SPOOL OFF
+EXIT;
 
-    units = sorted(df['UNIT'].unique())
-    rows = []
-
-    for unit in units:
-        d1 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee1)]
-        d2 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee2)]
-
-        d1 = d1.iloc[0] if not d1.empty else None
-        d2 = d2.iloc[0] if not d2.empty else None
-
-        nb_rum1 = d1['NB_RUM'] if d1 is not None else 0
-        nb_rum_sup1 = d1['NB_RUM_SUPPL'] if d1 is not None else 0
-        pct_rum1 = d1['%_RUM_SUPPL'] if d1 is not None else 0
-        nb_journees1 = d1['NB_JOURNEES'] if d1 is not None else 0
-        nb_journees_sup1 = d1['NB_JOURNEES_SUPPL'] if d1 is not None else 0
-        pct_journees1 = d1['%_JOURNEES_SUPPL'] if d1 is not None else 0
-
-        nb_rum2 = d2['NB_RUM'] if d2 is not None else 0
-        nb_rum_sup2 = d2['NB_RUM_SUPPL'] if d2 is not None else 0
-        pct_rum2 = d2['%_RUM_SUPPL'] if d2 is not None else 0
-        nb_journees2 = d2['NB_JOURNEES'] if d2 is not None else 0
-        nb_journees_sup2 = d2['NB_JOURNEES_SUPPL'] if d2 is not None else 0
-        pct_journees2 = d2['%_JOURNEES_SUPPL'] if d2 is not None else 0
-
-        evol_rum = round(pct_rum2 - pct_rum1, 1)
-        evol_journees = round(pct_journees2 - pct_journees1, 1)
-
-        unit_nom = f"UM {unit} - {d1['UNIT_NOM'] if d1 is not None else (d2['UNIT_NOM'] if d2 is not None else unit)}"
-
-        rows.append(
-        f'<tr>'
-        f'<td class="group-border-right">{unit_nom}</td>'
-        f'<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>'
-        f'<td>{nb_journees1}</td><td class="group-border-right">{nb_journees_sup1}</td>'
-        f'<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td class="group-border-right">{pct_rum2}%</td>'
-        f'<td>{nb_journees2}</td><td class="group-border-right">{nb_journees_sup2}</td>'
-        f'<td>{'+' if evol_rum > 0 else ''}{evol_rum}%</td>'
-        f'<td>{'+' if evol_journees > 0 else ''}{evol_journees}%</td>'
-        f'</tr>'
-        )
-
-    tableau_html = f"""
-    <h2>Évolution {annee1} vs {annee2}</h2>
-    <table class="table-grouped">
-        <thead>
-        <tr>
-          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
-          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee1} Journées</th>
-          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee2} Journées</th>
-          <th colspan="2" class="th-evol">Évolution</th>
-        </tr>
-        <tr>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
-          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
-        </tr>
-      </thead>
-      <tbody>
-        {''.join(rows)}
-      </tbody>
-    </table>
-    """
-    st.markdown(tableau_html, unsafe_allow_html=True)
-
-# Fonction d'affichage du graphique
-def afficher_graphique(df, annee1, annee2):
-    fig = go.Figure()
-    df1 = df[df['ANNEE'] == annee1]
-    df2 = df[df['ANNEE'] == annee2]
-
-    fig.add_trace(go.Bar(x=df1['UNIT'], y=df1['%_RUM_SUPPL'], name=f"% RUM {annee1}"))
-    fig.add_trace(go.Bar(x=df2['UNIT'], y=df2['%_RUM_SUPPL'], name=f"% RUM {annee2}"))
-    fig.add_trace(go.Bar(x=df1['UNIT'], y=df1['%_JOURNEES_SUPPL'], name=f"% Journées {annee1}"))
-    fig.add_trace(go.Bar(x=df2['UNIT'], y=df2['%_JOURNEES_SUPPL'], name=f"% Journées {annee2}"))
-
-    fig.update_layout(
-        bargap=0.2,
-        bargroupgap=0.05,
-        title="Évolution % RUM et % Journées par unité",
-        barmode="group",
-        xaxis_title="Unité médicale",
-        yaxis_title="%",
-        height=500,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# Fonction principale
-def main():
-    st.title("Dashboard d'évolution des RUMs")
-
-    annee1 = 2024
-    annee2 = 2025
-
-    sql_file = r"C:\Users\4251352\Portail_outils\SQL\Requete_RUM.sql"
-    csv_file = r"C:\Users\4251352\Portail_outils\data\dashboard.csv"
-    css_file = r"C:\Users\4251352\Portail_outils\outils\styles_dashboard_rum.css"
-
-    load_css(css_file)
-
-    #user = st.text_input("Nom d'utilisateur")
-    #password = st.text_input("Mot de passe", type="password")
-    user = "consult"
-    password = "consult"
-    tns_alias = st.text_input("TNS alias", value="SIP1CCH.WORLD")
-
-    if st.button("Actualiser le tableau"):
-
-        if not user or not password:
-            st.error("Merci de renseigner le nom d'utilisateur et le mot de passe")
-
-        else:
-            try:
-                run_sqlplus(user, password, tns_alias, sql_file)
-                df = load_data(csv_file)
-                afficher_tableau(df, annee1, annee2)
-                #afficher_graphique(df, annee1, annee2)
-
-            except Exception as e:
-                st.error(f"Erreur lors de l'exécution : {e}")
