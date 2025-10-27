@@ -24,70 +24,42 @@ BEGIN
 END;
 /
 
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
+def load_data(csv_file):
+    # colonnes attendues (ordre renvoyé par ta requête)
+    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
+            "NB_JOURNEES", "NB_JOURNEES_SUPPL",
+            "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
 
-SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
-SET TERMOUT OFF
+    # lecture (header=None car SQL*Plus peut écrire les en-têtes ou non)
+    df = pd.read_csv(csv_file, sep=";", engine="python", names=cols, header=None, encoding="cp1252", dtype=str)
 
-SELECT 
-    RSM.CDURM_P AS UNITE_MEDICALE,
-    TO_CHAR(RSM.D8EEUE, 'YYYY') AS ANNEE,
-    COUNT(RSM.KYRES) AS NB_RUM,
+    # enlever lignes complètement vides
+    df = df.dropna(how="all")
 
-    -- RUM avec supplément (REA, USC ou SI)
-    SUM(CASE WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0) 
-             THEN 1 ELSE 0 END) AS NB_RUM_SUPPL,
+    # nettoyer UNIT et supprimer lignes sans UNIT
+    df["UNIT"] = df["UNIT"].astype(str).str.strip()
+    df = df[df["UNIT"].notna() & (df["UNIT"] != "")]
 
-    SUM(NVL(RUM.NBJRUM, 0)) AS NB_JOURNEES,
+    # ----- ANNEE : convertir proprement et supprimer les lignes invalides -----
+    # parfois ANNEE peut contenir des entêtes ou du texte -> on force numeric
+    df["ANNEE"] = pd.to_numeric(df["ANNEE"].str.extract(r'(\d{4})', expand=False), errors="coerce")
+    # supprimer lignes sans année reconnue
+    df = df[df["ANNEE"].notna()].copy()
+    df["ANNEE"] = df["ANNEE"].astype(int)
 
-    -- Journées avec supplément (REA, USC ou SI)
-    SUM(
-        CASE 
-            WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0) 
-            THEN NVL(RUM.NBJRUM, 0) 
-            ELSE 0 
-        END
-    ) AS NB_JOURNEES_SUPPL,
+    # ----- Colonnes entières : forcer la conversion (NaN -> 0) -----
+    int_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
+    for c in int_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c].str.replace(",", ".").str.strip(), errors="coerce").fillna(0).astype(int)
 
-    -- % de RUM avec supplément
-    ROUND(
-        CASE WHEN COUNT(RSM.KYRES) = 0 THEN 0
-             ELSE (SUM(CASE WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0)
-                            THEN 1 ELSE 0 END) / COUNT(RSM.KYRES)) * 100
-        END, 1
-    ) AS PCT_RUM_SUPPL,
+    # ----- Colonnes pourcentages : virgule -> point, to_numeric, NaN -> 0.0 -----
+    pct_cols = ["%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
+    for c in pct_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".").str.replace("%","").str.strip(),
+                                  errors="coerce").fillna(0.0).astype(float)
 
-    -- % de journées avec supplément
-    ROUND(
-        CASE WHEN SUM(NVL(RUM.NBJRUM, 0)) = 0 THEN 0
-             ELSE (
-                 SUM(
-                     CASE WHEN (NVL(RUM.NBJREA_R,0) > 0 OR NVL(RUM.NBJUSC_R,0) > 0 OR NVL(RUM.NBJSI_R,0) > 0)
-                          THEN NVL(RUM.NBJREA_R,0) + NVL(RUM.NBJUSC_R,0) + NVL(RUM.NBJSI_R,0)
-                          ELSE 0
-                     END
-                 ) / SUM(NVL(RUM.NBJRUM, 0))
-             ) * 100
-        END, 1
-    ) AS PCT_JOURNEES_SUPPL
-
-FROM RSM, RUM
-WHERE RSM.KYRES = RUM.NORES
-  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
-  AND (
-        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
-        OR
-        (RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY') AND RSM.D8EEUE <= SYSDATE)
-      )
-GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE, 'YYYY')
-ORDER BY RSM.CDURM_P, ANNEE;
-
-SPOOL OFF
-EXIT;
-
+    # trier proprement
+    df = df.sort_values(["UNIT", "ANNEE"]).reset_index(drop=True)
+    return df
