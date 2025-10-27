@@ -2,3 +2,24 @@
 -	autres doublons 0 nuit (NDA1 <> NDA2 and UMA1 <> UMA2 and DateE1 = DateE2 and DateS1 = DateS2) ;
 -	séjours en chevauchement ou en inclusion (NDA1 <> NDA2 and UMA1 <> UMA2 and DateS1 between DE1+1 et Dates2) ;
 -	séjours contigus (NDA1 <> NDA2 and UMA1 <> UMA2 and Dates1 = DateE2).
+
+
+SET SERVEROUTPUT ON
+DECLARE
+    v_sql VARCHAR2(4000);
+    v_count NUMBER;
+BEGIN
+    FOR col IN (
+        SELECT COLUMN_NAME
+        FROM ALL_TAB_COLUMNS
+        WHERE TABLE_NAME = 'EPI'
+          AND DATA_TYPE IN ('VARCHAR2','CHAR')
+    ) LOOP
+        v_sql := 'SELECT COUNT(*) FROM EPI WHERE ' || col.COLUMN_NAME || ' = ''CODE''';
+        EXECUTE IMMEDIATE v_sql INTO v_count;
+        IF v_count > 0 THEN
+            DBMS_OUTPUT.PUT_LINE('Colonne : ' || col.COLUMN_NAME || ' contient ''CODE'' (' || v_count || ' occurrence(s))');
+        END IF;
+    END LOOP;
+END;
+/
