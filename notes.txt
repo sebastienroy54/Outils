@@ -1,10 +1,48 @@
-Unité médicale	2024 RUM	2024 Journées	2025 RUM	2025 Journées	Évolution
-Nb RUM	Nb RUM sup	% RUM	Nb journées	Nb journées sup	Nb RUM	Nb RUM sup	% RUM	Nb journées	Nb journées sup	% RUM	% Journées
-UM 103 - Réa CHIR	392	2213	564.5%	2650	437	142	1664	1171.8%	1767	103	+607.3%	-10.7%
-UM 104 - USC	128	0	0.0%	375	375	102	0	0.0%	497	497	0.0%	0.0%
-UM 21 - 21	1279	0	0.0%	3684	3684	968	0	0.0%	2646	2646	0.0%	0.0%
-UM 340 - Med Intensive Rea	1283	4542	354.0%	5596	1054	552	2837	513.9%	2926	89	+159.9%	-15.8%
-UM 341 - USIP MIR	3	0	0.0%	8	8	331	0	0.0%	749	749	0.0%	0.0%
-UM 451 - SI Hématologie	180	0	0.0%	1735	1735	203	0	0.0%	1766	1766	0.0%	0.0%
-UM 91 - 91	431	0	0.0%	5936	5936	321	0	0.0%	3869	3869	0.0%	0.0%
-UM 92 - 92	547	0	0.0%	3343	3343	361	0	0.0%	1815	1815	0.0%	0.0%
+# Chargement et nettoyage des données
+def load_data(csv_file):
+    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL", "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
+
+    df = pd.read_csv(csv_file, sep=";", engine='python', names=cols, header=None, encoding="cp1252")
+    df = df.dropna(subset=["UNIT"])
+
+    df["ANNEE"] = df["ANNEE"].astype(int)
+    df["UNIT"] = df["UNIT"].astype(str).str.strip()
+    numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+
+    df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
+    df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
+
+    df = df.sort_values("UNIT").reset_index(drop=True)
+
+    return df
+
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
+
+SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
+SET TERMOUT OFF
+
+SELECT 
+    RSM.CDURM_P AS UNITE_MEDICALE,
+    TO_CHAR(RSM.D8EEUE,'YYYY') AS ANNEE,
+    COUNT(RSM.KYRES) AS NB_RUM,
+    SUM(NVL(RUM.NBJREA_R,0)) AS NB_RUM_SUPPL,          -- RUM avec supplément
+    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,            -- Total journées
+    SUM(NVL(RUM.NBJRUM,0)) - SUM(NVL(RUM.NBJREA_R,0)) AS NB_JOURNEES_SUPPL -- Journées supplémentaires
+FROM RSM, RUM
+WHERE RSM.KYRES = RUM.NORES
+  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSM.D8EEUE <= SYSDATE
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE,'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
+
+SPOOL OFF
+EXIT;
