@@ -24,42 +24,31 @@ BEGIN
 END;
 /
 
-def load_data(csv_file):
-    # colonnes attendues (ordre renvoyé par ta requête)
-    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
-            "NB_JOURNEES", "NB_JOURNEES_SUPPL",
-            "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-
-    # lecture (header=None car SQL*Plus peut écrire les en-têtes ou non)
-    df = pd.read_csv(csv_file, sep=";", engine="python", names=cols, header=None, encoding="cp1252", dtype=str)
-
-    # enlever lignes complètement vides
-    df = df.dropna(how="all")
-
-    # nettoyer UNIT et supprimer lignes sans UNIT
-    df["UNIT"] = df["UNIT"].astype(str).str.strip()
-    df = df[df["UNIT"].notna() & (df["UNIT"] != "")]
-
-    # ----- ANNEE : convertir proprement et supprimer les lignes invalides -----
-    # parfois ANNEE peut contenir des entêtes ou du texte -> on force numeric
-    df["ANNEE"] = pd.to_numeric(df["ANNEE"].str.extract(r'(\d{4})', expand=False), errors="coerce")
-    # supprimer lignes sans année reconnue
-    df = df[df["ANNEE"].notna()].copy()
-    df["ANNEE"] = df["ANNEE"].astype(int)
-
-    # ----- Colonnes entières : forcer la conversion (NaN -> 0) -----
-    int_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
-    for c in int_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c].str.replace(",", ".").str.strip(), errors="coerce").fillna(0).astype(int)
-
-    # ----- Colonnes pourcentages : virgule -> point, to_numeric, NaN -> 0.0 -----
-    pct_cols = ["%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-    for c in pct_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".").str.replace("%","").str.strip(),
-                                  errors="coerce").fillna(0.0).astype(float)
-
-    # trier proprement
-    df = df.sort_values(["UNIT", "ANNEE"]).reset_index(drop=True)
-    return df
+SP2-0734: commande inconnue au début de "SUM(CASE W..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "THEN 1 ELS..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "SUM(NVL(RU..." - le reste de la ligne est ignoré.
+SP2-0042: commande inconnue "SUM(" - reste de la ligne ignoré.
+SP2-0042: commande inconnue "CASE" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de "WHEN (NVL(..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "THEN NVL(R..." - le reste de la ligne est ignoré.
+SP2-0044: Pour la liste des commandes connues entrez HELP
+and et pour sortir EXIT.
+SP2-0042: commande inconnue "ELSE 0" - reste de la ligne ignoré.
+SP2-0042: commande inconnue "END" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de ") AS NB_JO..." - le reste de la ligne est ignoré.
+SP2-0042: commande inconnue "ROUND(" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de "CASE WHEN ..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "ELSE (SUM(..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "THEN 1 ELS..." - le reste de la ligne est ignoré.
+SP2-0044: Pour la liste des commandes connues entrez HELP
+and et pour sortir EXIT.
+SP2-0042: commande inconnue "END, 1" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de ") AS PCT_R..." - le reste de la ligne est ignoré.
+SP2-0042: commande inconnue "ROUND(" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de "CASE WHEN ..." - le reste de la ligne est ignoré.
+SP2-0042: commande inconnue "ELSE (" - reste de la ligne ignoré.
+SP2-0042: commande inconnue "SUM(" - reste de la ligne ignoré.
+SP2-0044: Pour la liste des commandes connues entrez HELP
+and et pour sortir EXIT.
+SP2-0734: commande inconnue au début de "CASE WHEN ..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "THEN NVL(R..." - le reste de la ligne est 
