@@ -1,28 +1,15 @@
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
+# sChargement et nettoyage des données
+def load_data(csv_file):
+    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL", "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
+    df = pd.read_csv(csv_file, sep=";", engine='python', names=cols, header=None, encoding="cp1252")
+    df = df.dropna(subset=["UNIT"])
 
-SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
-SET TERMOUT OFF
+    df["ANNEE"] = df["ANNEE"].astype(int)
+    df["UNIT"] = df["UNIT"].astype(str).str.strip()
+    df = df.sort_values(["UNIT", "ANNEE"])
 
-SELECT 
-    RSM.CDURM_P AS UNITE_MEDICALE,
-    TO_CHAR(RSM.D8EEUE,'YYYY') AS ANNEE,
-    COUNT(RSM.KYRES) AS NB_RUM,
-    SUM(NVL(RUM.NBJREA_R,0)) AS NB_RUM_SUPPL,          -- RUM avec supplément
-    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,            -- Total journées
-    SUM(NVL(RUM.NBJRUM,0)) - SUM(NVL(RUM.NBJREA_R,0)) AS NB_JOURNEES_SUPPL -- Journées supplémentaires
-FROM RSM, RUM
-WHERE RSM.KYRES = RUM.NORES
-  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
-  AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSM.D8EEUE <= SYSDATE
-GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE,'YYYY')
-ORDER BY RSM.CDURM_P, ANNEE;
+    for col in ["%_RUM_SUPPL", "%_JOURNEES_SUPPL"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.replace(",", ".").astype(float)
 
-SPOOL OFF
-EXIT;
+    return df
