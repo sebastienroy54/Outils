@@ -1,41 +1,10 @@
-# Chargement et nettoyage des données
-def load_data(csv_file):
-    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL", "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-
-    df = pd.read_csv(csv_file, sep=";", engine='python', names=cols, header=None, encoding="cp1252")
-    df = df.dropna(subset=["UNIT"])
-
-    df["ANNEE"] = df["ANNEE"].astype(int)
-    df["UNIT"] = df["UNIT"].astype(str).str.strip()
-    numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-
-    df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
-    df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
-
-    df = df.sort_values("UNIT").reset_index(drop=True)
-
-    return df
-
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
-
-SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
-SET TERMOUT OFF
-
 SELECT 
     RSM.CDURM_P AS UNITE_MEDICALE,
     TO_CHAR(RSM.D8EEUE,'YYYY') AS ANNEE,
     COUNT(RSM.KYRES) AS NB_RUM,
-    SUM(NVL(RUM.NBJREA_R,0)) AS NB_RUM_SUPPL,          -- RUM avec supplément
-    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,            -- Total journées
-    SUM(NVL(RUM.NBJRUM,0)) - SUM(NVL(RUM.NBJREA_R,0)) AS NB_JOURNEES_SUPPL -- Journées supplémentaires
+    SUM(CASE WHEN NVL(RUM.NBJREA_R,0) > 0 THEN 1 ELSE 0 END) AS NB_RUM_SUPPL,  -- RUM avec supplément
+    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,                                    -- Total journées
+    SUM(CASE WHEN NVL(RUM.NBJREA_R,0) > 0 THEN NVL(RUM.NBJRUM,0) ELSE 0 END) AS NB_JOURNEES_SUPPL -- Journées sup.
 FROM RSM, RUM
 WHERE RSM.KYRES = RUM.NORES
   AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
@@ -43,6 +12,3 @@ WHERE RSM.KYRES = RUM.NORES
   AND RSM.D8EEUE <= SYSDATE
 GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE,'YYYY')
 ORDER BY RSM.CDURM_P, ANNEE;
-
-SPOOL OFF
-EXIT;
