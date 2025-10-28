@@ -24,31 +24,57 @@ BEGIN
 END;
 /
 
-SP2-0734: commande inconnue au début de "SUM(CASE W..." - le reste de la ligne est ignoré.
-SP2-0734: commande inconnue au début de "THEN 1 ELS..." - le reste de la ligne est ignoré.
-SP2-0734: commande inconnue au début de "SUM(NVL(RU..." - le reste de la ligne est ignoré.
-SP2-0042: commande inconnue "SUM(" - reste de la ligne ignoré.
-SP2-0042: commande inconnue "CASE" - reste de la ligne ignoré.
-SP2-0734: commande inconnue au début de "WHEN (NVL(..." - le reste de la ligne est ignoré.
-SP2-0734: commande inconnue au début de "THEN NVL(R..." - le reste de la ligne est ignoré.
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
+
+SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
+SET TERMOUT OFF
+
+SELECT DISTINCT
+    RSM.CDURM_P AS UNITE_MEDICALE,
+    TO_CHAR(RSM.D8EEUE, 'YYYY') AS ANNEE,
+    COUNT(RSM.KYRES) AS NB_RUM,
+    SUM(CASE WHEN RUM.NBJREA_R > 0 THEN 1 ELSE 0 END) AS NB_RUM_SUPPL, 
+    SUM(NVL(RUM.NBJRUM, 0)) AS NB_JOURNEES,
+    SUM(CASE WHEN RUM.NBJREA_R > 0 THEN NVL(RUM.NBJRUM, 0) ELSE 0 END) AS NB_JOURNEES_SUPPL,
+    ROUND(
+        CASE WHEN COUNT(RSM.KYRES) = 0 THEN 0
+             ELSE (SUM(CASE WHEN RUM.NBJREA_R > 0 THEN 1 ELSE 0 END) / COUNT(RSM.KYRES)) * 100
+        END, 1
+    ) AS PCT_RUM_SUPPL,
+    ROUND(
+        CASE WHEN SUM(NVL(RUM.NBJRUM, 0)) = 0 THEN 0
+             ELSE (SUM(CASE WHEN RUM.NBJREA_R > 0 THEN NVL(RUM.NBJRUM, 0) ELSE 0 END)
+                    / SUM(NVL(RUM.NBJRUM, 0))) * 100
+        END, 1
+    ) AS PCT_JOURNEES_SUPPL
+
+FROM RSM, RUM
+WHERE RSM.KYRES = RUM.NORES
+  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND (
+        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
+        OR
+        (RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY') AND RSM.D8EEUE <= SYSDATE)
+      )
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE, 'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
+
+SPOOL OFF
+EXIT;
+
+SP2-0734: commande inconnue au début de "FROM RSM, ..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "WHERE RSM...." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "AND RSM.CD..." - le reste de la ligne est ignoré.
+SP2-0042: commande inconnue "AND (" - reste de la ligne ignoré.
 SP2-0044: Pour la liste des commandes connues entrez HELP
 and et pour sortir EXIT.
-SP2-0042: commande inconnue "ELSE 0" - reste de la ligne ignoré.
-SP2-0042: commande inconnue "END" - reste de la ligne ignoré.
-SP2-0734: commande inconnue au début de ") AS NB_JO..." - le reste de la ligne est ignoré.
-SP2-0042: commande inconnue "ROUND(" - reste de la ligne ignoré.
-SP2-0734: commande inconnue au début de "CASE WHEN ..." - le reste de la ligne est ignoré.
-SP2-0734: commande inconnue au début de "ELSE (SUM(..." - le reste de la ligne est ignoré.
-SP2-0734: commande inconnue au début de "THEN 1 ELS..." - le reste de la ligne est ignoré.
-SP2-0044: Pour la liste des commandes connues entrez HELP
-and et pour sortir EXIT.
-SP2-0042: commande inconnue "END, 1" - reste de la ligne ignoré.
-SP2-0734: commande inconnue au début de ") AS PCT_R..." - le reste de la ligne est ignoré.
-SP2-0042: commande inconnue "ROUND(" - reste de la ligne ignoré.
-SP2-0734: commande inconnue au début de "CASE WHEN ..." - le reste de la ligne est ignoré.
-SP2-0042: commande inconnue "ELSE (" - reste de la ligne ignoré.
-SP2-0042: commande inconnue "SUM(" - reste de la ligne ignoré.
-SP2-0044: Pour la liste des commandes connues entrez HELP
-and et pour sortir EXIT.
-SP2-0734: commande inconnue au début de "CASE WHEN ..." - le reste de la ligne est ignoré.
-SP2-0734: commande inconnue au début de "THEN NVL(R..." - le reste de la ligne est 
+        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
+         *
+ERREUR à la ligne 1 :
+ORA-00928: missing SELECT keyword
