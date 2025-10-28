@@ -11,73 +11,18 @@ SET TERMOUT OFF
 
 SELECT 
     RSM.CDURM_P AS UNITE_MEDICALE,
-    TO_CHAR(RSM.D8EEUE, 'YYYY') AS ANNEE,
+    TO_CHAR(RSM.D8EEUE,'YYYY') AS ANNEE,
     COUNT(RSM.KYRES) AS NB_RUM,
-    
-    /* RUM avec au moins un jour de suppléments selon le type d'UM */
-    SUM(
-        CASE 
-            WHEN (RSM.CDURM_P IN ('103','340','341') AND NVL(RUM.NBJREA_R,0) > 0)
-              OR (RSM.CDURM_P = '104' AND NVL(RUM.NBJSRC_R,0) > 0)
-              OR (RSM.CDURM_P = '451' AND NVL(RUM.NBJSTF_ISSUDEREA_R,0) > 0)
-              OR (RSM.CDURM_P IN ('091','092') AND (NVL(RUM.NBJNNA_R,0)+NVL(RUM.NBJNNB_R,0)+NVL(RUM.NBJNNC_R,0)) > 0)
-            THEN 1 ELSE 0 
-        END
-    ) AS NB_RUM_SUPPL,
-
-    SUM(NVL(RUM.NBJRUM, 0)) AS NB_JOURNEES,
-
-    /* Journées de suppléments selon le type d’UM */
-    SUM(
-        CASE 
-            WHEN RSM.CDURM_P IN ('103','340','341') THEN NVL(RUM.NBJREA_R,0)
-            WHEN RSM.CDURM_P = '104' THEN NVL(RUM.NBJSRC_R,0)
-            WHEN RSM.CDURM_P = '451' THEN NVL(RUM.NBJSTF_ISSUDEREA_R,0)
-            WHEN RSM.CDURM_P IN ('091','092') THEN NVL(RUM.NBJNNA_R,0)+NVL(RUM.NBJNNB_R,0)+NVL(RUM.NBJNNC_R,0)
-            ELSE 0
-        END
-    ) AS NB_JOURNEES_SUPPL,
-
-    ROUND(
-        CASE WHEN COUNT(RSM.KYRES) = 0 THEN 0
-             ELSE (SUM(
-                CASE 
-                    WHEN (RSM.CDURM_P IN ('103','340','341') AND NVL(RUM.NBJREA_R,0) > 0)
-                      OR (RSM.CDURM_P = '104' AND NVL(RUM.NBJSRC_R,0) > 0)
-                      OR (RSM.CDURM_P = '451' AND NVL(RUM.NBJSTF_ISSUDEREA_R,0) > 0)
-                      OR (RSM.CDURM_P IN ('091','092') AND (NVL(RUM.NBJNNA_R,0)+NVL(RUM.NBJNNB_R,0)+NVL(RUM.NBJNNC_R,0)) > 0)
-                    THEN 1 ELSE 0 
-                END
-             ) / COUNT(RSM.KYRES)) * 100 
-        END, 1
-    ) AS PCT_RUM_SUPPL,
-
-    ROUND(
-        CASE WHEN SUM(NVL(RUM.NBJRUM, 0)) = 0 THEN 0
-             ELSE (
-                SUM(
-                    CASE 
-                        WHEN RSM.CDURM_P IN ('103','340','341') THEN NVL(RUM.NBJREA_R,0)
-                        WHEN RSM.CDURM_P = '104' THEN NVL(RUM.NBJSRC_R,0)
-                        WHEN RSM.CDURM_P = '451' THEN NVL(RUM.NBJSTF_ISSUDEREA_R,0)
-                        WHEN RSM.CDURM_P IN ('091','092') THEN NVL(RUM.NBJNNA_R,0)+NVL(RUM.NBJNNB_R,0)+NVL(RUM.NBJNNC_R,0)
-                        ELSE 0
-                    END
-                ) / SUM(NVL(RUM.NBJRUM, 0))
-             ) * 100
-        END, 1
-    ) AS PCT_JOURNEES_SUPPL
-
+    SUM(NVL(RUM.NBJREA_R,0)) AS NB_RUM_SUPPL,          -- RUM avec supplément
+    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,            -- Total journées
+    SUM(NVL(RUM.NBJRUM,0)) - SUM(NVL(RUM.NBJREA_R,0)) AS NB_JOURNEES_SUPPL -- Journées supplémentaires
 FROM RSM, RUM
 WHERE RSM.KYRES = RUM.NORES
-  AND RSM.CDURM_P IN ('103','104','021','340','341','451','091','092')
-  AND (
-        (RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY') AND RSM.D8EEUE < TO_DATE('01/01/2025','DD/MM/YYYY'))
-        OR
-        (RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY') AND RSM.D8EEUE <= SYSDATE)
-      )
-GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE, 'YYYY')
-ORDER BY RSM.CDURM_P, ANNEE
+  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSM.D8EEUE <= SYSDATE
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE,'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
 
 SPOOL OFF
-EXIT
+EXIT;
