@@ -3,12 +3,12 @@ def afficher_tableau(df, annee1, annee2):
     um_names = {
         "103": "Réa CHIR",
         "104": "USC",
-        "021": "SI Cardiologie",
+        "21": "SI Cardiologie",
         "340": "Med Intensive Rea",
         "341": "USIP MIR",
         "451": "SI Hématologie",
-        "091": "Réa Néonat",
-        "092": "SI Néonat"
+        "91": "Réa Néonat",
+        "92": "SI Néonat"
     }
 
     st.markdown("""
@@ -58,10 +58,10 @@ def afficher_tableau(df, annee1, annee2):
         rows.append(
         f'<tr>'
         f'<td class="group-border-right">{unit_nom}</td>'
-        f'<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>'
-        f'<td>{nb_journees1}</td><td class="group-border-right">{nb_journees_sup1}</td>'
         f'<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td class="group-border-right">{pct_rum2}%</td>'
-        f'<td>{nb_journees2}</td><td class="group-border-right">{nb_journees_sup2}</td>'
+        f'<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td class="group-border-right">{pct_journees2}</td>'
+        f'<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>'
+        f'<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td class="group-border-right">{pct_journees1}</td>'
         f'<td>{'+' if evol_rum > 0 else ''}{evol_rum}%</td>'
         f'<td>{'+' if evol_journees > 0 else ''}{evol_journees}%</td>'
         f'</tr>'
@@ -73,17 +73,17 @@ def afficher_tableau(df, annee1, annee2):
         <thead>
         <tr>
           <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
-          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee1} Journées</th>
           <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
           <th colspan="2" class="group-border-right th-jours">{annee2} Journées</th>
+          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
+          <th colspan="2" class="group-border-right th-jours">{annee1} Journées</th>
           <th colspan="2" class="th-evol">Évolution</th>
         </tr>
         <tr>
           <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
           <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours group-border-right">Nb journées sup</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
           <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
         </tr>
       </thead>
@@ -93,23 +93,3 @@ def afficher_tableau(df, annee1, annee2):
     </table>
     """
     st.markdown(tableau_html, unsafe_allow_html=True)
-
-
-def load_data(csv_file):
-    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL", "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-
-    df = pd.read_csv(csv_file, sep=";", engine='python', names=cols, header=None, encoding="cp1252")
-    df = df.dropna(subset=["UNIT"])
-
-    df["ANNEE"] = df["ANNEE"].astype(int)
-    df["UNIT"] = df["UNIT"].astype(str).str.strip()
-    numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-
-    df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
-    df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
-
-    df = df.sort_values("UNIT").reset_index(drop=True)
-
-    return df
