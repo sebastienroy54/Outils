@@ -1,95 +1,49 @@
-def afficher_tableau(df, annee1, annee2):
-
-    um_names = {
-        "103": "Réa CHIR",
-        "104": "USC",
-        "21": "SI Cardiologie",
-        "340": "Med Intensive Rea",
-        "341": "USIP MIR",
-        "451": "SI Hématologie",
-        "91": "Réa Néonat",
-        "92": "SI Néonat"
-    }
-
-    st.markdown("""
-    <style>
-    .block-container {
-                max-width : 95% !important;
-    }
-    .table-grouped {                
-                width : 100% !important;
-                margin-left: auto;
-                margin-right: auto;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    df["UNIT_NOM"] = df["UNIT"].map(um_names).fillna(df["UNIT"])
-
-    units = sorted(df['UNIT'].unique())
-    rows = []
-
-    for unit in units:
-        d1 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee1)]
-        d2 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee2)]
-
-        d1 = d1.iloc[0] if not d1.empty else None
-        d2 = d2.iloc[0] if not d2.empty else None
-
-        nb_rum1 = d1['NB_RUM'] if d1 is not None else 0
-        nb_rum_sup1 = d1['NB_RUM_SUPPL'] if d1 is not None else 0
-        pct_rum1 = d1['%_RUM_SUPPL'] if d1 is not None else 0
-        nb_journees1 = d1['NB_JOURNEES'] if d1 is not None else 0
-        nb_journees_sup1 = d1['NB_JOURNEES_SUPPL'] if d1 is not None else 0
-        pct_journees1 = d1['%_JOURNEES_SUPPL'] if d1 is not None else 0
-
-        nb_rum2 = d2['NB_RUM'] if d2 is not None else 0
-        nb_rum_sup2 = d2['NB_RUM_SUPPL'] if d2 is not None else 0
-        pct_rum2 = d2['%_RUM_SUPPL'] if d2 is not None else 0
-        nb_journees2 = d2['NB_JOURNEES'] if d2 is not None else 0
-        nb_journees_sup2 = d2['NB_JOURNEES_SUPPL'] if d2 is not None else 0
-        pct_journees2 = d2['%_JOURNEES_SUPPL'] if d2 is not None else 0
-
-        evol_rum = round(pct_rum2 - pct_rum1, 1)
-        evol_journees = round(pct_journees2 - pct_journees1, 1)
-
-        unit_nom = f"UM {unit} - {d1['UNIT_NOM'] if d1 is not None else (d2['UNIT_NOM'] if d2 is not None else unit)}"
-
-        rows.append(
-        f'<tr>'
-        f'<td class="group-border-right">{unit_nom}</td>'
-        f'<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td class="group-border-right">{pct_rum2}%</td>'
-        f'<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td class="group-border-right">{pct_journees2}</td>'
-        f'<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>'
-        f'<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td class="group-border-right">{pct_journees1}</td>'
-        f'<td>{'+' if evol_rum > 0 else ''}{evol_rum}%</td>'
-        f'<td>{'+' if evol_journees > 0 else ''}{evol_journees}%</td>'
-        f'</tr>'
-        )
-
-    tableau_html = f"""
-    <h2>Évolution {annee1} vs {annee2}</h2>
-    <table class="table-grouped">
-        <thead>
-        <tr>
-          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
-          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee2} Journées</th>
-          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
-          <th colspan="2" class="group-border-right th-jours">{annee1} Journées</th>
-          <th colspan="2" class="th-evol">Évolution</th>
-        </tr>
-        <tr>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
-          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
-        </tr>
-      </thead>
-      <tbody>
-        {''.join(rows)}
-      </tbody>
-    </table>
-    """
-    st.markdown(tableau_html, unsafe_allow_html=True)
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
+SPOOL C:/Users/4251352/Portail_outils/data/dashboard.csv
+SET TERMOUT OFF
+SELECT DISTINCT
+    RSM.CDURM_P AS UNITE_MEDICALE,
+    TO_CHAR(RSM.D8EEUE,'YYYY') AS ANNEE,
+    COUNT(RSM.KYRES) AS NB_RUM,
+    SUM(
+        CASE 
+            WHEN NVL(RUM.NBJREA_R,0)
+               + NVL(RUM.NBJSRC_R,0)
+               + NVL(RUM.NBJSTF_ISSUDEREA_R,0)
+               + NVL(RUM.NBJSTF_TOT_R,0)
+               + NVL(RUM.NBJNNA_R,0)
+               + NVL(RUM.NBJNNB_R,0)
+               + NVL(RUM.NBJNNC_R,0)
+               + NVL(RUM.NBJ_USIPR,0) > 0
+            THEN 1 ELSE 0 
+        END
+    ) AS NB_RUM_SUPPL,
+    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,
+    SUM(
+        CASE 
+            WHEN NVL(RUM.NBJREA_R,0)
+               + NVL(RUM.NBJSRC_R,0)
+               + NVL(RUM.NBJSTF_ISSUDEREA_R,0)
+               + NVL(RUM.NBJSTF_TOT_R,0)
+               + NVL(RUM.NBJNNA_R,0)
+               + NVL(RUM.NBJNNB_R,0)
+               + NVL(RUM.NBJNNC_R,0)
+               + NVL(RUM.NBJ_USIPR,0) > 0
+            THEN NVL(RUM.NBJRUM,0) ELSE 0 
+        END
+    ) AS NB_JOURNEES_SUPPL
+FROM RSM, RUM
+WHERE RSM.KYRES = RUM.NORES
+  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSM.D8EEUE <= TO_DATE('30/09/2025','DD/MM/YYYY')
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE,'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
+SPOOL OFF
+EXIT;
