@@ -58,3 +58,44 @@ WHERE E1.KYNODA = S1.KYNODA
 
 SPOOL OFF
 EXIT;
+
+import subprocess
+import getpass
+import os
+from openpyxl import Workbook
+import re
+import pandas as pd
+
+# Identification pour accès à la base de données
+user = input("Veuillez entrer le nom d'utilisateur : ")
+password = getpass.getpass("Mot de passe : ")
+tns_alias = "SIP1CCH.WORLD"
+
+# Chemin de la requête SQL à modifier si nécessaire
+sql_file = "contigus.sql"
+
+# Exécution de la requête SQL
+cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
+subprocess.run(
+    cmd,
+    shell=True
+)
+
+input_csv = "resultat.csv"
+output_excel = "doublons.xlsx"
+
+df = pd.read_csv(input_csv, sep=';')
+
+# Nettoyage du dataframe
+df.columns = [col.strip() for col in df.columns]
+df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+if "TYPE_RELATION" not in df.columns:
+    raise ValueError("Le champ TYPE_RELATION est manquant dans le fichier .csv")
+
+groupes = df["TYPE_RELATION"].dropna().unique()
+
+with pd.ExcelWriter(output_excel, engine="xlswriter") as writer:
+    for groupe in groupes:
+        subset = df[df["TYPE_RELATION"] == groupe]
+        subset.to_excel(writer, sheet_name=groupe[:31], index=False)
