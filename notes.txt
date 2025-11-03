@@ -6,66 +6,55 @@ SET FEEDBACK OFF
 SET TRIMSPOOL ON
 SET WRAP OFF
 SET TERMOUT OFF
+
 SPOOL resultat_doublons.csv
-SELECT S.KYNOIP AS IPP,
-       E.KYNODA AS NDA,
-       E.CDURM_P AS UMA,
-       E.D8EEUE AS DATE_ENTREE,
-       E.D8SOUE AS DATE_SORTIE
-FROM EPI E, SDO S
-WHERE E.KYNODA = S.KYNODA
-ORDER BY S.KYNOIP, E.D8EEUE;
+
+SELECT DISTINCT
+  S1.KYNOIP AS IPP,
+  E1.KYNODA AS KYNODA1,
+  E1.CDURM_P AS UMA1,
+  E1.D8EEUE AS DATEE1,
+  E1.D8SOUE AS DATES1,
+  E2.KYNODA AS KYNODA2,
+  E2.CDURM_P AS UMA2,
+  E2.D8EEUE AS DATEE2,
+  E2.D8SOUE AS DATES2,
+  CASE 
+    WHEN E1.CDURM_P = E2.CDURM_P 
+         AND E1.D8EEUE = E2.D8EEUE 
+         AND E1.D8SOUE = E2.D8SOUE 
+      THEN 'VRAI_DOUBLON'
+    WHEN E1.CDURM_P <> E2.CDURM_P 
+         AND E1.D8EEUE = E2.D8EEUE 
+         AND E1.D8SOUE = E2.D8SOUE 
+      THEN 'DOUBLON_0_NUIT'
+    WHEN E1.CDURM_P <> E2.CDURM_P 
+         AND E1.D8SOUE = E2.D8EEUE 
+      THEN 'CONTIGUS'
+    WHEN E1.CDURM_P <> E2.CDURM_P 
+         AND E1.D8SOUE BETWEEN E2.D8EEUE + 1 AND E2.D8SOUE 
+      THEN 'CHEVAUCHEMENT'
+    ELSE NULL 
+  END AS TYPE_RELATION
+FROM EPI E1, EPI E2, SDO S1, SDO S2
+WHERE E1.KYNODA = S1.KYNODA
+  AND E2.KYNODA = S2.KYNODA
+  AND S1.KYNOIP = S2.KYNOIP
+  AND E1.KYNODA <> E2.KYNODA
+  AND E1.CDURM_P IS NOT NULL
+  AND E2.CDURM_P IS NOT NULL
+  AND E1.CDURM_P <> ''
+  AND E2.CDURM_P <> ''
+  AND E1.D8EEUE >= TO_DATE('2024-01-01','YYYY-MM-DD')
+  AND E1.D8EEUE < TO_DATE('2026-01-01','YYYY-MM-DD')
+  AND E2.D8EEUE >= TO_DATE('2024-01-01','YYYY-MM-DD')
+  AND E2.D8EEUE < TO_DATE('2026-01-01','YYYY-MM-DD')
+  AND (
+      (E1.CDURM_P = E2.CDURM_P AND E1.D8EEUE = E2.D8EEUE AND E1.D8SOUE = E2.D8SOUE)
+   OR (E1.CDURM_P <> E2.CDURM_P AND E1.D8EEUE = E2.D8EEUE AND E1.D8SOUE = E2.D8SOUE)
+   OR (E1.CDURM_P <> E2.CDURM_P AND E1.D8SOUE = E2.D8EEUE)
+   OR (E1.CDURM_P <> E2.CDURM_P AND E1.D8SOUE BETWEEN E2.D8EEUE + 1 AND E2.D8SOUE)
+  );
+
 SPOOL OFF
 EXIT;
-
-import pandas as pd
-
-# Lecture du fichier brut
-df = pd.read_csv("sejours.csv", sep=";")
-df = df.dropna(how="all")
-
-# Convertir en dates
-df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"])
-df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"])
-
-# Trier par IPP et date
-df = df.sort_values(["IPP", "DATE_ENTREE", "DATE_SORTIE"])
-
-# Pour chaque IPP, comparer les séjours consécutifs
-groupes = []
-for ipp, g in df.groupby("IPP"):
-    g = g.reset_index(drop=True)
-    for i in range(len(g) - 1):
-        nda1, nda2 = g.loc[i, "NDA"], g.loc[i + 1, "NDA"]
-        uma1, uma2 = g.loc[i, "UMA"], g.loc[i + 1, "UMA"]
-        de1, ds1 = g.loc[i, "DATE_ENTREE"], g.loc[i, "DATE_SORTIE"]
-        de2, ds2 = g.loc[i + 1, "DATE_ENTREE"], g.loc[i + 1, "DATE_SORTIE"]
-
-        if (nda1 != nda2) and (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-            relation = "VRAI_DOUBLON"
-        elif (nda1 != nda2) and (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-            relation = "DOUBLON_0_NUIT"
-        elif (nda1 != nda2) and (uma1 != uma2) and (ds1 == de2):
-            relation = "CONTIGUS"
-        elif (nda1 != nda2) and (uma1 != uma2) and (ds1 > de2) and (ds1 <= ds2):
-            relation = "CHEVAUCHEMENT"
-        else:
-            relation = None
-
-        if relation:
-            groupes.append({
-                "IPP": ipp,
-                "NDA1": nda1,
-                "UMA1": uma1,
-                "DATEE1": de1,
-                "DATES1": ds1,
-                "NDA2": nda2,
-                "UMA2": uma2,
-                "DATEE2": de2,
-                "DATES2": ds2,
-                "TYPE_RELATION": relation
-            })
-
-res = pd.DataFrame(groupes)
-print("Lignes détectées :", len(res))
-res.to_excel("doublons_et_contigus.xlsx", index=False)
