@@ -62,40 +62,42 @@ EXIT;
 import subprocess
 import getpass
 import os
-from openpyxl import Workbook
-import re
 import pandas as pd
 
-# Identification pour accès à la base de données
 user = input("Veuillez entrer le nom d'utilisateur : ")
 password = getpass.getpass("Mot de passe : ")
 tns_alias = "SIP1CCH.WORLD"
 
-# Chemin de la requête SQL à modifier si nécessaire
 sql_file = "contigus.sql"
-
-# Exécution de la requête SQL
-cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
-subprocess.run(
-    cmd,
-    shell=True
-)
-
-input_csv = "resultat.csv"
+input_csv = "resultat_doublons.csv"   # nom du fichier produit par SQLPlus
 output_excel = "doublons.xlsx"
 
-df = pd.read_csv(input_csv, sep=';')
+print("\nExécution de la requête SQL, veuillez patienter...")
+cmd = f'sqlplus -s {user}/{password}@{tns_alias} @{sql_file}'
+subprocess.run(cmd, shell=True, check=True)
+print("Requête terminée. Lecture du fichier CSV...")
 
-# Nettoyage du dataframe
-df.columns = [col.strip() for col in df.columns]
+if not os.path.exists(input_csv):
+    raise FileNotFoundError(f"Le fichier {input_csv} est introuvable.")
+
+df = pd.read_csv(input_csv, sep=';', skip_blank_lines=True)
+
+# Nettoyage des colonnes
+df.columns = [col.strip().upper() for col in df.columns]
 df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
 if "TYPE_RELATION" not in df.columns:
-    raise ValueError("Le champ TYPE_RELATION est manquant dans le fichier .csv")
+    print("Champ TYPE_RELATION manquant dans le CSV."
+          "Aucune classification détectée, vérifie la requête SQL.")
+else:
+    groupes = df["TYPE_RELATION"].dropna().unique()
 
-groupes = df["TYPE_RELATION"].dropna().unique()
-
-with pd.ExcelWriter(output_excel, engine="xlswriter") as writer:
-    for groupe in groupes:
-        subset = df[df["TYPE_RELATION"] == groupe]
-        subset.to_excel(writer, sheet_name=groupe[:31], index=False)
+    if len(groupes) == 0:
+        print("Aucun type de relation trouvé dans le fichier CSV.")
+    else:
+        with pd.ExcelWriter(output_excel, engine="xlsxwriter") as writer:
+            for groupe in groupes:
+                subset = df[df["TYPE_RELATION"] == groupe]
+                # Limite à 31 caractères pour le nom d'onglet Excel
+                sheet_name = re.sub(r'[^A-Za-z0-9_]', '_', groupe)[:31]
+                subset.to_excel(writer, sheet_name=sheet_name, index=False)
