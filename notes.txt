@@ -117,31 +117,21 @@ rows = []
 for ipp, group in df.groupby('IPP', sort=False):
     g = group.reset_index(drop=True)
     n = len(g)
-    # pour chaque séjour i, on va comparer aux suivants j>i
     for i in range(n):
-        nda1 = g.loc[i,'KYNODA']
-        uma1 = g.loc[i,'UMA']
-        de1 = g.loc[i,'DATE_ENTREE']
-        ds1 = g.loc[i,'DATE_SORTIE']
-        # parcourir j tant que DATE_ENTREE_j <= DATE_SORTIE_i (condition nécessaire pour chevauchement/contiguïté/dupli)
+        nda1, uma1, de1, ds1 = g.loc[i, ['KYNODA','UMA','DATE_ENTREE','DATE_SORTIE']]
         j = i + 1
         while j < n:
             de2 = g.loc[j,'DATE_ENTREE']
-            # si le prochain séjour commence après la sortie (strictement) alors il ne peut pas chevaucher ni être doublon
-            # mais il peut être contigu si de2 == ds1; de2 > ds1 => break
             if pd.isna(de2):
                 j += 1
                 continue
             if de2 > ds1 and de2 != ds1:
                 break
-            nda2 = g.loc[j,'KYNODA']
-            uma2 = g.loc[j,'UMA']
-            ds2 = g.loc[j,'DATE_SORTIE']
-            # skip même NDA
+            nda2, uma2, ds2 = g.loc[j, ['KYNODA','UMA','DATE_SORTIE']]
             if nda1 == nda2:
                 j += 1
                 continue
-            # règles
+            rel = None
             if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
                 rel = "VRAI_DOUBLON"
             elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
@@ -150,11 +140,10 @@ for ipp, group in df.groupby('IPP', sort=False):
                 rel = "CONTIGUS"
             elif (uma1 != uma2) and (de2 <= ds1) and (ds1 <= ds2):
                 rel = "CHEVAUCHEMENT"
-            else:
-                rel = None
             if rel:
                 rows.append({
                     "IPP": ipp,
+                    "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
                     "NDA1": nda1,
                     "UMA1": uma1,
                     "DATEE1": de1,
@@ -167,7 +156,7 @@ for ipp, group in df.groupby('IPP', sort=False):
                 })
             j += 1
 
-res = pd.DataFrame(rows)
+res = pd.DataFrame(rows).drop_duplicates()
 
 # --- éliminer doublons de détection (ex: si plusieurs combinaisons identiques) ---
 if not res.empty:
