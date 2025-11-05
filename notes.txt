@@ -1,178 +1,92 @@
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL sejours_filtrés.csv
-
-SELECT S.KYNOIP AS IPP,
-       E.KYNODA AS NDA,
-       E.CDURM_P AS UMA,
-       E.D8EEUE AS DATE_ENTREE,
-       E.D8SOUE AS DATE_SORTIE
-FROM EPI E, SDO S
-WHERE E.KYNODA = S.KYNODA
-  AND E.CDURM_P IS NOT NULL
-  AND TRIM(E.CDURM_P) <> ''
-  -- plage de dates : de 01/01/2024 à aujourd'hui
-  AND TRUNC(E.D8EEUE) >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND TRUNC(E.D8EEUE) <= TRUNC(SYSDATE)
-  -- ne prendre que les patients ayant >1 séjour dans la même période
-  AND EXISTS (
-      SELECT 1 FROM EPI E2, SDO S2
-      WHERE E2.KYNODA = S2.KYNODA
-        AND S2.KYNOIP = S.KYNOIP
-        AND TRUNC(E2.D8EEUE) >= TO_DATE('01/01/2024','DD/MM/YYYY')
-        AND TRUNC(E2.D8EEUE) <= TRUNC(SYSDATE)
-        AND E2.KYNODA <> E.KYNODA
-  )
-ORDER BY S.KYNOIP, E.D8EEUE;
-
-SPOOL OFF
-EXIT;
-
-import pandas as pd
-import os
-import re
-import getpass
-import subprocess
-
-# --- paramètres (ajuste si besoin) ---
-sql_file = "sejours_filtrés.sql"         # ton fichier .sql qui produit sejours_filtrés.csv
-input_csv = "sejours_filtrés.csv"
-output_excel = "doublons_et_contigus.xlsx"
-
-# --- (optionnel) exécution SQL depuis Python (si tu veux lancer sqlplus ici) ---
-run_sql = False  # mettre True si tu veux lancer sqlplus depuis ce script
-if run_sql:
-    user = input("Utilisateur DB : ")
-    password = getpass.getpass("Mot de passe : ")
-    tns = input("TNS alias : ")
-    cmd = f"sqlplus -s {user}/{password}@{tns} @{sql_file}"
-    subprocess.run(cmd, shell=True, check=True)
-
-# --- vérification fichier ---
-if not os.path.exists(input_csv):
-    raise FileNotFoundError(f"Fichier attendu introuvable : {input_csv}")
-
-# --- lecture CSV (tolérant aux en-têtes manquants) ---
-# on essaie d'abord avec header=0 ; si header incorrect on réassigne
-try:
-    df = pd.read_csv(input_csv, sep=';', skip_blank_lines=True, dtype=str)
-except Exception as e:
-    raise RuntimeError("Erreur lecture CSV: " + str(e))
-
-df = df.dropna(how='all')  # lignes complètement vides supprimées
-df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
-
-# Si pas d'en-têtes valides (par ex les colonnes sont 'COL1','COL2',...), on force les noms attendus
-expected_cols = ["IPP","NDA","UMA","DATE_ENTREE","DATE_SORTIE"]
-if len(df.columns) != len(expected_cols) or not any(c.upper() in ["IPP","NDA","UMA"] for c in df.columns):
-    # Attribution manuelle si nombre de colonnes correspond
-    if df.shape[1] >= len(expected_cols):
-        df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1]-len(expected_cols))]
-    else:
-        raise ValueError("Le CSV n'a pas le nombre de colonnes attendu. Vérifie la requête SQL.")
-
-# Normalise noms colonnes
-df.columns = [c.strip().upper() for c in df.columns]
-df = df.rename(columns={"NDA":"KYNODA","DATE_ENTREE":"DATE_ENTREE","DATE_SORTIE":"DATE_SORTIE","UMA":"UMA","IPP":"IPP"})
-
-# --- conversion des dates ---
-def parse_date_safe(x):
-    if pd.isna(x):
-        return pd.NaT
-    if isinstance(x, pd.Timestamp):
-        return x
-    s = str(x).strip()
-    if s == '':
-        return pd.NaT
-    # essai formats fréquents
-    for fmt in ("%Y-%m-%d","%d/%m/%Y","%d-%m-%Y","%Y/%m/%d"):
-        try:
-            return pd.to_datetime(s, format=fmt)
-        except Exception:
-            pass
-    # fallback flex
-    try:
-        return pd.to_datetime(s, dayfirst=True, errors='coerce')
-    except:
-        return pd.NaT
-
-df['DATE_ENTREE'] = df['DATE_ENTREE'].apply(parse_date_safe)
-df['DATE_SORTIE'] = df['DATE_SORTIE'].apply(parse_date_safe)
-
-# supprimer lignes sans dates ou sans UMA
-df = df.dropna(subset=['DATE_ENTREE','DATE_SORTIE','UMA','IPP'])
-df['KYNODA'] = df['KYNODA'].astype(str)
-
-# tri par IPP puis date entrée
-df = df.sort_values(['IPP','DATE_ENTREE','DATE_SORTIE']).reset_index(drop=True)
-
-# --- détection efficace des relations ---
-rows = []
-for ipp, group in df.groupby('IPP', sort=False):
-    g = group.reset_index(drop=True)
-    n = len(g)
-    for i in range(n):
-        nda1, uma1, de1, ds1 = g.loc[i, ['KYNODA','UMA','DATE_ENTREE','DATE_SORTIE']]
-        j = i + 1
-        while j < n:
-            de2 = g.loc[j,'DATE_ENTREE']
-            if pd.isna(de2):
-                j += 1
-                continue
-            if de2 > ds1 and de2 != ds1:
-                break
-            nda2, uma2, ds2 = g.loc[j, ['KYNODA','UMA','DATE_SORTIE']]
-            if nda1 == nda2:
-                j += 1
-                continue
-            rel = None
-            if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                rel = "VRAI_DOUBLON"
-            elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                rel = "DOUBLON_0_NUIT"
-            elif (uma1 != uma2) and (ds1 == de2):
-                rel = "CONTIGUS"
-            elif (uma1 != uma2) and (de2 <= ds1) and (ds1 <= ds2):
-                rel = "CHEVAUCHEMENT"
-            if rel:
-                rows.append({
-                    "IPP": ipp,
-                    "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
-                    "NDA1": nda1,
-                    "UMA1": uma1,
-                    "DATEE1": de1,
-                    "DATES1": ds1,
-                    "NDA2": nda2,
-                    "UMA2": uma2,
-                    "DATEE2": de2,
-                    "DATES2": ds2,
-                    "TYPE_RELATION": rel
-                })
-            j += 1
-
-res = pd.DataFrame(rows).drop_duplicates()
-
-# --- éliminer doublons de détection (ex: si plusieurs combinaisons identiques) ---
-if not res.empty:
-    res = res.drop_duplicates()
-
-# --- export Excel en 4 onglets ---
-with pd.ExcelWriter(output_excel, engine="xlsxwriter") as writer:
-    for groupe in ["VRAI_DOUBLON","DOUBLON_0_NUIT","CONTIGUS","CHEVAUCHEMENT"]:
-        subset = res[res['TYPE_RELATION'] == groupe]
-        # si vide, on écrit une feuille vide avec en-têtes
-        if subset.empty:
-            # crée un df vide avec colonnes attendues
-            pd.DataFrame(columns=["IPP","NDA1","UMA1","DATEE1","DATES1","NDA2","UMA2","DATEE2","DATES2","TYPE_RELATION"]).to_excel(writer, sheet_name=groupe[:31], index=False)
-        else:
-            subset.to_excel(writer, sheet_name=groupe[:31], index=False)
-
-print("Fini. L'export Excel est :", output_excel)
-print("Nombre total de relations détectées :", len(res))
-
+-- SET LINESIZE 32767
+-- SET HEADING ON
+-- SET COLSEP ";"
+-- SET PAGESIZE 0
+-- SET FEEDBACK OFF
+-- SET TRIMSPOOL ON
+-- SET WRAP OFF
+-- SET TERMOUT OFF
+-- SPOOL resultat.csv
+-- SELECT DISTINCT S1.KYNOIP AS IPP,
+--        E1.KYNODA AS KYNODA1,
+--        E2.KYNODA AS KYNODA2,
+--        E1.CDURM_P AS UMA1,
+--        E2.CDURM_P AS UMA2,
+--        E1.D8EEUE AS DATEE1,
+--        E2.D8EEUE AS DATEE2,
+--        E1.D8SOUE AS DATES1,
+--        E2.D8SOUE AS DATES2,
+--        'VRAI_DOUBLON' AS TYPE_RELATION
+-- FROM EPI E1, EPI E2, SDO S1, SDO S2
+-- WHERE E1.KYNODA = S1.KYNODA
+--   AND E2.KYNODA = S2.KYNODA
+--   AND S1.KYNOIP = S2.KYNOIP
+--   AND E1.KYNODA < E2.KYNODA
+--   AND E1.CDURM_P = E2.CDURM_P
+--   AND E1.D8EEUE = E2.D8EEUE
+--   AND E1.D8SOUE = E2.D8SOUE
+--   AND E1.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+--   AND E1.D8SOUE <= TRUNC(SYSDATE);
+-- UNION ALL
+-- SELECT DISTINCT S1.KYNOIP AS IPP,
+--        E1.KYNODA AS KYNODA1,
+--        E2.KYNODA AS KYNODA2,
+--        E1.CDURM_P AS UMA1,
+--        E2.CDURM_P AS UMA2,
+--        E1.D8EEUE AS DATEE1,
+--        E2.D8EEUE AS DATEE2,
+--        E1.D8SOUE AS DATES1,
+--        E2.D8SOUE AS DATES2,
+--        'DOUBLON_0_NUIT' AS TYPE_RELATION
+-- FROM EPI E1, EPI E2, SDO S1, SDO S2
+-- WHERE E1.KYNODA = S1.KYNODA
+--   AND E2.KYNODA = S2.KYNODA
+--   AND S1.KYNOIP = S2.KYNOIP
+--   AND E1.KYNODA < E2.KYNODA
+--   AND E1.CDURM_P <> E2.CDURM_P
+--   AND E1.D8EEUE = E2.D8EEUE
+--   AND E1.D8SOUE = E2.D8SOUE
+--   AND E1.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+--   AND E1.D8SOUE <= TRUNC(SYSDATE);
+-- UNION ALL
+-- SELECT DISTINCT S1.KYNOIP AS IPP,
+--        E1.KYNODA AS KYNODA1,
+--        E2.KYNODA AS KYNODA2,
+--        E1.CDURM_P AS UMA1,
+--        E2.CDURM_P AS UMA2,
+--        E1.D8EEUE AS DATEE1,
+--        E2.D8EEUE AS DATEE2,
+--        E1.D8SOUE AS DATES1,
+--        E2.D8SOUE AS DATES2,
+--        'CONTIGUS' AS TYPE_RELATION
+-- FROM EPI E1, EPI E2, SDO S1, SDO S2
+-- WHERE E1.KYNODA = S1.KYNODA
+--   AND E2.KYNODA = S2.KYNODA
+--   AND S1.KYNOIP = S2.KYNOIP
+--   AND E1.KYNODA < E2.KYNODA
+--   AND E1.CDURM_P <> E2.CDURM_P
+--   AND E1.D8SOUE = E2.D8EEUE
+--   AND E1.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+--   AND E1.D8SOUE <= TRUNC(SYSDATE);
+-- UNION ALL
+-- SELECT DISTINCT S1.KYNOIP AS IPP,
+--        E1.KYNODA AS KYNODA1,
+--        E2.KYNODA AS KYNODA2,
+--        E1.CDURM_P AS UMA1,
+--        E2.CDURM_P AS UMA2,
+--        E1.D8EEUE AS DATEE1,
+--        E2.D8EEUE AS DATEE2,
+--        E1.D8SOUE AS DATES1,
+--        E2.D8SOUE AS DATES2,
+--        'CHEVAUCHEMENT' AS TYPE_RELATION
+-- FROM EPI E1, EPI E2, SDO S1, SDO S2
+-- WHERE E1.KYNODA = S1.KYNODA
+--   AND E2.KYNODA = S2.KYNODA
+--   AND S1.KYNOIP = S2.KYNOIP
+--   AND E1.KYNODA < E2.KYNODA
+--   AND E1.CDURM_P <> E2.CDURM_P
+--   AND E1.D8SOUE BETWEEN E2.D8EEUE + 1 AND E2.D8SOUE
+--   AND E1.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+--   AND E1.D8SOUE <= TRUNC(SYSDATE);
+-- SPOOL OFF
+-- EXIT;
