@@ -1,25 +1,135 @@
+---
+title: "generate_vidhosp_files_a_partir_Anohosp"
+author: "Octavien KPADEMONA YAMESSE"
+date: "2024-10-31"
+output: html_document
+---
+
+```{r}
+---
+  title: "Création des fichiers VIDHOSP"
+author: "Votre Nom"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# METTRE LES 4 FICHIERS DES 4 SITES A LA RACINE //wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR"
+# CONTROLE A POUR TOUT SELECTIONNER ET CONTROLE ENTREE POUR EXECUTER ET GENERER LES 4 FICHIERS VIDHOSP  
+  
+  
+# Chargement des bibliothèques nécessaires
+library(dplyr)
 library(stringr)
 library(readr)
 
-# Liste des fichiers à tester
-fichiers <- c("SSR16_Anohosp.fic", "SSR22_Anohosp.fic", "SSR90_Anohosp.fic")
+# Définir le répertoire de travail
+print(getwd())
+setwd("//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR")
 
-# Boucle sur chaque fichier
-for (fichier in fichiers) {
-  cat("\n📄 Fichier :", fichier, "\n")
+# Constantes pour les FINESSES
+FINESSES <- list(
+  "21" = c("750100166", "CCH"),
+  "16" = c("750801441", "BRC"),
+  "90" = c("750100216", "VGR"),
+  "22" = c("920100062", "CCL")
+)
+
+# Fonction pour lire le fichier ANOHOSP
+read_file <- function(file_path) {
+  read_lines(file_path)
+}
+
+# Fonction pour extraire les champs des lignes ANOHOSP
+extract_fields <- function(ano) {
+  list(
+    regime = substr(ano, 141, 142),
+    gestion = substr(ano, 143, 144),
+    ddn = substr(ano, 248, 255),
+    nas = substr(ano, 41, 60),
+    format = paste0("V", substr(ano, 17, 19)),
+    exo_a_montant_amc = substr(ano, 145, 247),
+    participation_a_centre_gestion = substr(ano, 257, 277),
+    sexe = ifelse(substr(ano, 256, 256) %in% c("1", "2"), substr(ano, 256, 256), "1"),
+    annee_ddn = substr(ano, 254, 255),
+    mois_ddn = substr(ano, 250, 251),
+    ipp_cropped = substr(ano, 403, 410),
+    confirmation_pc_a_ipp = substr(ano, 278, 420)
+  )
+}
+# Calcul de la clé d'assurance maladie fictive
+ano_cle <- function(num_secu) {
+  sprintf("%02d", 97 - as.numeric(num_secu) %% 97)
+}
+# Fonction principale pour créer VIDHOSP à partir d'ANOHOSP
+anohosp_to_vidhosp <- function(site, anohosp_data) {
+  anohosp_data <- str_trim(anohosp_data)
+  anohosp_data <- anohosp_data[str_detect(anohosp_data, "^[38]"), drop = FALSE]
   
-  if (!file.exists(fichier)) {
-    cat("⚠️ Fichier introuvable\n")
-    next
+  if (length(anohosp_data) == 0) {
+    stop("Aucune ligne trouvée correspondant aux critères. Vérifiez le fichier ANOHOSP.")
   }
   
-  # Lire les lignes
-  lignes <- read_lines(fichier)
-  lignes <- str_trim(lignes)
+  vid <- data.frame(anohosp = anohosp_data)
   
-  # Extraire le format (positions 17 à 19)
-  formats <- sapply(lignes, function(x) paste0("V", substr(x, 17, 19)))
+  vid$format <- sapply(vid$anohosp, function(x) extract_fields(x)$format)
+  vid$fake_num_am <- mapply(function(sexe, annee, mois, ipp) paste0(sexe, annee, mois, ipp),
+                            sexe = sapply(vid$anohosp, function(x) extract_fields(x)$sexe),
+                            annee = sapply(vid$anohosp, function(x) extract_fields(x)$annee_ddn),
+                            mois = sapply(vid$anohosp, function(x) extract_fields(x)$mois_ddn),
+                            ipp = sapply(vid$anohosp, function(x) extract_fields(x)$ipp_cropped))
   
-  # Afficher la distribution des formats
-  print(table(formats))
+  vid$cle <- sapply(vid$fake_num_am, ano_cle)
+  vid$regime <- sapply(vid$anohosp, function(x) extract_fields(x)$regime)
+  vid$gestion <- sapply(vid$anohosp, function(x) extract_fields(x)$gestion)
+  vid$ddn <- sapply(vid$anohosp, function(x) extract_fields(x)$ddn)
+  vid$sexe <- sapply(vid$anohosp, function(x) extract_fields(x)$sexe)
+  vid$nas <- sapply(vid$anohosp, function(x) extract_fields(x)$nas)
+  vid$filler <- str_pad("", 30)
+  vid$finess <- FINESSES[[site]][1]
+  vid$exo_a_montant_amc <- sapply(vid$anohosp, function(x) extract_fields(x)$exo_a_montant_amc)
+  vid$participation_a_centre_gestion <- sapply(vid$anohosp, function(x) extract_fields(x)$participation_a_centre_gestion)
+  vid$confirmation_pc_a_ipp <- sapply(vid$anohosp, function(x) extract_fields(x)$confirmation_pc_a_ipp)
+  vid$art51 <- str_pad("", 1)
+  
+  # Création de VIDHOSP
+  vid$raw <- ifelse(vid$format == "V013",
+                    paste0(vid$fake_num_am, vid$cle, vid$regime, vid$gestion, vid$ddn,
+                           vid$sexe, vid$nas, vid$format, vid$finess, vid$fake_num_am,
+                           vid$cle, vid$exo_a_montant_amc, vid$participation_a_centre_gestion,
+                           vid$filler, vid$confirmation_pc_a_ipp),
+                    paste0(vid$fake_num_am, vid$cle, vid$regime, vid$gestion, vid$ddn,
+                           vid$sexe, vid$nas, vid$format, vid$finess, vid$fake_num_am,
+                           vid$cle, vid$exo_a_montant_amc, vid$participation_a_centre_gestion,
+                           vid$filler, vid$confirmation_pc_a_ipp, vid$fake_num_am,
+                           vid$cle, vid$art51))
+  
+  vid <- vid[vid$format %in% c("V013", "V014", "V015"), ]
+  
+  if (nrow(vid) == 0) {
+    stop("Aucune ligne ne correspond aux formats V013 ou V014 après le filtrage.")
+  }
+  
+  return(vid)
 }
+
+# Fonction pour créer un fichier VIDHOSP pour un site donné
+create_vidhosp <- function(site, anohosp_file_path) {
+  anohosp_data <- read_file(anohosp_file_path)
+  vid <- anohosp_to_vidhosp(site, anohosp_data)
+  
+  output_name <- paste0(site, "_VIDHOSP_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".txt")
+  write_lines(vid$raw, output_name)
+  message("Fichier VIDHOSP créé : ", output_name)
+}
+# Fonction pour créer les fichiers VIDHOSP pour tous les sites définis dans FINESSES
+create_all_vidhosp_files <- function() {
+  lapply(names(FINESSES), function(site) {
+    anohosp_file_path <- paste0("SSR", site, "_Anohosp.fic")
+    create_vidhosp(site, anohosp_file_path)
+  })
+}
+
+# Exécution de la fonction pour générer tous les fichiers VIDHOSP
+create_all_vidhosp_files()
+
+# FIN DE TRAITEMENT 
+```
