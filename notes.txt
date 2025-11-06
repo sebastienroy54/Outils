@@ -1,25 +1,25 @@
----
-title: "Test formats ANOHOSP"
-author: "Test"
-date: "`r Sys.Date()`"
-output: html_document
----
-
-```{r}
 library(stringr)
 library(readr)
 
-# Remplace par le chemin réel de ton fichier de test
-fichier <- "SSR22_Anohosp.fic"
+# Liste des fichiers à tester
+fichiers <- c("SSR16_Anohosp.fic", "SSR22_Anohosp.fic", "SSR90_Anohosp.fic")
 
-# Lire le fichier
-lignes <- read_lines(fichier)
-
-# Supprimer les espaces en début/fin de ligne
-lignes <- str_trim(lignes)
-
-# Extraire le champ format (positions 17 à 19)
-formats <- sapply(lignes, function(x) paste0("V", substr(x, 17, 19)))
-
-# Afficher la distribution des formats
-table(formats)
+# Boucle sur chaque fichier
+for (fichier in fichiers) {
+  cat("\n📄 Fichier :", fichier, "\n")
+  
+  if (!file.exists(fichier)) {
+    cat("⚠️ Fichier introuvable\n")
+    next
+  }
+  
+  # Lire les lignes
+  lignes <- read_lines(fichier)
+  lignes <- str_trim(lignes)
+  
+  # Extraire le format (positions 17 à 19)
+  formats <- sapply(lignes, function(x) paste0("V", substr(x, 17, 19)))
+  
+  # Afficher la distribution des formats
+  print(table(formats))
+}
