@@ -1,21 +1,6 @@
-# --- TEST MULTI-FICHIERS : Vérifier le 1er caractère pour les 4 sites -----
+📄 Fichier : SSR22_Anohosp.fic 
+Nombre total de lignes : 2194 
+Distribution du premier caractère :
 
-fichiers <- c("SSR21_Anohosp.fic", "SSR16_Anohosp.fic", "SSR22_Anohosp.fic", "SSR90_Anohosp.fic")
-
-for (fic in fichiers) {
-  cat("\n==============================================\n")
-  cat("📄 Fichier :", fic, "\n")
-  if (!file.exists(fic)) {
-    cat("⚠️  Fichier introuvable.\n")
-  } else {
-    lignes <- read_lines(fic, locale = locale(encoding = "latin1"))
-    cat("Nombre total de lignes :", length(lignes), "\n")
-    if (length(lignes) > 0) {
-      cat("Distribution du premier caractère :\n")
-      print(table(substr(lignes, 1, 1)))
-      cat("Exemples :\n")
-      print(head(lignes, 2))
-    }
-  }
-}
-cat("\n✅ Fin du test multi-fichiers.\n")
+        3 
+   1 2193 
