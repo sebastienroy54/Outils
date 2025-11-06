@@ -1,10 +1,24 @@
-if res.empty:
-    pd.DataFrame([{col: "N/A" for col in cols}]).to_excel(output_excel, index=False)
 else:
     with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-        for groupe in ["VRAI_DOUBLON","DOUBLON_0_NUIT","CONTIGUS","CHEVAUCHEMENT"]:
+        for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
             subset = res[res["TYPE_RELATION"] == groupe]
+
             if subset.empty:
-                pd.DataFrame([{col: "N/A" for col in cols}]).to_excel(writer, sheet_name=groupe[:31], index=False)
+                df_to_write = pd.DataFrame([{col: "N/A" for col in cols}])
             else:
-                subset.to_excel(writer, sheet_name=groupe[:31], index=False)
+                df_to_write = subset
+
+            # Écrire dans la feuille
+            df_to_write.to_excel(writer, sheet_name=groupe[:31], index=False)
+
+            # --- Ajustement automatique des largeurs ---
+            worksheet = writer.sheets[groupe[:31]]
+            for i, col in enumerate(df_to_write.columns):
+                # Trouve la longueur max entre nom de colonne et valeurs
+                max_len = max(
+                    df_to_write[col].astype(str).map(len).max(),
+                    len(col)
+                ) + 2  # petite marge
+                worksheet.column_dimensions[
+                    worksheet.cell(row=1, column=i + 1).column_letter
+                ].width = max_len
