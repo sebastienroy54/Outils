@@ -1,72 +1,21 @@
----
-title: "Diagnostic lecture fichier ANOHOSP"
-output: html_document
----
+# --- TEST MULTI-FICHIERS : Vérifier le 1er caractère pour les 4 sites -----
 
-```{r}
-# --- CONFIGURATION ----------------------------------------------------------
+fichiers <- c("SSR21_Anohosp.fic", "SSR16_Anohosp.fic", "SSR22_Anohosp.fic", "SSR90_Anohosp.fic")
 
-# ⚠️ Remplace ce chemin par le tien :
-fichier <- "SSR21_Anohosp.fic"   # ou le nom exact du fichier à tester
-
-# Si le fichier est dans le même dossier que ce script :
-# fichier <- "./SSR21_Anohosp.fic"
-
-# --- CHARGEMENT DES PACKAGES -----------------------------------------------
-library(readr)
-library(stringr)
-
-# --- TEST 1 : Vérifier que le fichier est visible --------------------------
-cat("📁 Répertoire de travail :", getwd(), "\n")
-cat("📄 Fichier existe :", file.exists(fichier), "\n")
-cat("ℹ️ Informations sur le fichier :\n")
-print(file.info(fichier))
-
-# --- TEST 2 : Lecture simple du fichier -----------------------------------
-cat("\n--- Lecture avec read_lines (encodage par défaut) ---\n")
-anohosp1 <- read_lines(fichier)
-cat("Nombre de lignes lues :", length(anohosp1), "\n")
-
-if (length(anohosp1) > 0) {
-  cat("\nPremières lignes :\n")
-  print(head(anohosp1, 3))
+for (fic in fichiers) {
+  cat("\n==============================================\n")
+  cat("📄 Fichier :", fic, "\n")
+  if (!file.exists(fic)) {
+    cat("⚠️  Fichier introuvable.\n")
+  } else {
+    lignes <- read_lines(fic, locale = locale(encoding = "latin1"))
+    cat("Nombre total de lignes :", length(lignes), "\n")
+    if (length(lignes) > 0) {
+      cat("Distribution du premier caractère :\n")
+      print(table(substr(lignes, 1, 1)))
+      cat("Exemples :\n")
+      print(head(lignes, 2))
+    }
+  }
 }
-
-# --- TEST 3 : Lecture avec encodage latin1 --------------------------------
-cat("\n--- Lecture avec locale(encoding='latin1') ---\n")
-anohosp2 <- read_lines(fichier, locale = locale(encoding = "latin1"))
-cat("Nombre de lignes lues :", length(anohosp2), "\n")
-
-if (length(anohosp2) > 0) {
-  print(head(anohosp2, 3))
-}
-
-# --- TEST 4 : Vérifier le premier caractère de chaque ligne ---------------
-if (length(anohosp2) > 0) {
-  cat("\n--- Comptage du premier caractère par ligne ---\n")
-  print(table(substr(anohosp2, 1, 1)))
-}
-
-# --- TEST 5 : Vérifier si BOM UTF-8 présent -------------------------------
-if (length(anohosp2) > 0) {
-  cat("\n--- Octets du début de la première ligne ---\n")
-  print(charToRaw(substr(anohosp2[1], 1, 5)))
-}
-
-# --- TEST 6 : Vérifier les lignes commençant par '8' ----------------------
-if (length(anohosp2) > 0) {
-  lignes_8 <- anohosp2[str_detect(anohosp2, "^8")]
-  cat("\nNombre de lignes commençant exactement par '8' :", length(lignes_8), "\n")
-  
-  lignes_8_trim <- anohosp2[str_detect(str_trim(anohosp2), "^8")]
-  cat("Nombre de lignes commençant par '8' après trim :", length(lignes_8_trim), "\n")
-}
-
-# --- TEST 7 : Version du package readr ------------------------------------
-cat("\n--- Version du package readr ---\n")
-print(packageVersion("readr"))
-
-# --- CONCLUSION ------------------------------------------------------------
-cat("\n✅ Si un des tests ci-dessus renvoie 0 lignes lues ou 0 lignes commençant par '8',\n")
-cat("   cela signifie que le problème vient de l'encodage, d'un BOM ou du chemin réseau.\n")
-cat("   Le test des octets (TEST 5) te dira si un BOM est présent : EF BB BF = BOM UTF-8.\n")
+cat("\n✅ Fin du test multi-fichiers.\n")
