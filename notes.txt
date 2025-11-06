@@ -1,6 +1,25 @@
-📄 Fichier : SSR22_Anohosp.fic 
-Nombre total de lignes : 2194 
-Distribution du premier caractère :
+---
+title: "Test formats ANOHOSP"
+author: "Test"
+date: "`r Sys.Date()`"
+output: html_document
+---
 
-        3 
-   1 2193 
+```{r}
+library(stringr)
+library(readr)
+
+# Remplace par le chemin réel de ton fichier de test
+fichier <- "SSR22_Anohosp.fic"
+
+# Lire le fichier
+lignes <- read_lines(fichier)
+
+# Supprimer les espaces en début/fin de ligne
+lignes <- str_trim(lignes)
+
+# Extraire le champ format (positions 17 à 19)
+formats <- sapply(lignes, function(x) paste0("V", substr(x, 17, 19)))
+
+# Afficher la distribution des formats
+table(formats)
