@@ -1,18 +1,4 @@
-library(stringr)
-library(readr)
-
-# Lire le fichier
-file_path <- "SSR22_Anohosp.fic"
-lines <- read_lines(file_path)
-
-# Fonction pour extraire le format
-extract_format <- function(line) {
-  fmt <- substr(line, 17, 19)
-  paste0("V", str_trim(fmt))
-}
-
-# Appliquer à toutes les lignes
-formats <- sapply(lines, extract_format)
-
-# Trouver l'indice (numéro de ligne) correspondant à "V" seul
-which(formats == "V")
+> which(formats == "V")
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    893 
+> 
