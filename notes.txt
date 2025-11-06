@@ -1,56 +1,10 @@
----
-title: "formatage_FICHCOMP_MO_SSR"
-author: "B.FUCHS"
-date: "28/02/2022"
-output: html_document
----
-
-```{r}
-####### FORMATAGE DES FICHCOMP MO SSR POUR IMPORT DANS PMSIPilot ###############
-
-# Loading libraries
-library(tidyverse)
-library(data.table)
-
-####### ********** A PARAMETRER ************#############
-# //cch-srvnas/data/informatique medicale/PMSIPILOT/Remontee_ATIH/SSR
-
-chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR"
-
-
-####### ********** A PARAMETRER SI MODIFICATION DU FORMAT ************#############
-ligne.stop = 104
-
-
-####### ********** IMPORT ************#############
-setwd(dir = chemin)
-SSR16_MO  <- fread("SSR16_MO.fic", sep = NULL, header = FALSE, colClasses = "character", strip.white = FALSE)
-SSR21_MO  <- fread("SSR21_MO.fic", sep = NULL, header = FALSE, colClasses = "character", strip.white = FALSE)
-SSR22_MO  <- fread("SSR22_MO.fic", sep = NULL, header = FALSE, colClasses = "character", strip.white = FALSE)
-SSR90_MO  <- fread("SSR22_MO.fic", sep = NULL, header = FALSE, colClasses = "character", strip.white = FALSE)
-
-
-####### ********** FORMATAGE ************#############
-
-myFunction <- function(x){
- x$V1 <-  paste(x$V1,"         ",sep = "")
- x$V1 <- substr(x$V1,1,ligne.stop)
- return(x)
-} 
-
-SSR16_MO  <- SSR16_MO  %>% myFunction()
-SSR21_MO  <- SSR21_MO  %>% myFunction()
-SSR22_MO  <- SSR22_MO  %>% myFunction()
-SSR90_MO  <- SSR22_MO  %>% myFunction()
-
-
-####### ********** EXPORT ************#############
-
-write(unlist(SSR16_MO), file = "SSR16_MO-corrige.fic")
-write(unlist(SSR21_MO), file = "SSR21_MO-corrige.fic")
-write(unlist(SSR22_MO), file = "SSR22_MO-corrige.fic")
-write(unlist(SSR90_MO), file = "SSR22_MO-corrige.fic")
-
-####### ********** FIN ************#############
-```
-
+if res.empty:
+    pd.DataFrame([{col: "N/A" for col in cols}]).to_excel(output_excel, index=False)
+else:
+    with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
+        for groupe in ["VRAI_DOUBLON","DOUBLON_0_NUIT","CONTIGUS","CHEVAUCHEMENT"]:
+            subset = res[res["TYPE_RELATION"] == groupe]
+            if subset.empty:
+                pd.DataFrame([{col: "N/A" for col in cols}]).to_excel(writer, sheet_name=groupe[:31], index=False)
+            else:
+                subset.to_excel(writer, sheet_name=groupe[:31], index=False)
