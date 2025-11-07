@@ -117,4 +117,35 @@ if submitted:
         cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "DATEE1", "DATES1", "NDA2", "UMA2", "DATEE2", "DATES2"]
 
         # Sauvegarde Excel
-        with pd.ExcelWriter(OUTPUT
+        with pd.ExcelWriter(OUTPUT_PATH, engine='openpyxl') as writer:
+            for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
+                subset = res[res["TYPE_RELATION"] == groupe].drop(columns=["TYPE_RELATION"], errors='ignore')
+
+                if subset.empty:
+                    df_to_write = pd.DataFrame([{col: "N/A" for col in cols}])
+                else:
+                    df_to_write = subset.copy()
+                    for c in ["DATEE1", "DATES1", "DATEE2", "DATES2"]:
+                        df_to_write[c] = pd.to_datetime(df_to_write[c], errors='coerce').dt.strftime("%d/%m/%Y")
+
+                df_to_write.to_excel(writer, sheet_name=groupe[:31], index=False)
+
+                worksheet = writer.sheets[groupe[:31]]
+                for i, col in enumerate(df_to_write.columns):
+                    max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
+                    worksheet.column_dimensions[
+                        worksheet.cell(row=1, column=i + 1).column_letter
+                    ].width = max_len
+
+    st.success("✅ Analyse terminée avec succès !")
+
+    # =============================
+    # TÉLÉCHARGEMENT DU FICHIER
+    # =============================
+    with open(OUTPUT_PATH, "rb") as f:
+        st.download_button(
+            label="📥 Télécharger le fichier Excel",
+            data=f,
+            file_name=f"doublons_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
