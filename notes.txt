@@ -1,134 +1,120 @@
-import subprocess
-import getpass
-import os
+import streamlit as st
 import pandas as pd
-import re
+import subprocess
+import os
+from io import BytesIO
+from datetime import datetime
 
-# Chemin de la requête SQL à modifier si nécessaire
-sql_file = "contigus.sql"
+# =============================
+# CONFIGURATION
+# =============================
+SQL_PATH = "Portail_outils/SQL/contigus.sql"
+CSV_PATH = "Portail_outils/data/resultat.csv"
+OUTPUT_PATH = "Portail_outils/data/doublons.xlsx"
 
-input_csv = "resultat.csv"
-output_excel = "doublons.xlsx"
+st.set_page_config(page_title="Analyse des Séjours Contigus & Doublons", layout="centered")
 
-# Exécution de la requête SQL
-tmp = False
-if tmp:
-    # Identification pour accès à la base de données
-    user = input("Veuillez entrer le nom d'utilisateur : ")
-    password = getpass.getpass("Mot de passe : ")
-    tns_alias = "SIP1CCH.WORLD"
+st.title("🔍 Détection des Doublons, Contigus et Chevauchements")
+st.markdown("Cet outil exécute la requête SQL, analyse les séjours et génère un fichier Excel structuré.")
 
-    print("\nExécution de la requête SQL, veuillez patienter...")
-    cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
-    subprocess.run(
-        cmd,
-        shell=True
-    )
-    print("------------------------------------------------------------------------------------")
-    print("\nRequête terminée. Lecture du fichier .csv...")
-    print("\n------------------------------------------------------------------------------------")
+# =============================
+# FORMULAIRE DE CONNEXION
+# =============================
+with st.form("connexion"):
+    st.subheader("Connexion Oracle")
+    user = st.text_input("👤 Nom d'utilisateur Oracle :", value="", placeholder="ex: SIP_USER")
+    password = st.text_input("🔑 Mot de passe :", type="password")
+    execute_sql = st.checkbox("Exécuter la requête SQL avant analyse", value=False)
+    submitted = st.form_submit_button("🚀 Lancer le traitement")
 
-if not os.path.exists(input_csv):
-    raise FileNotFoundError(f"Le fichier {input_csv} n'existe pas")
+if submitted:
+    if not user or not password:
+        st.error("Veuillez renseigner vos identifiants Oracle.")
+        st.stop()
 
-try:
-    df = pd.read_csv(input_csv, sep=';', skip_blank_lines=True)
-except UnicodeDecodeError:
-    df = pd.read_csv(input_csv, sep=';', skip_blank_lines=True, dtype=str, encoding='ISO-8859-1')
+    # =============================
+    # EXÉCUTION DE LA REQUÊTE SQL
+    # =============================
+    if execute_sql:
+        with st.spinner("🧠 Exécution de la requête SQL, veuillez patienter..."):
+            tns_alias = "SIP1CCH.WORLD"
+            cmd = f'sqlplus {user}/{password}@{tns_alias} @{SQL_PATH}'
+            subprocess.run(cmd, shell=True)
+        st.success("✅ Requête SQL terminée et fichier CSV généré.")
+        st.divider()
 
-# Nettoyage du dataframe
-df = df.dropna(how='all')
-df.columns = [col.strip() for col in df.columns]
-df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    if not os.path.exists(CSV_PATH):
+        st.error(f"❌ Le fichier {CSV_PATH} n'existe pas. Veuillez exécuter la requête SQL.")
+        st.stop()
 
-expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]
-if df.shape[1] >= len(expected_cols):
-    df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1]-len(expected_cols))]
-else:
-    raise ValueError(f"Colonnes inattendues ({len(df.columns)} trouvées, attendu {len(expected_cols)})")
+    # =============================
+    # ANALYSE PYTHON
+    # =============================
+    with st.spinner("🔎 Analyse des séjours en cours..."):
+        df = pd.read_csv(CSV_PATH, sep=';', skip_blank_lines=True, dtype=str)
+        df = df.dropna(how='all')
+        df.columns = [col.strip().upper() for col in df.columns]
 
-df.columns = [c.strip().upper() for c in df.columns]
+        expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]
+        if df.shape[1] >= len(expected_cols):
+            df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
 
-df['IPP'] = df['IPP'].astype(str).str.strip()
-df['UMA'] = df['UMA'].astype(str).str.strip()
-df['NDA'] = df['NDA'].astype(str).str.strip()
-df['DATE_ENTREE'] = pd.to_datetime(df['DATE_ENTREE'], dayfirst=True, errors='coerce')
-df['DATE_SORTIE'] = pd.to_datetime(df['DATE_SORTIE'], dayfirst=True, errors='coerce')
+        df['IPP'] = df['IPP'].astype(str).str.strip()
+        df['UMA'] = df['UMA'].astype(str).str.strip()
+        df['NDA'] = df['NDA'].astype(str).str.strip()
+        df['DATE_ENTREE'] = pd.to_datetime(df['DATE_ENTREE'], dayfirst=True, errors='coerce')
+        df['DATE_SORTIE'] = pd.to_datetime(df['DATE_SORTIE'], dayfirst=True, errors='coerce')
 
-df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
-df["NDA"] = df["NDA"].astype(str)
-df = df.sort_values(['IPP','DATE_ENTREE','DATE_SORTIE']).reset_index(drop=True)
+        df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
+        df = df.sort_values(['IPP', 'DATE_ENTREE', 'DATE_SORTIE']).reset_index(drop=True)
 
-rows = []
-for ipp, group in df.groupby('IPP', sort=False):
-    g = group.reset_index(drop=True)
-    n = len(g)
-    for i in range(n):
-        nda1, uma1, de1, ds1 = g.loc[i, ['NDA','UMA','DATE_ENTREE','DATE_SORTIE']]
-        j = i + 1
-        while j < n:
-            de2 = g.loc[j,'DATE_ENTREE']
-            if pd.isna(de2):
-                j += 1
-                continue
-            if de2 > ds1 and de2 != ds1:
-                break
-            nda2, uma2, ds2 = g.loc[j, ['NDA','UMA','DATE_SORTIE']]
-            if nda1 == nda2:
-                j += 1
-                continue
-            rel = None
-            if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                rel = "VRAI_DOUBLON"
-            elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                rel = "DOUBLON_0_NUIT"
-            elif (uma1 != uma2) and (ds1 == de2) or (ds2 == de1):
-                rel = "CONTIGUS"
-            elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
-                rel = "CHEVAUCHEMENT"
-            if rel:
-                rows.append({
-                    "IPP": ipp,
-                    "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
-                    "NDA1": nda1,
-                    "UMA1": uma1,
-                    "DATEE1": de1,
-                    "DATES1": ds1,
-                    "NDA2": nda2,
-                    "UMA2": uma2,
-                    "DATEE2": de2,
-                    "DATES2": ds2,
-                    "TYPE_RELATION": rel
-                })
-            j += 1
+        rows = []
+        for ipp, group in df.groupby('IPP', sort=False):
+            g = group.reset_index(drop=True)
+            n = len(g)
+            for i in range(n):
+                nda1, uma1, de1, ds1 = g.loc[i, ['NDA', 'UMA', 'DATE_ENTREE', 'DATE_SORTIE']]
+                j = i + 1
+                while j < n:
+                    de2 = g.loc[j, 'DATE_ENTREE']
+                    if pd.isna(de2):
+                        j += 1
+                        continue
+                    if de2 > ds1 and de2 != ds1:
+                        break
+                    nda2, uma2, ds2 = g.loc[j, ['NDA', 'UMA', 'DATE_SORTIE']]
+                    if nda1 == nda2:
+                        j += 1
+                        continue
 
-res = pd.DataFrame(rows).drop_duplicates()
+                    rel = None
+                    if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
+                        rel = "VRAI_DOUBLON"
+                    elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
+                        rel = "DOUBLON_0_NUIT"
+                    elif (uma1 != uma2) and ((ds1 == de2) or (ds2 == de1)):
+                        rel = "CONTIGUS"
+                    elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
+                        rel = "CHEVAUCHEMENT"
 
-cols = ["IPP","DATE_NAISSANCE","NDA1","UMA1","DATEE1","DATES1","NDA2","UMA2","DATEE2","DATES2"]
+                    if rel:
+                        rows.append({
+                            "IPP": ipp,
+                            "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
+                            "NDA1": nda1,
+                            "UMA1": uma1,
+                            "DATEE1": de1,
+                            "DATES1": ds1,
+                            "NDA2": nda2,
+                            "UMA2": uma2,
+                            "DATEE2": de2,
+                            "DATES2": ds2,
+                            "TYPE_RELATION": rel
+                        })
+                    j += 1
 
-if res.empty:
-    pd.DataFrame([{col: "N/A" for col in cols}]).to_excel(output_excel, index=False)
-else:
-    with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-        for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
-            subset = res[res["TYPE_RELATION"] == groupe].drop(columns=["TYPE_RELATION"], errors='ignore')
+        res = pd.DataFrame(rows).drop_duplicates()
+        cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "DATEE1", "DATES1", "NDA2", "UMA2", "DATEE2", "DATES2"]
 
-            if subset.empty:
-                df_to_write = pd.DataFrame([{col: "N/A" for col in cols}])
-            else:
-                df_to_write = subset
-                for c in ["DATEE1", "DATES1", "DATEE2", "DATES2"]:
-                    if c in df_to_write.columns:
-                        df_to_write[c] = pd.to_datetime(df_to_write[c], errors='coerce').dt.strftime("%d/%m/%Y")
-
-            df_to_write.to_excel(writer, sheet_name=groupe[:31], index=False)
-
-            worksheet = writer.sheets[groupe[:31]]
-            for i, col in enumerate(df_to_write.columns):
-                max_len = max(
-                    df_to_write[col].astype(str).map(len).max(),
-                    len(col)
-                ) + 2
-                worksheet.column_dimensions[
-                    worksheet.cell(row=1, column=i + 1).column_letter
-                ].width = max_len
+        # Sauvegarde Excel
+        with pd.ExcelWriter(OUTPUT
