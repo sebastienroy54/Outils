@@ -11,8 +11,8 @@ df["IPP"] = df["IPP"].astype(str).str.strip()
 df["UMA"] = df["UMA"].astype(str).str.strip()
 df["NDA"] = df["NDA"].astype(str).str.strip()
 
-df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"],  dayfirst=True, errors='coerce')
-df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"],  dayfirst=True, errors='coerce')
+df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"], dayfirst=True, errors='coerce')
+df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"], dayfirst=True, errors='coerce')
 
 df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "IPP", "UMA"])
 
@@ -23,10 +23,17 @@ for ipp, group in df.groupby("IPP", sort=False):
 
     for i in range(n):
         nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
-        for j in range(i+1, n):
+        for j in range(i + 1, n):
             nda2, uma2, de2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
 
-            if (uma1!=uma2) and (de1 <= ds2) and (de2 <= ds1):
+            # Vérifie d'abord si les deux séjours se recoupent
+            chevauche = (uma1 != uma2) and (de1 <= ds2) and (de2 <= ds1)
+
+            # Exclut les contigus et doublons 0 nuit
+            contigu = (ds1 == de2)
+            doublon_0_nuit = (de1 == de2) and (ds1 == ds2)
+
+            if chevauche and not contigu and not doublon_0_nuit:
                 rows.append({
                     "IPP": ipp,
                     "DATE_NAISSANCE": g.loc[i, "DATE_NAISSANCE"],
@@ -47,8 +54,8 @@ if not res.empty:
         res[col] = pd.to_datetime(res[col], errors='coerce').dt.strftime("%d/%m/%Y")
 
 if res.empty:
-    print("Pas de chevauchement")
+    print("✅ Aucun chevauchement détecté.")
 else:
-    print(f"Nombre total de chevaucement : {len(res)}")
+    print(f"🔍 Nombre total de chevauchements réels : {len(res)}")
 
 res.to_excel('chevauchement.xlsx', index=False)
