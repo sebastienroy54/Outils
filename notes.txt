@@ -1,4 +1,54 @@
-c:\Users\4251352\projets\contigus.py:71: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  df['DATE_ENTREE'] = pd.to_datetime(df['DATE_ENTREE'], dayfirst=True, errors='coerce')
-c:\Users\4251352\projets\contigus.py:72: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  df['DATE_SORTIE'] = pd.to_datetime(df['DATE_SORTIE'], dayfirst=True, errors='coerce')
+import pandas as pd
+
+input_csv = "resultat.csv"
+
+cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]
+
+df = pd.read_csv(input_csv, sep=";", header=None, names=cols, skip_blank_lines=True, dtype=str)
+df = df.dropna(how='all')
+
+df["IPP"] = df["IPP"].astype(str).str.strip()
+df["UMA"] = df["UMA"].astype(str).str.strip()
+df["NDA"] = df["NDA"].astype(str).str.strip()
+
+df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"],  dayfirst=True, errors='coerce')
+df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"],  dayfirst=True, errors='coerce')
+
+df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "IPP", "UMA"])
+
+rows = []
+for ipp, group in df.groupby("IPP", sort=False):
+    g = group.sort_values('DATE_ENTREE').reset_index(drop=True)
+    n = len(g)
+
+    for i in range(n):
+        nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+        for j in range(i+1, n):
+            nda2, uma2, de2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+
+            if (uma1!=uma2) and (de1 <= ds2) and (de2 <= ds1):
+                rows.append({
+                    "IPP": ipp,
+                    "DATE_NAISSANCE": g.loc[i, "DATE_NAISSANCE"],
+                    "NDA1": nda1,
+                    "UMA1": uma1,
+                    "DATEE1": de1,
+                    "DATES1": ds1,
+                    "NDA2": nda2,
+                    "UMA2": uma2,
+                    "DATEE2": de2,
+                    "DATES2": ds2
+                })
+
+res = pd.DataFrame(rows)
+
+if not res.empty:
+    for col in ["DATEE1", "DATES1", "DATEE2", "DATES2"]:
+        res[col] = pd.to_datetime(res[col], errors='coerce').dt.strftime("%d/%m/%Y")
+
+if res.empty:
+    print("Pas de chevauchement")
+else:
+    print(f"Nombre total de chevaucement : {len(res)}")
+
+res.to_excel('chevauchement.xlsx', index=False)
