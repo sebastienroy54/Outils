@@ -1,32 +1,12 @@
-def afficher_tableau_colore(df, annee_new, annee_old):
-    valorisation_cols = [c for c in df.columns if "Valorisation" in c or "Écart Valorisation" in c]
-    quantite_cols = [c for c in df.columns if "Quantité" in c]
+def debug_nan_unites(df):
     unite_cols = [c for c in df.columns if "Unité" in c]
-
-    df_styled = df.copy()
-
-    # Formater les quantités
-    for col in quantite_cols:
-        df_styled[col] = df_styled[col].apply(format_quantite)
-
-    # Unités : remplacer toutes valeurs manquantes ou NaN par chaîne vide
     for col in unite_cols:
-        df_styled[col] = df_styled[col].fillna("").replace("nan", "").replace("NaN", "")
-
-    # Valorisation : format monétaire avec 2 décimales et €
-    for col in valorisation_cols:
-        df_styled[col] = df_styled[col].apply(lambda v: format_valeur_monetaire(v) if pd.notna(v) else "")
-
-    # Style : texte rouge pour négatifs, italique pour Quantité et Unité
-    def color_neg(v):
-        try:
-            val = float(str(v).replace("€", "").replace(" ", "").replace(",", "."))
-            return 'color: red' if val < 0 else ''
-        except:
-            return ''
-
-    st.dataframe(
-        df_styled.style
-        .applymap(color_neg, subset=valorisation_cols)
-        .applymap(lambda v: 'font-style: italic', subset=quantite_cols + unite_cols)
-    )
+        # Trouver les lignes où l'unité est NaN ou None
+        mask_nan = df[col].isna() | (df[col].astype(str).str.lower() == "nan")
+        if mask_nan.any():
+            print(f"\n=== Colonnes '{col}' contenant NaN ===")
+            for idx in df[mask_nan].index:
+                indicateur = df.loc[idx, "Indicateur"]
+                quantite = df.loc[idx, [c for c in df.columns if "Quantité" in c][0]]
+                valeur_unite = df.loc[idx, col]
+                print(f"Ligne {idx+9} (ligne Excel): Indicateur='{indicateur}', Quantité='{quantite}', Unité='{valeur_unite}', type={type(valeur_unite)}")
