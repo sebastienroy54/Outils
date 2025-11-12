@@ -1,29 +1,49 @@
-def lire_fichier_excel(fichier):
-    df = pd.read_excel(fichier, header=None, dtype=str, engine='openpyxl')
-    resume_filtrage = df.iloc[3, 0]
-    periode = str(df.iloc[4, 0])
-    filtres = df.iloc[5, 0]
-    detail_valo = df.iloc[7, 0]
+def generer_excel(df, annee_new, annee_old):
+    output = BytesIO()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comparatif"
 
-    import re
-    match = re.search(r"(\d{4})", periode)
-    annee = match.group(1) if match else "XXXX"
+    titre = f"Comparatif {annee_new} vs {annee_old}"
+    ws.cell(row=1, column=1, value=titre).font = Font(size=14, bold=True)
+    ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(df.columns))
 
-    data = pd.read_excel(fichier, header=8, dtype=str, engine='openpyxl')
-    data = data.iloc[:, :4]
-    data.columns = ["Indicateur", "Valorisation", "Quantité", "Unité"]
+    header_fill = PatternFill("solid", fgColor="D9D9D9")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                         top=Side(style='thin'), bottom=Side(style='thin'))
+    for j, col in enumerate(df.columns, start=1):
+        cell = ws.cell(row=2, column=j, value=col)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+        cell.fill = header_fill
+        cell.border = thin_border
 
-    # Conversion des colonnes numériques
-    data["Valorisation"] = pd.to_numeric(data["Valorisation"], errors='coerce')
-    data["Quantité"] = pd.to_numeric(data["Quantité"], errors='coerce')
+    for i, row in enumerate(df.values, start=3):
+        bg_fill = PatternFill("solid", fgColor="FFFFFF" if (i-3) % 2 == 0 else "F2F2F2")
+        for j, val in enumerate(row, start=1):
+            col_name = df.columns[j-1]
+            cell = ws.cell(row=i, column=j)
+            if "Valorisation" in col_name or "Écart Valorisation" in col_name:
+                if pd.notna(val):
+                    cell.value = format_valeur_monetaire(val)
+                    if val < 0: 
+                        cell.font = Font(color="FF0000")
+            elif "Quantité" in col_name and pd.notna(val):
+                cell.value = format_quantite(val)
+                cell.font = Font(italic=True)
+            elif "Unité" in col_name:
+                cell.value = str(val)
+                cell.font = Font(italic=True)
+            else:
+                cell.value = val
+            cell.border = thin_border
+            cell.fill = bg_fill
 
-    # ✅ Harmonisation des valeurs manquantes dans "Unité"
-    # Les NaN ou "nan" deviennent simplement des chaînes vides
-    data["Unité"] = data["Unité"].replace("nan", "").fillna("")
+    for j, col in enumerate(df.columns, start=1):
+        max_len = max(len(str(col)), *(len(str(ws.cell(row=i, column=j).value)) for i in range(3, len(df)+3) if ws.cell(row=i, column=j).value))
+        ws.column_dimensions[ws.cell(row=2, column=j).column_letter].width = max_len + 2
 
-    return annee, data, {
-        "Résumé": resume_filtrage,
-        "Période": periode,
-        "Filtres": filtres,
-        "Détail": detail_valo
-    }
+    wb.save(output)
+    output.seek(0)
+    return output
