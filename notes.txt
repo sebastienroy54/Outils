@@ -1,10 +1,201 @@
-AttributeError: 'MergedCell' object has no attribute 'column_letter'
-Traceback:
-File "C:\Users\4251352\Portail_outils\app.py", line 16, in <module>
-    tableau_comparaison_valo.main()
-File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 165, in main
-    annee2, df2, meta2 = lire_fichier_excel(fichier2, widget_label="deuxième fichier")
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 109, in generer_excel
-    val_float = float(val)
-     ^^^^^^^^^^^^^^^^^^^^
+import streamlit as st
+import pandas as pd
+from io import BytesIO
+from openpyxl.styles import Font, Alignment
+from openpyxl import Workbook
+
+# -----------------------
+# Helpers
+# -----------------------
+def safe_show_exception(e):
+    """Affiche un message utilisateur simple et propose d'afficher le détail technique."""
+    st.error("Une erreur est survenue pendant le traitement. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher les détails techniques (pour un développeur)"):
+        st.exception(e)
+
+def lire_fichier_excel(fichier, widget_label="fichier"):
+    """Lit un fichier Excel et renvoie (annee, data, meta)."""
+    try:
+        df = pd.read_excel(fichier, header=None)
+    except Exception as e:
+        raise RuntimeError(f"Impossible de lire le {widget_label} : fichier non lisible.") from e
+
+    try:
+        resume_filtrage = df.iloc[3, 0]
+        periode = str(df.iloc[4, 0])
+        filtres = df.iloc[5, 0]
+        detail_valo = df.iloc[7, 0]
+
+        import re
+        match = re.search(r"(\d{4})", periode)
+        annee = match.group(1) if match else "XXXX"
+
+        data = pd.read_excel(fichier, header=8)
+        data = data.iloc[:, :4]
+        data.columns = ["Indicateur", "Valorisation", "Quantité", "Unité"]
+    except Exception as e:
+        raise RuntimeError("Le format du fichier Excel ne correspond pas au modèle attendu.") from e
+
+    return annee, data, {
+        "Résumé de filtrage": resume_filtrage,
+        "Période": periode,
+        "Filtres": filtres,
+        "Détail valorisation": detail_valo
+    }
+
+def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
+    """Fusionne en gardant l'ordre df_new (le plus récent)."""
+    try:
+        df_new = df_new.rename(columns={
+            "Valorisation": f"Valorisation {annee_new}",
+            "Quantité": f"Quantité {annee_new}",
+            "Unité": f"Unité {annee_new}"
+        })
+        df_old = df_old.rename(columns={
+            "Valorisation": f"Valorisation {annee_old}",
+            "Quantité": f"Quantité {annee_old}",
+            "Unité": f"Unité {annee_old}"
+        })
+
+        df_merge = df_new.merge(df_old, on="Indicateur", how="left", sort=False)
+        df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] = (
+            df_merge[f"Valorisation {annee_new}"] - df_merge[f"Valorisation {annee_old}"]
+        )
+    except Exception as e:
+        raise RuntimeError("Erreur lors de la création du tableau comparatif.") from e
+
+    return df_merge
+
+def format_valeur_monetaire(val):
+    """Format 1 234 567 € ou vide si NaN."""
+    try:
+        if pd.isna(val) or val == "":
+            return ""
+        v = float(val)
+        return f"{v:,.0f}".replace(",", " ") + " €"
+    except:
+        return val
+
+def generer_excel(df, annee_new, annee_old):
+    """Génère un fichier Excel stylisé et renvoie BytesIO."""
+    try:
+        output = BytesIO()
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Comparatif"
+
+        # Titre
+        titre = f"Comparatif {annee_new} vs {annee_old}"
+        ws.cell(row=1, column=1, value=titre)
+        ws.cell(row=1, column=1).font = Font(size=14, bold=True)
+        ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
+
+        # Écrire le DataFrame en partant de la ligne 2
+        df_to_write = df.copy()
+
+        # Quantité en entier
+        for col in df_to_write.columns:
+            if "Quantité" in col:
+                df_to_write[col] = df_to_write[col].apply(lambda x: int(x) if pd.notna(x) else x)
+
+        # Formater Valorisation et Écart
+        for col in df_to_write.columns:
+            if "Valorisation" in col or "Écart Valorisation" in col:
+                df_to_write[col] = df_to_write[col].apply(lambda x: format_valeur_monetaire(x))
+
+        # Écrire les en-têtes
+        for j, col in enumerate(df_to_write.columns, start=1):
+            ws.cell(row=2, column=j, value=col).font = Font(bold=True)
+
+        # Écrire les valeurs
+        for i, row in enumerate(df_to_write.values, start=3):
+            for j, val in enumerate(row, start=1):
+                cell = ws.cell(row=i, column=j, value=val)
+                if isinstance(val, str) and "€" in val:
+                    try:
+                        num = float(val.replace("€","").replace(" ",""))
+                        if num < 0:
+                            cell.font = Font(color="FF0000")
+                    except:
+                        pass
+
+        wb.save(output)
+        output.seek(0)
+        return output
+
+    except Exception as e:
+        raise RuntimeError("Impossible de générer le fichier Excel.") from e
+
+def afficher_tableau_colore(df, annee_new, annee_old):
+    """Affiche le tableau dans Streamlit."""
+    try:
+        valorisation_cols = [c for c in df.columns if "Valorisation" in c or "Écart Valorisation" in c]
+        df_styled = df.copy()
+
+        for col in valorisation_cols:
+            df_styled[col] = df_styled[col].apply(
+                lambda v: format_valeur_monetaire(float(v)) if pd.notna(v) and v != "" else ""
+            )
+
+        def color_neg(v):
+            try:
+                val = float(str(v).replace("€", "").replace(" ", "").replace(",", "."))
+                return 'color: red' if val < 0 else ''
+            except:
+                return ''
+
+        st.markdown(f"### 📊 Comparatif {annee_new} vs {annee_old}")
+        st.dataframe(df_styled.style.applymap(color_neg, subset=valorisation_cols))
+
+    except Exception as e:
+        raise RuntimeError("Erreur lors de l'affichage du tableau.") from e
+
+# -----------------------
+# main()
+# -----------------------
+def main():
+    st.title("💶 Comparateur de Valorisation T2A")
+    st.write("### 🗂️ Importez les deux fichiers Excel")
+
+    fichier1 = st.file_uploader("Fichier récent (ex: 2025)", type=["xlsx"], key="file1")
+    fichier2 = st.file_uploader("Fichier ancien (ex: 2024)", type=["xlsx"], key="file2")
+
+    if not (fichier1 and fichier2):
+        st.info("Veuillez uploader les deux fichiers pour comparer.")
+        return
+
+    if not st.button("Lancer la comparaison"):
+        return
+
+    try:
+        annee1, df1, meta1 = lire_fichier_excel(fichier1, "premier fichier")
+        annee2, df2, meta2 = lire_fichier_excel(fichier2, "deuxième fichier")
+
+        # Swap si ordre inversé
+        try:
+            if int(annee1) < int(annee2):
+                st.info("Inversion détectée : les fichiers seront réordonnés automatiquement.")
+                annee1, annee2 = annee2, annee1
+                df1, df2 = df2, df1
+        except:
+            st.warning("Impossible de déterminer l'ordre des années automatiquement.")
+
+        st.write(f"**Période {annee1}:** {meta1.get('Période','')}")
+        st.write(f"**Période {annee2}:** {meta2.get('Période','')}")
+
+        df_comparatif = creer_tableau_comparatif(df1, annee1, df2, annee2)
+        afficher_tableau_colore(df_comparatif, annee1, annee2)
+
+        excel_data = generer_excel(df_comparatif, annee1, annee2)
+        st.download_button(
+            label="💾 Télécharger le comparatif (Excel)",
+            data=excel_data,
+            file_name=f"Comparatif_{annee1}_{annee2}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except Exception as e:
+        safe_show_exception(e)
+
+if __name__ == "__main__":
+    main()
