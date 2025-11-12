@@ -14,10 +14,6 @@ def afficher_tableau_colore(df, annee_new, annee_old):
     for col in quantite_cols:
         df_styled[col] = df_styled[col].apply(format_quantite)
 
-    # Unités : remplacer toutes valeurs NaN (float ou None) par chaîne vide
-    for col in unite_cols:
-        df_styled[col] = df_styled[col].apply(lambda x: "" if pd.isna(x) else str(x))
-
     # Valorisation : format monétaire avec 2 décimales et €
     def format_valeur_monetaire(val):
         try:
@@ -27,7 +23,7 @@ def afficher_tableau_colore(df, annee_new, annee_old):
     for col in valorisation_cols:
         df_styled[col] = df_styled[col].apply(lambda v: format_valeur_monetaire(v) if pd.notna(v) else "")
 
-    # Style : texte rouge si négatif pour les valorisations, italique pour Quantité et Unité
+    # Style : texte rouge si négatif pour les valorisations, italique pour Quantité
     def color_neg(v):
         try:
             val = float(str(v).replace("€", "").replace(" ", "").replace(",", "."))
@@ -38,5 +34,5 @@ def afficher_tableau_colore(df, annee_new, annee_old):
     st.dataframe(
         df_styled.style
         .applymap(color_neg, subset=valorisation_cols)
-        .applymap(lambda v: 'font-style: italic', subset=quantite_cols + unite_cols)
+        .applymap(lambda v: 'font-style: italic', subset=quantite_cols)
     )
