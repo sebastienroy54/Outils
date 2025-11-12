@@ -1,24 +1,98 @@
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:/Users/4251352/Portail_outils/data/resultat.csv
-SELECT DISTINCT S.KYNOIP AS IPP,
-       S.DANAIS AS DATE_NAISSANCE,
-       E.KYNODA AS NDA,
-       E.CDURM_P AS UMA,
-       TO_CHAR(E.D8EEUE, 'DD/MM/YYYY') AS DATE_ENTREE,
-       TO_CHAR(E.D8EEUE, 'hh24:mi') AS HEURE_ENTREE,
-       TO_CHAR(E.D8SOUE, 'DD/MM/YYYY') AS DATE_SORTIE,
-       TO_CHAR(E.D8SOUE, 'hh24:mi') AS HEURE_SORTIE
-FROM EPI E, SDO S
-WHERE E.KYNODA = S.KYNODA
-  AND E.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND E.D8EEUE <= TRUNC(SYSDATE)
-ORDER BY S.KYNOIP, E.D8EEUE;
-SPOOL OFF
-EXIT;
+import streamlit as st
+import pandas as pd
+
+def lire_fichier_excel(fichier):
+    """Lit un fichier Excel et renvoie les métadonnées et le tableau nettoyé."""
+    df = pd.read_excel(fichier, header=None)
+
+    # Récupération des métadonnées
+    resume_filtrage = df.iloc[3, 0]
+    periode = str(df.iloc[4, 0])  # Contient la période (ex : "Période : 2025")
+    filtres = df.iloc[5, 0]
+    detail_valo = df.iloc[7, 0]
+
+    # Extraction de l'année à partir de la ligne de période
+    import re
+    match = re.search(r"(\d{4})", periode)
+    annee = match.group(1) if match else "XXXX"
+
+    # Le vrai tableau commence à la ligne 8 (index 8 -> ligne 9 Excel)
+    data = pd.read_excel(fichier, header=8)
+
+    # Nettoyage des colonnes
+    data = data.iloc[:, :4]
+    data.columns = ["Indicateur", "Valorisation", "Quantité", "Unité"]
+
+    return annee, data, {
+        "Résumé de filtrage": resume_filtrage,
+        "Période": periode,
+        "Filtres": filtres,
+        "Détail valorisation": detail_valo
+    }
+
+def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
+    """Fusionne et compare deux DataFrames selon l'indicateur."""
+    # Renommer les colonnes selon les années détectées
+    df_new = df_new.rename(columns={
+        "Valorisation": f"Valorisation {annee_new}",
+        "Quantité": f"Quantité {annee_new}",
+        "Unité": f"Unité {annee_new}"
+    })
+    df_old = df_old.rename(columns={
+        "Valorisation": f"Valorisation {annee_old}",
+        "Quantité": f"Quantité {annee_old}",
+        "Unité": f"Unité {annee_old}"
+    })
+
+    # Fusion sur la colonne Indicateur
+    df_merge = pd.merge(df_new, df_old, on="Indicateur", how="outer")
+
+    # Calcul de la différence
+    df_merge[""] = ""  # colonne vide
+    df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] = (
+        df_merge[f"Valorisation {annee_new}"] - df_merge[f"Valorisation {annee_old}"]
+    )
+
+    return df_merge
+
+def afficher_tableau_colore(df, annee_new, annee_old):
+    """Applique une mise en forme conditionnelle au DataFrame Streamlit."""
+    def color_neg(v):
+        color = 'red' if isinstance(v, (int, float)) and v < 0 else 'black'
+        return f'color: {color}'
+
+    st.dataframe(
+        df.style.applymap(color_neg, subset=[f"Écart Valorisation ({annee_new}-{annee_old})"])
+    )
+
+def main():
+    st.title("📊 Comparateur de Valorisation T2A")
+
+    st.write("### 🗂️ Importez les deux fichiers Excel")
+    fichier1 = st.file_uploader("Fichier récent (ex: 2025)", type=["xlsx"], key="file1")
+    fichier2 = st.file_uploader("Fichier ancien (ex: 2024)", type=["xlsx"], key="file2")
+
+    if fichier1 and fichier2:
+        annee1, df1, meta1 = lire_fichier_excel(fichier1)
+        annee2, df2, meta2 = lire_fichier_excel(fichier2)
+
+        # Vérifie l'ordre chronologique et swap si besoin
+        if int(annee1) < int(annee2):
+            st.warning(f"⚠️ Inversion détectée : le fichier {annee1} semble plus ancien que {annee2}. Inversion automatique.")
+            df1, df2 = df2, df1
+            annee1, annee2 = annee2, annee1
+
+        st.write("### 🧾 Métadonnées")
+        st.write(f"**Période {annee1} :** {meta1['Période']}")
+        st.write(f"**Période {annee2} :** {meta2['Période']}")
+
+        st.write("### 📈 Tableau comparatif")
+        df_comparatif = creer_tableau_comparatif(df1, annee1, df2, annee2)
+        afficher_tableau_colore(df_comparatif, annee1, annee2)
+
+        # Option de téléchargement
+        csv = df_comparatif.to_csv(index=False).encode('utf-8')
+        st.download_button("💾 Télécharger le comparatif (CSV)", data=csv, file_name="comparatif_valo.csv", mime="text/csv")
+
+if __name__ == "__main__":
+    main()
