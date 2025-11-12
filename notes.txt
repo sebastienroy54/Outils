@@ -1,7 +1,42 @@
-=== Colonnes 'Unité' contenant NaN ===
-Ligne 9 (ligne Excel): Indicateur='Valorisation des GHS', Quantité='nan', Unité='nan', type=<class 'float'>
-Ligne 37 (ligne Excel): Indicateur='Total valorisation', Quantité='nan', Unité='nan', type=<class 'float'>
+def afficher_tableau_colore(df, annee_new, annee_old):
+    valorisation_cols = [c for c in df.columns if "Valorisation" in c or "Écart Valorisation" in c]
+    quantite_cols = [c for c in df.columns if "Quantité" in c]
+    unite_cols = [c for c in df.columns if "Unité" in c]
 
-=== Colonnes 'Unité' contenant NaN ===
-Ligne 9 (ligne Excel): Indicateur='Valorisation des GHS', Quantité='nan', Unité='nan', type=<class 'float'>
-Ligne 37 (ligne Excel): Indicateur='Total valorisation', Quantité='nan', Unité='nan', type=<class 'float'>
+    df_styled = df.copy()
+
+    # Formater les quantités avec espace pour les milliers
+    def format_quantite(val):
+        try:
+            return f"{int(val):,}".replace(",", " ")
+        except:
+            return val
+    for col in quantite_cols:
+        df_styled[col] = df_styled[col].apply(format_quantite)
+
+    # Unités : remplacer toutes valeurs NaN (float ou None) par chaîne vide
+    for col in unite_cols:
+        df_styled[col] = df_styled[col].apply(lambda x: "" if pd.isna(x) else str(x))
+
+    # Valorisation : format monétaire avec 2 décimales et €
+    def format_valeur_monetaire(val):
+        try:
+            return f"{float(val):,.2f}".replace(",", " ") + " €"
+        except:
+            return val
+    for col in valorisation_cols:
+        df_styled[col] = df_styled[col].apply(lambda v: format_valeur_monetaire(v) if pd.notna(v) else "")
+
+    # Style : texte rouge si négatif pour les valorisations, italique pour Quantité et Unité
+    def color_neg(v):
+        try:
+            val = float(str(v).replace("€", "").replace(" ", "").replace(",", "."))
+            return 'color: red' if val < 0 else ''
+        except:
+            return ''
+
+    st.dataframe(
+        df_styled.style
+        .applymap(color_neg, subset=valorisation_cols)
+        .applymap(lambda v: 'font-style: italic', subset=quantite_cols + unite_cols)
+    )
