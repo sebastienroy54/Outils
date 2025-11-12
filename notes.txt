@@ -1,12 +1,7 @@
-def debug_nan_unites(df):
-    unite_cols = [c for c in df.columns if "Unité" in c]
-    for col in unite_cols:
-        # Trouver les lignes où l'unité est NaN ou None
-        mask_nan = df[col].isna() | (df[col].astype(str).str.lower() == "nan")
-        if mask_nan.any():
-            print(f"\n=== Colonnes '{col}' contenant NaN ===")
-            for idx in df[mask_nan].index:
-                indicateur = df.loc[idx, "Indicateur"]
-                quantite = df.loc[idx, [c for c in df.columns if "Quantité" in c][0]]
-                valeur_unite = df.loc[idx, col]
-                print(f"Ligne {idx+9} (ligne Excel): Indicateur='{indicateur}', Quantité='{quantite}', Unité='{valeur_unite}', type={type(valeur_unite)}")
+=== Colonnes 'Unité' contenant NaN ===
+Ligne 9 (ligne Excel): Indicateur='Valorisation des GHS', Quantité='nan', Unité='nan', type=<class 'float'>
+Ligne 37 (ligne Excel): Indicateur='Total valorisation', Quantité='nan', Unité='nan', type=<class 'float'>
+
+=== Colonnes 'Unité' contenant NaN ===
+Ligne 9 (ligne Excel): Indicateur='Valorisation des GHS', Quantité='nan', Unité='nan', type=<class 'float'>
+Ligne 37 (ligne Excel): Indicateur='Total valorisation', Quantité='nan', Unité='nan', type=<class 'float'>
