@@ -2,85 +2,58 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 # -----------------------
 # Helpers
 # -----------------------
 def safe_show_exception(e):
-    st.error("Une erreur est survenue pendant le traitement. Vérifiez vos fichiers ou contactez le support.")
-    if st.checkbox("Afficher les détails techniques (pour un développeur)"):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
         st.exception(e)
 
 def lire_fichier_excel(fichier):
-    """Lit un fichier Excel et renvoie année, tableau et métadonnées."""
     df = pd.read_excel(fichier, header=None, dtype=str, engine='openpyxl')
-
-    # Récupération des métadonnées
     resume_filtrage = df.iloc[3, 0]
     periode = str(df.iloc[4, 0])
     filtres = df.iloc[5, 0]
     detail_valo = df.iloc[7, 0]
-
-    # Extraction de l'année
     import re
     match = re.search(r"(\d{4})", periode)
     annee = match.group(1) if match else "XXXX"
-
-    # Lecture du tableau de données à partir de la ligne 9 (index 8)
     data = pd.read_excel(fichier, header=8, dtype=str, engine='openpyxl')
     data = data.iloc[:, :4]
     data.columns = ["Indicateur", "Valorisation", "Quantité", "Unité"]
-
-    # Conversion des colonnes numériques
     data["Valorisation"] = pd.to_numeric(data["Valorisation"], errors='coerce')
     data["Quantité"] = pd.to_numeric(data["Quantité"], errors='coerce')
-
-    return annee, data, {
-        "Résumé de filtrage": resume_filtrage,
-        "Période": periode,
-        "Filtres": filtres,
-        "Détail valorisation": detail_valo
-    }
+    return annee, data, {"Résumé": resume_filtrage, "Période": periode, "Filtres": filtres, "Détail": detail_valo}
 
 def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
-    """Fusionne les DataFrames et calcule l'écart, en conservant l'ordre de df_new."""
-    df_new = df_new.rename(columns={
-        "Valorisation": f"Valorisation {annee_new}",
-        "Quantité": f"Quantité {annee_new}",
-        "Unité": f"Unité {annee_new}"
-    })
-    df_old = df_old.rename(columns={
-        "Valorisation": f"Valorisation {annee_old}",
-        "Quantité": f"Quantité {annee_old}",
-        "Unité": f"Unité {annee_old}"
-    })
-
-    # Ajouter colonne temporaire pour l'ordre
+    df_new = df_new.rename(columns={"Valorisation": f"Valorisation {annee_new}",
+                                    "Quantité": f"Quantité {annee_new}",
+                                    "Unité": f"Unité {annee_new}"})
+    df_old = df_old.rename(columns={"Valorisation": f"Valorisation {annee_old}",
+                                    "Quantité": f"Quantité {annee_old}",
+                                    "Unité": f"Unité {annee_old}"})
     df_new["__order__"] = range(len(df_new))
-
-    # Merge
     df_merge = pd.merge(df_new, df_old, on="Indicateur", how="outer")
-
-    # Reclasser selon l'ordre original du fichier récent
-    df_merge = df_merge.sort_values("__order__").reset_index(drop=True)
-    df_merge = df_merge.drop(columns="__order__")
-
-    # Calcul de l'écart
+    df_merge = df_merge.sort_values("__order__").reset_index(drop=True).drop(columns="__order__")
     df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] = (
         df_merge[f"Valorisation {annee_new}"] - df_merge[f"Valorisation {annee_old}"]
     )
-
     return df_merge
 
 def format_valeur_monetaire(val):
-    """Format monétaire avec espace et € avec 2 décimales."""
     if pd.isna(val):
         return ""
     return f"{val:,.2f}".replace(",", " ") + " €"
 
+def format_quantite(val):
+    if pd.isna(val):
+        return ""
+    return f"{int(val):,}".replace(",", " ")
+
 def generer_excel(df, annee_new, annee_old):
-    """Génère un fichier Excel avec mise en forme et ajustement automatique des colonnes."""
     output = BytesIO()
     wb = Workbook()
     ws = wb.active
@@ -88,53 +61,56 @@ def generer_excel(df, annee_new, annee_old):
 
     # Titre
     titre = f"Comparatif {annee_new} vs {annee_old}"
-    ws.cell(row=1, column=1, value=titre)
-    ws.cell(row=1, column=1).font = Font(size=14, bold=True)
+    ws.cell(row=1, column=1, value=titre).font = Font(size=14, bold=True)
     ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(df.columns))
 
-    # Écrire les en-têtes avec style
-    header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+    # Header et bordures
+    header_fill = PatternFill("solid", fgColor="D9D9D9")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                         top=Side(style='thin'), bottom=Side(style='thin'))
     for j, col in enumerate(df.columns, start=1):
         cell = ws.cell(row=2, column=j, value=col)
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center")
         cell.fill = header_fill
+        cell.border = thin_border
 
-    # Écrire les données avec style
+    # Données
     for i, row in enumerate(df.values, start=3):
         for j, val in enumerate(row, start=1):
-            cell = ws.cell(row=i, column=j, value=val)
             col_name = df.columns[j-1]
-            # Valorisation / Écart
-            if isinstance(val, (int, float)) and ("Valorisation" in col_name or "Écart Valorisation" in col_name):
-                cell.value = format_valeur_monetaire(val)
-                if val < 0:
-                    cell.font = Font(color="FF0000")
-            # Quantité en entier
-            if "Quantité" in col_name and pd.notna(val):
-                cell.value = int(val)
-            # Italique pour Quantité / Unité
-            if "Quantité" in col_name or "Unité" in col_name:
+            cell = ws.cell(row=i, column=j)
+            if "Valorisation" in col_name or "Écart Valorisation" in col_name:
+                if pd.notna(val):
+                    cell.value = format_valeur_monetaire(val)
+                    if val < 0: cell.font = Font(color="FF0000")
+            elif "Quantité" in col_name and pd.notna(val):
+                cell.value = format_quantite(val)
                 cell.font = Font(italic=True)
+            elif "Unité" in col_name:
+                cell.value = val
+                cell.font = Font(italic=True)
+            else:
+                cell.value = val
+            cell.border = thin_border
 
-    # Ajustement automatique largeur colonnes
+    # Ajustement largeur colonnes
     for j, col in enumerate(df.columns, start=1):
-        max_length = len(col)
-        for i in range(3, len(df)+3):
-            val = ws.cell(row=i, column=j).value
-            if val is not None:
-                max_length = max(max_length, len(str(val)))
-        ws.column_dimensions[ws.cell(row=2, column=j).column_letter].width = max_length + 2
+        max_len = max(len(str(col)), *(len(str(ws.cell(row=i, column=j).value)) for i in range(3, len(df)+3) if ws.cell(row=i, column=j).value))
+        ws.column_dimensions[ws.cell(row=2, column=j).column_letter].width = max_len + 2
 
     wb.save(output)
     output.seek(0)
     return output
 
 def afficher_tableau_colore(df, annee_new, annee_old):
-    """Affiche le tableau dans Streamlit avec rouge pour valeurs négatives et italique pour Quantité / Unité."""
     valorisation_cols = [c for c in df.columns if "Valorisation" in c or "Écart Valorisation" in c]
     quantite_unite_cols = [c for c in df.columns if "Quantité" in c or "Unité" in c]
+
+    df_styled = df.copy()
+    for col in quantite_unite_cols:
+        df_styled[col] = df_styled[col].apply(format_quantite)
 
     def color_neg(v):
         try:
@@ -143,13 +119,10 @@ def afficher_tableau_colore(df, annee_new, annee_old):
         except:
             return ''
 
-    def italique(v):
-        return 'font-style: italic'
-
     st.dataframe(
-        df.style
+        df_styled.style
         .applymap(color_neg, subset=valorisation_cols)
-        .applymap(italique, subset=quantite_unite_cols)
+        .applymap(lambda v: 'font-style: italic', subset=quantite_unite_cols)
     )
 
 # -----------------------
@@ -169,9 +142,9 @@ def main():
 
             # Swap si fichiers inversés
             if int(annee1) < int(annee2):
-                st.warning(f"Inversion détectée : {annee1} < {annee2}. Correction automatique.")
                 df1, df2 = df2, df1
                 annee1, annee2 = annee2, annee1
+                st.warning(f"Inversion détectée. Fichiers réordonnés.")
 
             st.write(f"**Période {annee1}:** {meta1['Période']}")
             st.write(f"**Période {annee2}:** {meta2['Période']}")
