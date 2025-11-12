@@ -1,27 +1,40 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-from openpyxl.styles import Font
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+
+# -----------------------
+# Helpers
+# -----------------------
+def safe_show_exception(e):
+    st.error("Une erreur est survenue pendant le traitement. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher les détails techniques (pour un développeur)"):
+        st.exception(e)
 
 def lire_fichier_excel(fichier):
-    """Lit un fichier Excel et renvoie les métadonnées et le tableau nettoyé."""
-    df = pd.read_excel(fichier, header=None)
+    """Lit un fichier Excel et renvoie année, tableau et métadonnées."""
+    df = pd.read_excel(fichier, header=None, dtype=str, engine='openpyxl')
 
     # Récupération des métadonnées
     resume_filtrage = df.iloc[3, 0]
-    periode = str(df.iloc[4, 0])  # Contient la période (ex : "Période : 2025")
+    periode = str(df.iloc[4, 0])
     filtres = df.iloc[5, 0]
     detail_valo = df.iloc[7, 0]
 
-    # Extraction de l'année à partir de la ligne de période
+    # Extraction de l'année
     import re
     match = re.search(r"(\d{4})", periode)
     annee = match.group(1) if match else "XXXX"
 
     # Lecture du tableau de données à partir de la ligne 9 (index 8)
-    data = pd.read_excel(fichier, header=8)
+    data = pd.read_excel(fichier, header=8, dtype=str, engine='openpyxl')
     data = data.iloc[:, :4]
     data.columns = ["Indicateur", "Valorisation", "Quantité", "Unité"]
+
+    # Conversion des colonnes numériques
+    data["Valorisation"] = pd.to_numeric(data["Valorisation"], errors='coerce')
+    data["Quantité"] = pd.to_numeric(data["Quantité"], errors='coerce')
 
     return annee, data, {
         "Résumé de filtrage": resume_filtrage,
@@ -31,8 +44,7 @@ def lire_fichier_excel(fichier):
     }
 
 def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
-    """Fusionne et compare deux DataFrames selon les indicateurs."""
-    # Renommer les colonnes selon les années détectées
+    """Fusionne les DataFrames et calcule l'écart de valorisation."""
     df_new = df_new.rename(columns={
         "Valorisation": f"Valorisation {annee_new}",
         "Quantité": f"Quantité {annee_new}",
@@ -44,69 +56,72 @@ def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
         "Unité": f"Unité {annee_old}"
     })
 
-    # Fusion sur la colonne Indicateur
     df_merge = pd.merge(df_new, df_old, on="Indicateur", how="outer")
-
-    # Calcul de la différence de valorisation
-    df_merge[""] = ""  # colonne vide pour séparation visuelle
     df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] = (
         df_merge[f"Valorisation {annee_new}"] - df_merge[f"Valorisation {annee_old}"]
     )
-
     return df_merge
 
+def format_valeur_monetaire(val):
+    """Format monétaire avec espace et €."""
+    if pd.isna(val):
+        return ""
+    return f"{val:,.0f}".replace(",", " ") + " €"
+
 def generer_excel(df, annee_new, annee_old):
-    """Crée un fichier Excel avec mise en forme : rouge si négatif."""
+    """Génère un fichier Excel avec mise en forme."""
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name="Comparatif")
-        wb = writer.book
-        ws = wb["Comparatif"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comparatif"
 
-        # Trouver la colonne de l'écart
-        col_diff = None
-        for i, col in enumerate(df.columns, start=1):
-            if f"Écart Valorisation" in col:
-                col_diff = i
-                break
+    # Titre
+    titre = f"Comparatif {annee_new} vs {annee_old}"
+    ws.cell(row=1, column=1, value=titre)
+    ws.cell(row=1, column=1).font = Font(size=14, bold=True)
+    ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
 
-        # Mise en forme : texte rouge si négatif
-        if col_diff:
-            for row in range(2, len(df) + 2):  # Ignorer l’en-tête
-                cell = ws.cell(row=row, column=col_diff)
-                try:
-                    val = float(cell.value)
-                    if val < 0:
-                        cell.font = Font(color="FF0000")  # rouge
-                except:
-                    pass
+    # Écrire les en-têtes
+    for j, col in enumerate(df.columns, start=1):
+        ws.cell(row=2, column=j, value=col).font = Font(bold=True)
 
-        # Ajuster largeur colonnes automatiquement
-        for col in ws.columns:
-            max_length = 0
-            col_letter = col[0].column_letter
-            for cell in col:
-                if cell.value:
-                    max_length = max(max_length, len(str(cell.value)))
-            ws.column_dimensions[col_letter].width = max_length + 2
+    # Écrire les données
+    for i, row in enumerate(df.values, start=3):
+        for j, val in enumerate(row, start=1):
+            cell = ws.cell(row=i, column=j, value=val)
+            # Format monétaire
+            if isinstance(val, (int, float)) and ("Valorisation" in df.columns[j-1] or "Écart Valorisation" in df.columns[j-1]):
+                cell.value = format_valeur_monetaire(val)
+                if val < 0:
+                    cell.font = Font(color="FF0000")
+            # Quantité en entier
+            if "Quantité" in df.columns[j-1] and pd.notna(val):
+                cell.value = int(val)
 
+    wb.save(output)
     output.seek(0)
     return output
 
 def afficher_tableau_colore(df, annee_new, annee_old):
-    """Affiche le tableau dans Streamlit avec valeurs négatives en rouge."""
+    """Affiche le tableau dans Streamlit avec rouge pour valeurs négatives."""
+    valorisation_cols = [c for c in df.columns if "Valorisation" in c or "Écart Valorisation" in c]
+
     def color_neg(v):
-        color = 'red' if isinstance(v, (int, float)) and v < 0 else 'black'
-        return f'color: {color}'
+        try:
+            val = float(v)
+            return 'color: red' if val < 0 else ''
+        except:
+            return ''
 
-    st.dataframe(
-        df.style.applymap(color_neg, subset=[f"Écart Valorisation ({annee_new}-{annee_old})"])
-    )
+    st.dataframe(df.style.applymap(color_neg, subset=valorisation_cols))
 
+# -----------------------
+# main
+# -----------------------
 def main():
-    st.title("📊 Comparateur de Valorisation T2A")
-
+    st.title("💶 Comparateur de Valorisation T2A")
     st.write("### 🗂️ Importez les deux fichiers Excel")
+
     fichier1 = st.file_uploader("Fichier récent (ex: 2025)", type=["xlsx"], key="file1")
     fichier2 = st.file_uploader("Fichier ancien (ex: 2024)", type=["xlsx"], key="file2")
 
@@ -114,23 +129,18 @@ def main():
         annee1, df1, meta1 = lire_fichier_excel(fichier1)
         annee2, df2, meta2 = lire_fichier_excel(fichier2)
 
-        # Vérifie si les fichiers sont inversés et corrige automatiquement
+        # Swap si fichiers inversés
         if int(annee1) < int(annee2):
-            st.warning(f"⚠️ Inversion détectée : le fichier {annee1} semble plus ancien que {annee2}. Inversion automatique.")
+            st.warning(f"Inversion détectée : {annee1} < {annee2}. Correction automatique.")
             df1, df2 = df2, df1
             annee1, annee2 = annee2, annee1
 
-        st.write("### 🧾 Métadonnées")
-        st.write(f"**Période {annee1} :** {meta1['Période']}")
-        st.write(f"**Période {annee2} :** {meta2['Période']}")
+        st.write(f"**Période {annee1}:** {meta1['Période']}")
+        st.write(f"**Période {annee2}:** {meta2['Période']}")
 
-        # Création du tableau comparatif
         df_comparatif = creer_tableau_comparatif(df1, annee1, df2, annee2)
-
-        st.write("### 📈 Tableau comparatif")
         afficher_tableau_colore(df_comparatif, annee1, annee2)
 
-        # Génération du fichier Excel à télécharger
         excel_data = generer_excel(df_comparatif, annee1, annee2)
         st.download_button(
             label="💾 Télécharger le comparatif (Excel)",
