@@ -1,42 +1,10 @@
-def generer_excel(df, annee_new, annee_old):
-    try:
-        output = BytesIO()
-        titre = f"Comparatif {annee_new} vs {annee_old}"
-
-        # Quantité en entier
-        for col in df.columns:
-            if "Quantité" in col:
-                df[col] = df[col].apply(lambda x: int(x) if pd.notna(x) else x)
-
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # écrire le titre et le df dans le même sheet, titre ligne 0
-            df.to_excel(writer, index=False, sheet_name="Comparatif", startrow=1)
-            wb = writer.book
-            ws = wb["Comparatif"]
-
-            # Ajouter le titre dans la première ligne, sans fusion
-            ws.insert_rows(1)
-            cell_titre = ws.cell(row=1, column=1)
-            cell_titre.value = titre
-            cell_titre.font = Font(size=14, bold=True)
-            cell_titre.alignment = Alignment(horizontal="center")
-
-            # Formater les valeurs monétaires
-            valorisation_cols_idx = [i+1 for i, c in enumerate(df.columns) if "Valorisation" in c or "Écart Valorisation" in c]
-            for row in range(3, len(df) + 3):
-                for col_idx in valorisation_cols_idx:
-                    cell = ws.cell(row=row, column=col_idx)
-                    val = cell.value
-                    try:
-                        val_float = float(val)
-                        cell.value = format_valeur_monetaire_cell(val_float)
-                        if val_float < 0:
-                            cell.font = Font(color="FF0000")
-                    except:
-                        continue
-
-        output.seek(0)
-        return output
-
-    except Exception as e:
-        raise RuntimeError("Impossible de générer le fichier Excel.") from e
+AttributeError: 'MergedCell' object has no attribute 'column_letter'
+Traceback:
+File "C:\Users\4251352\Portail_outils\app.py", line 16, in <module>
+    tableau_comparaison_valo.main()
+File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 165, in main
+    annee2, df2, meta2 = lire_fichier_excel(fichier2, widget_label="deuxième fichier")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 109, in generer_excel
+    val_float = float(val)
+     ^^^^^^^^^^^^^^^^^^^^
