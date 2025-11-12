@@ -5,4 +5,4 @@ File "C:\Users\4251352\Portail_outils\app.py", line 16, in <module>
 File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 165, in main
     # Préparer une copie pour affichage avec format monétaire
                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 109, in genere
+File "C:\Users\4251352\Portail_outils\outils\tableau_comparaison_valo.py", line 109, in generer_excel
