@@ -210,3 +210,33 @@ def main():
 
     try:
         annee1, df1, meta1 = lire_fichier_excel(fichier1, widget_label="premier fichier")
+        annee2, df2, meta2 = lire_fichier_excel(fichier2, widget_label="deuxième fichier")
+
+        try:
+            if int(annee1) < int(annee2):
+                st.info(f"Inversion détectée : {annee1} < {annee2}. Les fichiers seront réordonnés automatiquement.")
+                annee1, annee2 = annee2, annee1
+                df1, df2 = df2, df1
+        except Exception:
+            st.warning("Impossible de déterminer l'ordre des années automatiquement (format de la période inattendu).")
+
+        st.write("### 🧾 Métadonnées")
+        st.write(f"**Période {annee1} :** {meta1.get('Période','')}")
+        st.write(f"**Période {annee2} :** {meta2.get('Période','')}")
+
+        df_comparatif = creer_tableau_comparatif(df1, annee1, df2, annee2)
+        afficher_tableau_colore(df_comparatif, annee1, annee2)
+
+        excel_data = generer_excel(df_comparatif, annee1, annee2)
+        st.download_button(
+            label="💾 Télécharger le comparatif (Excel)",
+            data=excel_data,
+            file_name=f"Comparatif_{annee1}_{annee2}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except Exception as e:
+        safe_show_exception(e)
+
+if __name__ == "__main__":
+    main()
