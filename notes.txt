@@ -1,198 +1,199 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
 
 # -----------------------
-# Lecture des fichiers Excel
+# Helpers
 # -----------------------
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
+        st.exception(e)
+
 def lire_fichier_excel(fichier):
-    """Lit un fichier Excel et renvoie (année, DataFrame, métadonnées)."""
-    df = pd.read_excel(fichier, header=None)
-
-    # métadonnées
+    df = pd.read_excel(fichier, header=None, dtype=str, engine='openpyxl')
     resume_filtrage = df.iloc[3, 0]
     periode = str(df.iloc[4, 0])
     filtres = df.iloc[5, 0]
     detail_valo = df.iloc[7, 0]
-
     import re
     match = re.search(r"(\d{4})", periode)
     annee = match.group(1) if match else "XXXX"
-
-    # tableau principal
-    data = pd.read_excel(fichier, header=8)
+    data = pd.read_excel(fichier, header=8, dtype=str, engine='openpyxl')
     data = data.iloc[:, :4]
     data.columns = ["Indicateur", "Valorisation", "Quantité", "Unité"]
+    data["Valorisation"] = pd.to_numeric(data["Valorisation"], errors='coerce')
+    data["Quantité"] = pd.to_numeric(data["Quantité"], errors='coerce')
+    return annee, data, {"Résumé": resume_filtrage, "Période": periode, "Filtres": filtres, "Détail": detail_valo}
 
-    return annee, data, {
-        "Résumé de filtrage": resume_filtrage,
-        "Période": periode,
-        "Filtres": filtres,
-        "Détail valorisation": detail_valo
-    }
-
-# -----------------------
-# Création du comparatif
-# -----------------------
 def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
-    """Fusionne les deux années en conservant l'ordre du fichier récent."""
-    df_new = df_new.rename(columns={
-        "Valorisation": f"Valorisation {annee_new}",
-        "Quantité": f"Quantité {annee_new}",
-        "Unité": f"Unité {annee_new}"
-    })
-    df_old = df_old.rename(columns={
-        "Valorisation": f"Valorisation {annee_old}",
-        "Quantité": f"Quantité {annee_old}",
-        "Unité": f"Unité {annee_old}"
-    })
-
-    df_merge = df_new.merge(df_old, on="Indicateur", how="left", sort=False)
+    df_new = df_new.rename(columns={"Valorisation": f"Valorisation {annee_new}",
+                                    "Quantité": f"Quantité {annee_new}",
+                                    "Unité": f"Unité {annee_new}"})
+    df_old = df_old.rename(columns={"Valorisation": f"Valorisation {annee_old}",
+                                    "Quantité": f"Quantité {annee_old}",
+                                    "Unité": f"Unité {annee_old}"})
+    df_new["__order__"] = range(len(df_new))
+    df_merge = pd.merge(df_new, df_old, on="Indicateur", how="outer")
+    df_merge = df_merge.sort_values("__order__").reset_index(drop=True).drop(columns="__order__")
     df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] = (
         df_merge[f"Valorisation {annee_new}"] - df_merge[f"Valorisation {annee_old}"]
     )
     return df_merge
 
-# -----------------------
-# Formatage
-# -----------------------
 def format_valeur_monetaire(val):
     if pd.isna(val):
         return ""
-    try:
-        return f"{val:,.2f}".replace(",", " ") + " €"
-    except Exception:
-        return val
+    return f"{val:,.2f}".replace(",", " ") + " €"
 
 def format_quantite(val):
     if pd.isna(val):
         return ""
     try:
         return f"{int(val):,}".replace(",", " ")
-    except Exception:
-        return val
+    except (ValueError, TypeError):
+        return str(val)
 
-# -----------------------
-# Génération du fichier Excel
-# -----------------------
 def generer_excel(df, annee_new, annee_old):
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        titre = f"Comparatif {annee_new} vs {annee_old}"
-        df.to_excel(writer, index=False, sheet_name="Comparatif", startrow=1)
-        wb = writer.book
-        ws = wb["Comparatif"]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Comparatif"
 
-        # Titre
-        cell_titre = ws.cell(row=1, column=1, value=titre)
-        cell_titre.font = Font(size=14, bold=True)
-        cell_titre.alignment = Alignment(horizontal="center")
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=df.shape[1])
+    # Titre
+    titre = f"Comparatif {annee_new} vs {annee_old}"
+    ws.cell(row=1, column=1, value=titre).font = Font(size=14, bold=True)
+    ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(df.columns))
 
-        # En-têtes
-        header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
-        border = Border(
-            left=Side(style="thin", color="000000"),
-            right=Side(style="thin", color="000000"),
-            top=Side(style="thin", color="thin"),
-            bottom=Side(style="thin", color="thin"),
-        )
+    # Bordures et header
+    header_fill = PatternFill("solid", fgColor="D9D9D9")
+    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                         top=Side(style='thin'), bottom=Side(style='thin'))
+    for j, col in enumerate(df.columns, start=1):
+        cell = ws.cell(row=2, column=j, value=col)
+        cell.font = Font(bold=True)
+        cell.alignment = Alignment(horizontal="center")
+        cell.fill = header_fill
+        cell.border = thin_border
 
-        for c in range(1, df.shape[1] + 1):
-            cell = ws.cell(row=2, column=c)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal="center")
-            cell.fill = header_fill
-            cell.border = border
+    # Données
+    for i, row in enumerate(df.values, start=3):
+        for j, val in enumerate(row, start=1):
+            col_name = df.columns[j-1]
+            cell = ws.cell(row=i, column=j)
+            if "Valorisation" in col_name or "Écart Valorisation" in col_name:
+                if pd.notna(val):
+                    cell.value = format_valeur_monetaire(val)
+                    if val < 0: cell.font = Font(color="FF0000")
+            elif "Quantité" in col_name and pd.notna(val):
+                cell.value = format_quantite(val)
+                cell.font = Font(italic=True)
+            elif "Unité" in col_name:
+                cell.value = str(val)
+                cell.font = Font(italic=True)
+            else:
+                cell.value = val
+            cell.border = thin_border
 
-        # Mise en forme des valeurs
-        for r in range(3, len(df) + 3):
-            for c, col_name in enumerate(df.columns, start=1):
-                cell = ws.cell(row=r, column=c)
-                cell.border = border
-                val = df.iloc[r - 3, c - 1]
-                if "Valorisation" in col_name or "Écart Valorisation" in col_name:
-                    try:
-                        val_float = float(val)
-                        cell.value = format_valeur_monetaire(val_float)
-                        if val_float < 0:
-                            cell.font = Font(color="FF0000")
-                    except:
-                        cell.value = format_valeur_monetaire(val)
-                elif "Quantité" in col_name:
-                    cell.value = format_quantite(val)
-                else:
-                    cell.value = val
+    # Ajustement largeur colonnes
+    for j, col in enumerate(df.columns, start=1):
+        max_len = max(len(str(col)), *(len(str(ws.cell(row=i, column=j).value)) for i in range(3, len(df)+3) if ws.cell(row=i, column=j).value))
+        ws.column_dimensions[ws.cell(row=2, column=j).column_letter].width = max_len + 2
 
-        # Ajustement automatique largeur des colonnes
-        for col_idx in range(1, df.shape[1] + 1):
-            max_length = 0
-            for r in range(1, len(df) + 3):
-                val = ws.cell(row=r, column=col_idx).value
-                if val:
-                    max_length = max(max_length, len(str(val)))
-            ws.column_dimensions[get_column_letter(col_idx)].width = max(8, max_length + 2)
-
+    wb.save(output)
     output.seek(0)
     return output
 
-# -----------------------
-# Affichage Streamlit
-# -----------------------
 def afficher_tableau_colore(df, annee_new, annee_old):
+    valorisation_cols = [c for c in df.columns if "Valorisation" in c or "Écart Valorisation" in c]
+    quantite_cols = [c for c in df.columns if "Quantité" in c]
+    unite_cols = [c for c in df.columns if "Unité" in c]
+
     df_styled = df.copy()
 
-    # Format monétaire et quantités
-    for col in df.columns:
-        if "Valorisation" in col or "Écart Valorisation" in col:
-            df_styled[col] = df_styled[col].apply(format_valeur_monetaire)
-        elif "Quantité" in col:
-            df_styled[col] = df_styled[col].apply(format_quantite)
-        # On ne touche PAS aux colonnes Unité
+    # Formater les quantités avec espace pour les milliers
+    def format_quantite(val):
+        try:
+            return f"{int(val):,}".replace(",", " ")
+        except:
+            return val
+    for col in quantite_cols:
+        df_styled[col] = df_styled[col].apply(format_quantite)
 
-    # Mise en rouge des valeurs négatives
+    # Valorisation : format monétaire avec 2 décimales et €
+    def format_valeur_monetaire(val):
+        try:
+            return f"{float(val):,.2f}".replace(",", " ") + " €"
+        except:
+            return val
+    for col in valorisation_cols:
+        df_styled[col] = df_styled[col].apply(lambda v: format_valeur_monetaire(v) if pd.notna(v) else "")
+
+    # Style : texte rouge si négatif pour les valorisations, italique pour Quantité
     def color_neg(v):
         try:
-            s = str(v).replace("€", "").replace(" ", "").replace(",", ".")
-            return "color: red" if float(s) < 0 else ""
+            val = float(str(v).replace("€", "").replace(" ", "").replace(",", "."))
+            return 'color: red' if val < 0 else ''
         except:
-            return ""
+            return ''
 
-    st.markdown(f"### 📊 Comparatif {annee_new} vs {annee_old}")
-    st.dataframe(df_styled.style.applymap(color_neg, subset=[c for c in df.columns if "Valorisation" in c]))
+    st.dataframe(
+        df_styled.style
+        .applymap(color_neg, subset=valorisation_cols)
+        .applymap(lambda v: 'font-style: italic', subset=quantite_cols)
+    )
+
+def debug_nan_unites(df):
+    unite_cols = [c for c in df.columns if "Unité" in c]
+    for col in unite_cols:
+        mask_nan = df[col].isna() | (df[col].astype(str).str.lower() == "nan")
+        if mask_nan.any():
+            print(f"\n=== Colonnes '{col}' contenant NaN ===")
+            for idx in df[mask_nan].index:
+                indicateur = df.loc[idx, "Indicateur"]
+                quantite = df.loc[idx, [c for c in df.columns if "Quantité" in c][0]]
+                valeur_unite = df.loc[idx, col]
+                print(f"Ligne {idx+9} (ligne Excel): Indicateur='{indicateur}', Quantité='{quantite}', Unité='{valeur_unite}', type={type(valeur_unite)}")
 
 # -----------------------
-# Application principale
+# main
 # -----------------------
 def main():
     st.title("💶 Comparateur de Valorisation T2A")
-    fichier1 = st.file_uploader("Fichier récent (ex: 2025)", type=["xlsx"])
-    fichier2 = st.file_uploader("Fichier ancien (ex: 2024)", type=["xlsx"])
+    st.write("### 🗂️ Importez les deux fichiers Excel")
 
-    if not (fichier1 and fichier2):
-        st.info("Veuillez uploader les deux fichiers pour comparer.")
-        return
+    fichier1 = st.file_uploader("Fichier récent (ex: 2025)", type=["xlsx"], key="file1")
+    fichier2 = st.file_uploader("Fichier ancien (ex: 2024)", type=["xlsx"], key="file2")
 
-    annee1, df1, meta1 = lire_fichier_excel(fichier1)
-    annee2, df2, meta2 = lire_fichier_excel(fichier2)
+    if fichier1 and fichier2:
+        try:
+            annee1, df1, meta1 = lire_fichier_excel(fichier1)
+            annee2, df2, meta2 = lire_fichier_excel(fichier2)
 
-    if int(annee1) < int(annee2):
-        df1, df2 = df2, df1
-        annee1, annee2 = annee2, annee1
+            if int(annee1) < int(annee2):
+                df1, df2 = df2, df1
+                annee1, annee2 = annee2, annee1
+                st.warning(f"Inversion détectée. Fichiers réordonnés.")
 
-    df_comparatif = creer_tableau_comparatif(df1, annee1, df2, annee2)
+            st.write(f"**Période {annee1}:** {meta1['Période']}")
+            st.write(f"**Période {annee2}:** {meta2['Période']}")
 
-    afficher_tableau_colore(df_comparatif, annee1, annee2)
+            df_comparatif = creer_tableau_comparatif(df1, annee1, df2, annee2)
+            afficher_tableau_colore(df_comparatif, annee1, annee2)
 
-    excel_data = generer_excel(df_comparatif, annee1, annee2)
-    st.download_button(
-        label="💾 Télécharger le comparatif (Excel)",
-        data=excel_data,
-        file_name=f"Comparatif_{annee1}_{annee2}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+            excel_data = generer_excel(df_comparatif, annee1, annee2)
+            st.download_button(
+                label="💾 Télécharger le comparatif (Excel)",
+                data=excel_data,
+                file_name=f"Comparatif_{annee1}_{annee2}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        except Exception as e:
+            safe_show_exception(e)
 
 if __name__ == "__main__":
     main()
