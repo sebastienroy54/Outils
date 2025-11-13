@@ -7,7 +7,7 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 def trouver_debut_tableau(df):
     for idx, val in enumerate(df.iloc[:,0]):
-        if str(val).strip() == 'Indicateur':
+        if isinstance(val, str) and 'indicateur' in val.strip().lower():
             return idx
     raise RuntimeError("Impossible de trouver le début du tableau. Vérifiez vos fichiers ou contactez le support.")
 
@@ -61,6 +61,12 @@ def creer_tableau_comparatif(df_new, annee_new, df_old, annee_old):
     df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] = (
         df_merge[f"Valorisation {annee_new}"] - df_merge[f"Valorisation {annee_old}"]
     )
+    df_merge[f"% Évolution Valorisation ({annee_new}-{annee_old})"] =(
+        (df_merge[f"Écart Valorisation ({annee_new}-{annee_old})"] / df_merge[f"Valorisation {annee_old}"])*100
+    )
+    df_merge[f"% Évolution Quantité ({annee_new}-{annee_old})"] =(
+        (df_merge[f"Quantité {annee_new}"] / df_merge[f"Quantité {annee_old}"])*100
+    )
     return df_merge
 
 def format_valeur_monetaire(val):
@@ -90,6 +96,7 @@ def generer_excel(df, annee_new, annee_old):
     header_fill = PatternFill("solid", fgColor="D9D9D9")
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
                          top=Side(style='thin'), bottom=Side(style='thin'))
+    
     for j, col in enumerate(df.columns, start=1):
         cell = ws.cell(row=2, column=j, value=col)
         cell.font = Font(bold=True)
@@ -108,6 +115,13 @@ def generer_excel(df, annee_new, annee_old):
                     cell.value = format_valeur_monetaire(val)
                     if val < 0: 
                         cell.font = Font(color="FF0000")
+            if "%" in col_name and pd.notna(val):
+                try:
+                    cell.value = f"{float(val):.2f} %"
+                    if val < 0:
+                        cell.font = Font(color="FF0000")
+                except:
+                    cell.value = ""
             elif "Quantité" in col_name and pd.notna(val):
                 cell.value = format_quantite(val)
                 cell.font = Font(italic=True)
@@ -176,7 +190,7 @@ def debug_nan_unites(df):
                 print(f"Ligne {idx+9} (ligne Excel): Indicateur='{indicateur}', Quantité='{quantite}', Unité='{valeur_unite}', type={type(valeur_unite)}")
 
 def main():
-    st.title("💶 Comparateur de Valorisation T2A")
+    st.title("Comparateur de Valorisation T2A")
     st.write("### 🗂️ Importez les deux fichiers Excel")
 
     fichier1 = st.file_uploader("Fichier récent (ex: 2025)", type=["xlsx"], key="file1")
