@@ -1,5 +1,7 @@
-        df1[['C', 'Prénom']],
-        df2[['Nom', 'Prénom', 'DDN', 'nip']],
-        left_on=['C', 'Prénom'],
-        right_on=['Nom', 'Prénom'],
-        how='left'
+ValueError: En-tête contenant ['c', 'Prénom'] non trouvé
+Traceback:
+File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 54, in main
+    df1 = trouver_header(df1_raw, ['c', 'Prénom'])
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 20, in trouver_header
+    raise ValueError(f"En-tête contenant {liste_colonnes} non trouvé")
