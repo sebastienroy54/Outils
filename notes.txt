@@ -1,18 +1,37 @@
-set verify off
-set linesize 300
-set pagesize 6000
-spool M:/CCH_DIAG_Coriat.txt
-set termout off
-SELECT DISTINCT RSM.NOIP
-FROM RSM, DGN WHERE RSM.KYRES = DGN.KYRES(+)
-AND
-(
-RSM.CDDNC9 in ('I330', 'I339') 
-OR RSM.CDRELIE  in ('I330', 'I339') 
-OR DGN.KYCDDG in ('I330', 'I339')
-) 
-AND RSM.CDURM_P in ('450', '451')
-AND RSM.D8SOUE  >= to_date('01/01/2015','DD/MM/YYYY')
-AND RSM.D8SOUE  < to_date('01/01/2025','DD/MM/YYYY')
-;
-spool off;
+import streamlit as st
+import pandas as pd
+import re
+import numpy as np
+from io import BytesIO
+from openpyxl import Workbook
+
+# Fonction permettant d'afficher les détails techniques lors d'une erreur
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
+        st.exception(e)
+
+def fusion_excel(df1, df2):
+    pass
+
+def main():
+    st.title("Croisement Fichiers Excel BHRe")
+    st.write("### 🗂️ Importez les deux fichiers Excel")
+
+    fichier1 = st.file_uploader("Fichier Indicateur", type=["xlsx"], key="file1")
+    fichier2 = st.file_uploader("Fichier Suivi", type=["xlsx"], key="file2")
+
+    if fichier1 and fichier2:
+        try:
+            df1 = pd.read_excel(fichier1, header=None, dtype=str, engine='openpyxl')
+            df2 = pd.read_excel(fichier2, header=None, dtype=str, engine='openpyxl')
+
+            excel_data = generer_excel(df_comparatif, annee1, annee2)
+            st.download_button(
+                label="💾 Télécharger le croisement (Excel)",
+                data=excel_data,
+                file_name=f"Comparatif_{annee1}_{annee2}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        except Exception as e:
+            safe_show_exception(e)
