@@ -1,38 +1,10 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 200
-SET COLSEP ','
-SPOOL C:\Users\4251352\Documents\obste.csv
-SELECT DISTINCT S.KYNOIP AS IPP
-FROM EPI E1, SDO S
-WHERE E1.KYNODA = S.KYNODA
-  AND S.DANAIS < TO_DATE('01/01/2012','DD/MM/YYYY')   -- exclure bébés
-  AND EXISTS (
-        -- vérifier qu'il y a un passage obstétrique
-        SELECT 1
-        FROM EPI E_OBS
-        WHERE E_OBS.KYNODA = E1.KYNODA
-          AND E_OBS.CDURM_P = '130'
-          AND E_OBS.UE = '435'
-  )
-  AND EXISTS (
-        -- vérifier que le dernier passage du séjour = décès
-        SELECT 1
-        FROM EPI E_FIN
-        WHERE E_FIN.KYNODA = E1.KYNODA
-          AND E_FIN.D8SOUE = (SELECT MAX(D8SOUE)
-                              FROM EPI
-                              WHERE KYNODA = E1.KYNODA)
-          AND E_FIN.MDSOUE = '9'
-          AND E_FIN.D8SOUE BETWEEN TO_DATE('01/01/2013','DD/MM/YYYY') AND SYSDATE
-  )
-  AND (
-        -- optionnel : passage en réa
-        EXISTS (SELECT 1
-                FROM EPI E_REA
-                WHERE E_REA.KYNODA = E1.KYNODA
-                  AND E_REA.CDURM_P IN ('103','104','101','102'))
-        OR 1=1
-  );
-SPOOL OFF   
+SELECT S.KYNOIP AS IPP,
+       E.KYNODA AS numero_sejour,
+       E.CDURM_P AS UM,
+       E.UE AS UH,
+       E.MDSOUE AS mode_sortie,
+       E.D8SOUE AS date_sortie
+FROM EPI E, SDO S
+WHERE E.KYNODA = S.KYNODA
+  AND S.KYNOIP IN ('IPP1','IPP2','IPP3')  -- liste de tes IPP
+ORDER BY S.KYNOIP, E.D8SOUE;
