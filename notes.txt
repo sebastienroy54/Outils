@@ -1,7 +1,26 @@
-ValueError: En-tête contenant ['c', 'Prénom'] non trouvé
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 54, in main
-    df1 = trouver_header(df1_raw, ['c', 'Prénom'])
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 20, in trouver_header
-    raise ValueError(f"En-tête contenant {liste_colonnes} non trouvé")
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 200
+SET COLSEP ','
+SPOOL C:\Users\4251352\Documents\obste.csv
+SELECT DISTINCT S.KYNOIP AS IPP
+FROM EPI E, SDO S
+WHERE E.KYNODA = S.KYNODA
+    AND E.MDSOUE = '9'
+    AND S.DANAIS < TO_DATE('01/01/2012','DD/MM/YYYY')
+    AND E.D8SOUE BETWEEN TO_DATE('01/01/2013','DD/MM/YYYY') AND SYSDATE
+    AND (
+        (E.CDURM_P = '130' AND E.UE = '435')
+        OR
+        (
+            E.CDURM_P = '130'
+            AND EXISTS (
+                SELECT 1
+                FROM EPI E2
+                WHERE E2.KYNODA = E.KYNODA 
+                AND E2.CDURM_P IN ('103','104','101','102')
+            )
+        )
+    );
+SPOOL OFF   
