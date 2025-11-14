@@ -1,18 +1,19 @@
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 200
+SET COLSEP ','
+SPOOL C:\Users\4251352\Documents\sortie_B965.csv
 SELECT DISTINCT
-    RSM.NOIP,
-    RSM.D8EEUE,
-    RSM.CDDNC9 AS DP
-FROM RSM, SDO S
-WHERE RSM.KYNODA = S.KYNODA
-  AND S.DANAIS < TO_DATE('01/01/2012','DD/MM/YYYY')
-  AND RSM.D8EEUE BETWEEN TO_DATE('01/01/2025','DD/MM/YYYY')
-                     AND TO_DATE('31/12/2025','DD/MM/YYYY')
-  AND (
-        RSM.CDDNC9 LIKE 'O95%'                     -- DP
-        OR EXISTS (
-            SELECT 1
-            FROM DGN D
-            WHERE D.KYRES = RSM.KYRES
-              AND D.KYCDDG LIKE 'O95%'
-        )
-      );
+    r.NODA         AS numero_sejour,
+    r.NOIP         AS ipp_patient,
+    r.CDURM        AS code_service,
+    d.KYCDDG       AS code_diagnostic,
+    r.D8EEUE       AS date_entree
+FROM RSM r, DGN d
+WHERE r.KYRES = d.KYRES
+  AND r.CDURM = '040s'
+  AND d.KYCDDG = 'B965'
+  AND r.D8EEUE BETWEEN TO_DATE('2025-01-01','YYYY-MM-DD') AND SYSDATE
+ORDER BY r.D8EEUE ASC;
+SPOOL OFF
