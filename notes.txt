@@ -1,10 +1,27 @@
-SELECT S.KYNOIP AS IPP,
-       E.KYNODA AS numero_sejour,
-       E.CDURM_P AS UM,
-       E.UE AS UH,
-       E.MDSOUE AS mode_sortie,
-       E.D8SOUE AS date_sortie
-FROM EPI E, SDO S
-WHERE E.KYNODA = S.KYNODA
-  AND S.KYNOIP IN ('IPP1','IPP2','IPP3')  -- liste de tes IPP
-ORDER BY S.KYNOIP, E.D8SOUE;
+SET PAGESIZE 6000
+SET LINESIZE 200
+SET COLSEP ','
+SPOOL C:\Users\4251352\Documents\obste.csv
+SELECT DISTINCT S.KYNOIP AS IPP
+FROM EPI E1, SDO S
+WHERE E1.KYNODA = S.KYNODA
+    AND S.DANAIS < TO_DATE('01/01/2012','DD/MM/YYYY')
+    AND E1.CDURM_P = '130'
+    AND E1.UE = '435'
+    AND EXISTS (
+        SELECT 1
+        FROM EPI E2
+        WHERE E2.KYNODA = E1.KYNODA
+            AND E2.D8SOUE = (SELECT MAX(D8SOUE) FROM EPI WHERE KYNODA = E1.KYNODA)
+            AND E2.MDSOUE = '9'
+    )
+    AND(
+        1=1
+        OR EXISTS (
+            SELECT 1
+            FROM EPI E3
+            WHERE E3.KYNODA = E1.KYNODA
+                AND E3.CDURM_P IN ('101','102','103','104')
+        )
+    );
+SPOOL OFF
