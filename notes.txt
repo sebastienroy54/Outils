@@ -1,173 +1,83 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import re
-from io import BytesIO
-import openpyxl
-
-# -------------------------
-# OUTILS
-# -------------------------
-
-def safe_show_exception(e):
-    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
-    if st.checkbox("Afficher détails techniques"):
-        st.exception(e)
-
-def normaliser_texte(val):
-    if val is None:
-        return ""
-    return str(val).strip().lower().replace("\n", " ")
-
-# Détection dynamique de la bonne feuille + de la ligne d’en-tête
 def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50):
+    import openpyxl
     wb = openpyxl.load_workbook(fichier, data_only=True)
-    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
+    st.write("DEBUG: sheetnames trouvées ->", wb.sheetnames)
 
     def correspond(cell, attendu):
         c = normaliser_texte(cell)
         a = normaliser_texte(attendu)
-
         if c == a:
             return True
         if a == "ipp" and re.sub(r"[^a-z]", "", c) == "ipp":
             return True
         if a == "prénom" and c.replace("é","e") == "prenom":
             return True
-        
         return False
-    
+
+    # Parcours des feuilles
     for sheetname in wb.sheetnames:
+        st.write(f"\n--- FEUILLE: {sheetname} ---")
+        # IMPORTANT: remettre le curseur en début pour que pandas puisse relire l'uploader
+        try:
+            fichier.seek(0)
+        except Exception:
+            pass
+
         df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
+        st.write(f"Aperçu brut ({sheetname}) shape={df.shape}:")
+        st.dataframe(df.head(20))
 
         # Scanner les premières lignes
-        for i in range(min(len(df), max_scan)):
+        nscan = min(len(df), max_scan)
+        st.write(f"DEBUG: je scanne jusqu'à {nscan} lignes dans la feuille {sheetname}")
+        for i in range(nscan):
             row = df.iloc[i].tolist()
-            if any("=" in str(x) for x in row):
-                continue
-
+            row_norm = [normaliser_texte(x) for x in row]
             non_empty = [x for x in row if str(x).strip() not in ["", "None", "nan"]]
-            if len(non_empty) < 3:
-                continue
+            contains_equal = any("=" in str(x) for x in row)
+            long_cells = any(len(str(x)) > 25 for x in non_empty)
 
-            if any(len(str(x)) > 30 for x in non_empty):
-                continue
-
-            ok = True
+            # compter les correspondances
+            match_count = 0
+            matches = {}
             for attendu in colonnes_attendues:
-                if not any(correspond(x, attendu) for x in row):
-                    ok = False
-            if not ok:
+                ok = any(correspond(x, attendu) for x in row)
+                if ok:
+                    match_count += 1
+                matches[attendu] = ok
+
+            st.write({
+                "sheet": sheetname,
+                "line_index": i,
+                "raw_row": row,
+                "normalized_row": row_norm,
+                "non_empty_count": len(non_empty),
+                "contains_equal": contains_equal,
+                "has_long_cells": long_cells,
+                "match_count": match_count,
+                "matches": matches
+            })
+
+            # conditions initiales de notre detection (gardées pour debug)
+            if contains_equal:
+                st.write(f"  -> skip ligne {i} (contient '=')")
                 continue
+            if len(non_empty) < 3:
+                st.write(f"  -> skip ligne {i} (trop peu de cellules non vides: {len(non_empty)})")
+                continue
+            if long_cells:
+                st.write(f"  -> skip ligne {i} (cellule trop longue)")
+                continue
+            if match_count >= 2:
+                st.write(f"  -> POSSIBLE HEADER trouvé en ligne {i} de la feuille {sheetname}")
+                # retélécharger proprement avec header fixé
+                try:
+                    fichier.seek(0)
+                except Exception:
+                    pass
+                df_final = pd.read_excel(fichier, sheet_name=sheetname, header=i, dtype=str, engine="openpyxl")
+                st.write("Aperçu avec header fixé :")
+                st.dataframe(df_final.head(10))
+                return df_final, sheetname, i
 
-            #row_norm = [normaliser_texte(x) for x in row]
-
-            #if all(c in row_norm for c in colonnes_norm):
-                # Retélécharger proprement avec header fixé
-            df_final = pd.read_excel(fichier, sheet_name=sheetname, header=i, dtype=str, engine="openpyxl")
-            return df_final, sheetname, i
-
-    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
-
-# Fusion F1 + F2
-def fusion_excel(df1, df2, df3):
-    # Normalisation colonnes
-    df1.columns = [normaliser_texte(c) for c in df1.columns]
-    df2.columns = [normaliser_texte(c) for c in df2.columns]
-    df3.columns = [normaliser_texte(c) for c in df3.columns]
-
-    # Renommage pour éviter les confusions
-    df1 = df1.rename(columns={"c": "nom", "prénom": "prenom"})
-    df2 = df2.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
-    df3 = df3.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "ipp": "ipp"})
-
-    # Normaliser nom + prénom
-    for col in ["nom", "prenom"]:
-        if col in df1:
-            df1[col] = df1[col].astype(str).str.strip().str.upper()
-        if col in df2:
-            df2[col] = df2[col].astype(str).str.strip().str.upper()
-        if col in df3:
-            df3[col] = df3[col].astype(str).str.strip().str.upper()
-
-    ref = pd.concat([df2, df3], ignore_index=True)
-    ref = ref.drop_duplicates(subset=["nom", "prenom", "ipp"])
-
-    df_merge = df1.merge(ref, on=["nom", "prenom"], how="inner")
-
-    df_merge["ddn"] = pd.to_datetime(df_merge["ddn"], errors='coerce', dayfirst=True)
-    df_merge["ddn"] = df_merge["ddn"].dt.strftime("%d/%m/%Y")
-
-    df_merge = df_merge.sort_values(by="nom").reset_index(drop=True)
-
-    return df_merge[["nom", "prenom", "ddn", "ipp"]]
-
-# Génération du fichier Excel téléchargeable
-def generer_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Croisement")
-    return output.getvalue()
-
-# -------------------------
-# INTERFACE STREAMLIT
-# -------------------------
-
-def main():
-    st.title("Croisement Fichiers Excel BHRe")
-    st.write("### 🗂️ Importez les deux fichiers Excel")
-
-    fichier1 = st.file_uploader("Fichier Indicateur", type=["xlsx"], key="file1")
-    fichier2 = st.file_uploader("Fichier Suivi Terminé", type=["xlsx"], key="file2")
-    fichier3 = st.file_uploader("Fichier Suivi", type=["xlsx"], key="file3")
-
-    if fichier1 and fichier2 and fichier3:
-        try:
-            st.info("🔍 Analyse des fichiers...")
-
-            # --- Détection bonne feuille / header ---
-            df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(
-                fichier1, ["c", "prénom"]
-            )
-            st.success(f"Fichier 1 → feuille détectée : **{feuil1}** (header ligne {ligne1})")
-            st.dataframe(df1.head())
-
-            df2, feuil2, ligne2 = trouver_feuille_avec_colonnes(
-                fichier2, ["nom", "prénom", "ddn", "nip"]
-            )
-            st.success(f"Fichier 2 → feuille détectée : **{feuil2}** (header ligne {ligne2})")
-            st.dataframe(df2.head())
-
-            df3, feuil3, ligne3 = trouver_feuille_avec_colonnes(
-                fichier3, ["nom", "prénom", "ddn", "ipp"]
-            )
-            st.success(f"Fichier 3 → feuille détectée : **{feuil3}** (header ligne {ligne3})")
-            st.dataframe(df3.head())
-
-            # --- Fusion ---
-            st.info("🔗 Fusion des fichiers...")
-            df_result = fusion_excel(df1, df2, df3)
-
-            st.success("Fusion terminée ! Aperçu :")
-            st.dataframe(df_result.head())
-
-            # --- Export Excel ---
-            excel_data = generer_excel(df_result)
-
-            st.download_button(
-                label="💾 Télécharger le fichier fusionné",
-                data=excel_data,
-                file_name="Croisement_BHRe.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-        except Exception as e:
-            safe_show_exception(e)
-
-ValueError: Aucune feuille ne contient les colonnes ['c', 'prénom']
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 129, in main
-    df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 70, in trouver_feuille_avec_colonnes
-    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
+    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues} (diagnostic terminé)")
