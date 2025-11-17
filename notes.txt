@@ -1,13 +1,120 @@
-Pas de table structurée. Lecture brute et scan pour header...
-Aperçu brut fichier 1 (10 premières lignes) :
+import streamlit as st
+import pandas as pd
+import numpy as np
+import re
+from io import BytesIO
+import openpyxl
 
-Une erreur est survenue.
+# -------------------------
+# OUTILS
+# -------------------------
+
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
+        st.exception(e)
+
+def normaliser_texte(val):
+    if val is None:
+        return ""
+    return str(val).strip().lower().replace("\n", " ")
+
+# Détection dynamique de la bonne feuille + de la ligne d’en-tête
+def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50):
+    wb = openpyxl.load_workbook(fichier, data_only=True)
+    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
+
+    for sheetname in wb.sheetnames:
+        df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
+
+        # Scanner les premières lignes
+        for i in range(min(len(df), max_scan)):
+            row = df.iloc[i].tolist()
+            row_norm = [normaliser_texte(x) for x in row]
+
+            if all(c in row_norm for c in colonnes_norm):
+                # Retélécharger proprement avec header fixé
+                df_final = pd.read_excel(fichier, sheet_name=sheetname, header=i, dtype=str, engine="openpyxl")
+                return df_final, sheetname, i
+
+    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
+
+# Fusion F1 + F2
+def fusion_excel(df1, df2):
+    # Normalisation colonnes
+    df1.columns = [normaliser_texte(c) for c in df1.columns]
+    df2.columns = [normaliser_texte(c) for c in df2.columns]
+
+    # Renommage pour éviter les confusions
+    df1 = df1.rename(columns={"c": "nom", "prénom": "prenom"})
+    df2 = df2.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
+
+    # Normaliser nom + prénom
+    for col in ["nom", "prenom"]:
+        if col in df1:
+            df1[col] = df1[col].astype(str).str.strip().str.upper()
+        if col in df2:
+            df2[col] = df2[col].astype(str).str.strip().str.upper()
+
+    df_merge = df1.merge(df2, on=["nom", "prenom"], how="left")
+
+    return df_merge[["nom", "prenom", "ddn", "ipp"]]
+
+# Génération du fichier Excel téléchargeable
+def generer_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Croisement")
+    return output.getvalue()
+
+# -------------------------
+# INTERFACE STREAMLIT
+# -------------------------
+
+def main():
+    st.title("Croisement Fichiers Excel BHRe")
+    st.write("### 🗂️ Importez les deux fichiers Excel")
+
+    fichier1 = st.file_uploader("Fichier Indicateur (F1)", type=["xlsx"], key="file1")
+    fichier2 = st.file_uploader("Fichier Suivi (F2)", type=["xlsx"], key="file2")
+
+    if fichier1 and fichier2:
+        try:
+            st.info("🔍 Analyse des fichiers...")
+
+            # --- Détection bonne feuille / header ---
+            df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(
+                fichier1, ["c", "prénom"]
+            )
+            st.success(f"Fichier 1 → feuille détectée : **{feuil1}** (header ligne {ligne1})")
+            st.dataframe(df1.head())
+
+            df2, feuil2, ligne2 = trouver_feuille_avec_colonnes(
+                fichier2, ["nom", "prénom", "ddn", "nip"]
+            )
+            st.success(f"Fichier 2 → feuille détectée : **{feuil2}** (header ligne {ligne2})")
+            st.dataframe(df2.head())
+
+            # --- Fusion ---
+            st.info("🔗 Fusion des fichiers...")
+            df_result = fusion_excel(df1, df2)
+
+            st.success("Fusion terminée ! Aperçu :")
+            st.dataframe(df_result.head())
+
+            # --- Export Excel ---
+            excel_data = generer_excel(df_result)
+
+            st.download_button(
+                label="💾 Télécharger le fichier fusionné",
+                data=excel_data,
+                file_name="Croisement_BHRe.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        except Exception as e:
+            safe_show_exception(e)
 
 
-ValueError: En-tête contenant ['c', 'Prénom'] non trouvé (scan jusqu'à 3 lignes).
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 165, in main
-    df1, idx1 = trouver_header_par_scan(df1_raw, ['c', 'Prénom'])
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 67, in trouver_header_par_scan
-    raise ValueError(f"En-tête contenant {colonnes_attendues} non trouvé (scan jusqu'à {len(df_raw)} lignes).")
+if __name__ == "__main__":
+    main()
