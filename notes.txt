@@ -1,27 +1,16 @@
-def trouver_header(df, liste_colonnes):
-    import unicodedata
+def lire_table_excel(fichier):
+    wb = load_workbook(fichier, data_only=True)
+    sheet = wb.active
 
-    def normaliser(s):
-        if not isinstance(s, str):
-            return ""
-        s = s.strip().lower()
-        s = ''.join(c for c in unicodedata.normalize('NFD', s)
-                    if unicodedata.category(c) != 'Mn')
-        return s
+    # Cherche une vraie table Excel (tableau structuré)
+    if sheet.tables:
+        nom_table = list(sheet.tables.keys())[0]
+        table = sheet.tables[nom_table]
 
-    liste_norm = [normaliser(c) for c in liste_colonnes]
+        # Adresse de la table (ex : "B3:F200")
+        ref = table.ref
+        df = pd.read_excel(fichier, engine="openpyxl", sheet_name=sheet.title, usecols=ref)
+        return df
 
-    for i, row in df.iterrows():
-        row_norm = [normaliser(x) for x in row.values]
-
-        # On ne garde que les lignes qui contiennent au moins du texte
-        if not any(len(x) > 0 for x in row_norm):
-            continue
-
-        # Vérification que les colonnes attendues sont présentes
-        if all(col in row_norm for col in liste_norm):
-            df.columns = row  # garde les noms tels qu'ils apparaissent
-            df = df.drop(index=range(i+1)).reset_index(drop=True)
-            return df
-
-    raise ValueError(f"Impossible de trouver des colonnes : {liste_colonnes}")
+    # Sinon on lit toute la feuille (fallback)
+    return pd.read_excel(fichier, dtype=str)
