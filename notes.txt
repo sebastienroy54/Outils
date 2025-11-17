@@ -1,16 +1,226 @@
-def lire_table_excel(fichier):
-    wb = load_workbook(fichier, data_only=True)
-    sheet = wb.active
+import streamlit as st
+import pandas as pd
+from io import BytesIO
+from openpyxl import load_workbook
+import unicodedata
 
-    # Cherche une vraie table Excel (tableau structuré)
-    if sheet.tables:
-        nom_table = list(sheet.tables.keys())[0]
-        table = sheet.tables[nom_table]
+# --- helpers ---
+def normaliser_texte(s):
+    """Renvoie une version normalisée d'une chaîne (str) : strip, lower, sans accents."""
+    if pd.isna(s):
+        return ""
+    if not isinstance(s, str):
+        s = str(s)
+    s = s.strip().lower()
+    s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+    # collapse multiple spaces
+    s = " ".join(s.split())
+    return s
 
-        # Adresse de la table (ex : "B3:F200")
-        ref = table.ref
-        df = pd.read_excel(fichier, engine="openpyxl", sheet_name=sheet.title, usecols=ref)
-        return df
+def lire_table_excel_si_present(fichier):
+    """Si la feuille contient une table structurée Excel, retourne un DataFrame de cette table.
+       Sinon retourne None (le fallback se fera par pandas)."""
+    try:
+        wb = load_workbook(filename=fichier, data_only=True, read_only=True)
+        sheet = wb.active
+        if sheet.tables:
+            # prend la première table trouvée
+            nom_table = list(sheet.tables.keys())[0]
+            table = sheet.tables[nom_table]
+            ref = table.ref  # ex "B3:F200"
+            # usecols n'accepte pas les refs "B3:F200" directement, on lit la feuille et on slice ensuite
+            df_sheet = pd.read_excel(fichier, engine="openpyxl", sheet_name=sheet.title, dtype=str)
+            # extraire les coordonnées de la ref
+            # on lit avec header=0 pour récupérer les colonnes effectivement
+            # mais souvent la table contient header sur la première ligne de la ref
+            return df_sheet
+    except Exception:
+        pass
+    return None
 
-    # Sinon on lit toute la feuille (fallback)
-    return pd.read_excel(fichier, dtype=str)
+def trouver_header_par_scan(df_raw, colonnes_attendues):
+    """
+    df_raw : DataFrame lu avec header=None (toutes les lignes brute).
+    colonnes_attendues : liste de noms attendus, ex ['c','prénom'].
+    Renvoie (df, idx_header) où df a ses colonnes définies à partir de la ligne trouvée.
+    """
+    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
+
+    # itérer ligne par ligne
+    for i, row in df_raw.iterrows():
+        # normaliser chaque cellule de la ligne
+        row_norm = [normaliser_texte(x) for x in row.tolist()]
+        # ignorer ligne vide
+        if not any(cell for cell in row_norm):
+            continue
+        # si tous les noms attendus sont présents dans la ligne normalisée
+        if all(col in row_norm for col in colonnes_norm):
+            # définir l'en-tête
+            header = row.tolist()
+            df = df_raw.copy()
+            df.columns = header
+            # supprimer les lignes au-dessus de l'en-tête
+            df = df.drop(index=range(i+1)).reset_index(drop=True)
+            return df, i
+    # si pas trouvé
+    raise ValueError(f"En-tête contenant {colonnes_attendues} non trouvé (scan jusqu'à {len(df_raw)} lignes).")
+
+def normaliser_colonnes_df(df, mapping_out=None):
+    """Normalise les colonnes: renvoie colonnes normales (no accents, lower) et mapping original->normalisé."""
+    new_cols = []
+    mapping = {}
+    for col in df.columns:
+        col_norm = normaliser_texte(col)
+        new_cols.append(col_norm)
+        mapping[col_norm] = col  # on garde le nom original en valeur si besoin
+    df.columns = new_cols
+    if mapping_out is not None:
+        return df, mapping
+    return df
+
+def fusion_excel(df1, df2):
+    # On suppose que df1 a colonnes normalisées 'c' et 'prenom' (après normalisation),
+    # et df2 a 'nom','prenom','ddn','nip'
+    # On crée colonnes de jointure normalisées pour augmenter le matching
+    df1 = df1.copy()
+    df2 = df2.copy()
+
+    for col in ['c', 'prenom', 'nom']:
+        if col in df1.columns:
+            df1[f'{col}_norm'] = df1[col].map(normaliser_texte)
+        if col in df2.columns:
+            df2[f'{col}_norm'] = df2[col].map(normaliser_texte)
+
+    # choisir les colonnes de jointure
+    left_on = []
+    right_on = []
+    if 'c_norm' in df1.columns:
+        left_on.append('c_norm')
+        right_on.append('nom_norm')
+    if 'prenom_norm' in df1.columns and 'prenom_norm' in df2.columns:
+        left_on.append('prenom_norm')
+        right_on.append('prenom_norm')
+
+    if not left_on:
+        raise ValueError("Colonnes de jointure non trouvées après normalisation.")
+
+    df_fusion = pd.merge(df1, df2, left_on=left_on, right_on=right_on, how='left', suffixes=('_ind', '_suiv'))
+
+    # Conserver/renommer colonnes de sortie
+    out = pd.DataFrame()
+    # Nom (prendre depuis df1 si existant sinon df2)
+    if 'c' in df1.columns:
+        out['Nom'] = df_fusion['c']
+    elif 'nom' in df2.columns:
+        out['Nom'] = df_fusion['nom']
+    else:
+        out['Nom'] = df_fusion.get('nom', '')
+
+    # Prénom
+    if 'prenom' in df1.columns:
+        out['Prénom'] = df_fusion['prenom']
+    else:
+        out['Prénom'] = df_fusion.get('prenom', '')
+
+    # DDN et IPP (nip)
+    # df2 colonnes peuvent s'appeler 'ddn' et 'nip'
+    out['DDN'] = df_fusion.get('ddn', '')
+    out['IPP'] = df_fusion.get('nip', '')
+
+    return out
+
+def generer_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Croisement')
+    return output.getvalue()
+
+# --- Streamlit app ---
+def main():
+    st.title("Croisement Fichiers Excel BHRe")
+    st.write("### 🗂️ Importez les deux fichiers Excel")
+
+    fichier1 = st.file_uploader("Fichier Indicateur (contenant 'c' et 'Prénom')", type=["xlsx"], key="file1")
+    fichier2 = st.file_uploader("Fichier Suivi (contenant 'Nom','Prénom','DDN','nip')", type=["xlsx"], key="file2")
+
+    if fichier1 and fichier2:
+        try:
+            progress = st.progress(0)
+            status = st.empty()
+
+            status.text("Lecture fichier 1 (Indicateur) — tentative lecture table structurée...")
+            df1_table = lire_table_excel_si_present(fichier1)
+            if df1_table is not None and not df1_table.empty:
+                df1 = df1_table
+                status.text("Table structurée trouvée dans fichier 1.")
+                progress.progress(20)
+            else:
+                status.text("Pas de table structurée. Lecture brute et scan pour header...")
+                # lecture brute
+                df1_raw = pd.read_excel(fichier1, header=None, dtype=str, engine='openpyxl')
+                st.write("Aperçu brut fichier 1 (10 premières lignes) :")
+                st.dataframe(df1_raw.head(10))
+                # rechercher header
+                df1, idx1 = trouver_header_par_scan(df1_raw, ['c', 'Prénom'])
+                status.text(f"En-tête trouvé dans fichier 1 à la ligne index {idx1}.")
+                progress.progress(30)
+
+            # ---------- fichier 2 ----------
+            status.text("Lecture fichier 2 (Suivi)...")
+            # fichier 2 normal -> lecture simple
+            df2_raw = pd.read_excel(fichier2, header=0, dtype=str, engine='openpyxl')
+            st.write("Aperçu fichier 2 (10 premières lignes) :")
+            st.dataframe(df2_raw.head(10))
+
+            # Si besoin, essayer table structured pour fichier 2 aussi
+            df2_table = lire_table_excel_si_present(fichier2)
+            if df2_table is not None and not df2_table.empty:
+                df2 = df2_table
+            else:
+                df2 = df2_raw
+
+            progress.progress(60)
+            status.text("Normalisation des noms de colonnes...")
+
+            # normaliser noms de colonnes pour faciliter le mapping
+            df1 = df1.copy()
+            df2 = df2.copy()
+            # on renomme les colonnes en version normalisée (c, prenom, nom, ddn, nip)
+            df1, _ = normaliser_colonnes_df(df1, mapping_out=True) if False else (normaliser_colonnes_df(df1), None)
+            df2, _ = normaliser_colonnes_df(df2, mapping_out=True) if False else (normaliser_colonnes_df(df2), None)
+
+            # Vérification rapide présence des colonnes essentielles
+            needed1 = ['c', 'prenom']
+            needed2 = ['nom','prenom','ddn','nip']
+            if not all(x in df1.columns for x in [normaliser_texte(x) for x in needed1]):
+                raise ValueError(f"Fichier 1 : colonnes attendues {needed1} absentes (colonnes trouvées: {list(df1.columns)})")
+            if not all(x in df2.columns for x in [normaliser_texte(x) for x in needed2]):
+                raise ValueError(f"Fichier 2 : colonnes attendues {needed2} absentes (colonnes trouvées: {list(df2.columns)})")
+
+            progress.progress(75)
+            status.text("Fusion des données (normalisation noms/prénoms)...")
+
+            df_result = fusion_excel(df1, df2)
+
+            progress.progress(95)
+            status.text("Génération du fichier Excel...")
+
+            excel_data = generer_excel(df_result)
+            progress.progress(100)
+            status.text("Terminé ✅")
+
+            st.success("✅ Croisement effectué avec succès !")
+            st.download_button(
+                label="💾 Télécharger le croisement (Excel)",
+                data=excel_data,
+                file_name="Croisement_BHRe.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        except Exception as e:
+            st.error("Une erreur est survenue.")
+            if st.checkbox("Afficher détails techniques"):
+                st.exception(e)
+
+if __name__ == "__main__":
+    main()
