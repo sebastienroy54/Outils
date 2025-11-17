@@ -1,23 +1,27 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 200
-SET COLSEP ','
-SPOOL C:\Users\4251352\Documents\sortie_B965.csv
-SELECT DISTINCT
-    r.NODA         AS numero_sejour,
-    r.NOIP         AS ipp_patient,
-    r.CDURM        AS code_service,
-    r.CDDNC9       AS DP,
-    r.CDRELIE      AS DR,
-    d.KYCDDG       AS DAS,
-    r.D8EEUE       AS date_entree
-FROM RSM r, DGN d
-WHERE r.KYRES = d.KYRES
-  AND r.CDURM = '040s'
-  AND ( r.CDDNC9  = 'B965'
-        OR r.CDRELIE = 'B965'
-        OR d.KYCDDG  = 'B965' )
-  AND r.D8EEUE BETWEEN TO_DATE('2025-01-01','YYYY-MM-DD') AND SYSDATE
-ORDER BY r.D8EEUE ASC;
-SPOOL OFF
+def trouver_header(df, liste_colonnes):
+    import unicodedata
+
+    def normaliser(s):
+        if not isinstance(s, str):
+            return ""
+        s = s.strip().lower()
+        s = ''.join(c for c in unicodedata.normalize('NFD', s)
+                    if unicodedata.category(c) != 'Mn')
+        return s
+
+    liste_norm = [normaliser(c) for c in liste_colonnes]
+
+    for i, row in df.iterrows():
+        row_norm = [normaliser(x) for x in row.values]
+
+        # On ne garde que les lignes qui contiennent au moins du texte
+        if not any(len(x) > 0 for x in row_norm):
+            continue
+
+        # Vérification que les colonnes attendues sont présentes
+        if all(col in row_norm for col in liste_norm):
+            df.columns = row  # garde les noms tels qu'ils apparaissent
+            df = df.drop(index=range(i+1)).reset_index(drop=True)
+            return df
+
+    raise ValueError(f"Impossible de trouver des colonnes : {liste_colonnes}")
