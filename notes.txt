@@ -24,18 +24,48 @@ def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50):
     wb = openpyxl.load_workbook(fichier, data_only=True)
     colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
 
+    def correspond(cell, attendu):
+        c = normaliser_texte(cell)
+        a = normaliser_texte(attendu)
+
+        if c == a:
+            return True
+        if a == "ipp" and re.sub(r"[^a-z]", "", c) == "ipp":
+            return True
+        if a == "prénom" and c.replace("é","e") == "prenom":
+            return True
+        
+        return False
+    
     for sheetname in wb.sheetnames:
         df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
 
         # Scanner les premières lignes
         for i in range(min(len(df), max_scan)):
             row = df.iloc[i].tolist()
-            row_norm = [normaliser_texte(x) for x in row]
+            if any("=" in str(x) for x in row):
+                continue
 
-            if all(c in row_norm for c in colonnes_norm):
+            non_empty = [x for x in row if str(x).strip() not in ["", "None", "nan"]]
+            if len(non_empty) < 3:
+                continue
+
+            if any(len(str(x)) > 30 for x in non_empty):
+                continue
+
+            ok = True
+            for attendu in colonnes_attendues:
+                if not any(correspond(x, attendu) for x in row):
+                    ok = False
+            if not ok:
+                continue
+
+            #row_norm = [normaliser_texte(x) for x in row]
+
+            #if all(c in row_norm for c in colonnes_norm):
                 # Retélécharger proprement avec header fixé
-                df_final = pd.read_excel(fichier, sheet_name=sheetname, header=i, dtype=str, engine="openpyxl")
-                return df_final, sheetname, i
+            df_final = pd.read_excel(fichier, sheet_name=sheetname, header=i, dtype=str, engine="openpyxl")
+            return df_final, sheetname, i
 
     raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
 
@@ -49,7 +79,7 @@ def fusion_excel(df1, df2, df3):
     # Renommage pour éviter les confusions
     df1 = df1.rename(columns={"c": "nom", "prénom": "prenom"})
     df2 = df2.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
-    df3 = df3.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
+    df3 = df3.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "ipp": "ipp"})
 
     # Normaliser nom + prénom
     for col in ["nom", "prenom"]:
@@ -134,19 +164,10 @@ def main():
         except Exception as e:
             safe_show_exception(e)
 
-InvalidIndexError: Reindexing only valid with uniquely valued Index objects
+ValueError: Aucune feuille ne contient les colonnes ['c', 'prénom']
 Traceback:
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 119, in main
-    df_result = fusion_excel(df1, df2, df3)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 63, in fusion_excel
-    ref = pd.concat([df2, df3], ignore_index=True)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\reshape\concat.py", line 395, in concat
-    return op.get_result()
-           ^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\reshape\concat.py", line 680, in get_result
-    indexers[ax] = obj_labels.get_indexer(new_labels)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexes\base.py", line 3892, in get_indexer
-    raise InvalidIndexError(self._requires_unique_msg)
+File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 129, in main
+    df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 70, in trouver_feuille_avec_colonnes
+    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
