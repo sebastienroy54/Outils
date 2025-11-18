@@ -6,6 +6,8 @@ from io import BytesIO
 import openpyxl
 import subprocess
 from pathlib import Path
+import os
+import time
 
 # -------------------------
 # OUTILS
@@ -21,38 +23,6 @@ def normaliser_texte(val):
         return ""
     return str(val).strip().lower().replace("\n", " ")
 
-# -------------------------
-# DETECTION FEUILLES
-# -------------------------
-
-def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50, debug=False):
-    fichier.seek(0)
-    wb = openpyxl.load_workbook(fichier, data_only=True)
-    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
-
-    for sheetname in wb.sheetnames:
-        fichier.seek(0)
-        df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
-        if debug:
-            st.write(f"--- FEUILLE : {sheetname} ---")
-            st.write(df.head())
-        for i in range(min(len(df), max_scan)):
-            row = df.iloc[i].tolist()
-            row_norm = [normaliser_texte(x) for x in row]
-            if any("=" in str(x) for x in row_norm):
-                continue
-            if sum(x.strip() not in ["", "none", "nan"] for x in row_norm) < 2:
-                continue
-            if all(col in row_norm for col in colonnes_norm):
-                fichier.seek(0)
-                df_final = pd.read_excel(fichier, sheet_name=sheetname, header=i, dtype=str, engine="openpyxl")
-                return df_final, sheetname, i
-    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
-
-# -------------------------
-# NETTOYAGE IPP
-# -------------------------
-
 def nettoyer_ipp(val):
     if val is None:
         return ""
@@ -60,54 +30,103 @@ def nettoyer_ipp(val):
     return val[-10:] if len(val) >= 10 else ""
 
 # -------------------------
-# FUSION DES DONNEES
+# Détection dynamique de la feuille contenant les colonnes cibles
 # -------------------------
+def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50, debug=False):
 
+    fichier.seek(0)
+    wb = openpyxl.load_workbook(fichier, data_only=True)
+    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
+
+    for sheetname in wb.sheetnames:
+        fichier.seek(0)
+        df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
+
+        if debug:
+            st.write(f"--- FEUILLE : {sheetname} ---")
+            st.write(df.head())
+
+        for i in range(min(len(df), max_scan)):
+            row = df.iloc[i].tolist()
+            row_norm = [normaliser_texte(x) for x in row]
+
+            if any("=" in str(x) for x in row_norm):
+                continue
+
+            if sum(x.strip() not in ["", "none", "nan"] for x in row_norm) < 2:
+                continue
+
+            if all(col in row_norm for col in colonnes_norm):
+                fichier.seek(0)
+                df_final = pd.read_excel(
+                    fichier,
+                    sheet_name=sheetname,
+                    header=i,
+                    dtype=str,
+                    engine="openpyxl"
+                )
+                return df_final, sheetname, i
+
+    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
+
+# -------------------------
+# Fusion des fichiers Excel
+# -------------------------
 def fusion_excel(df1, df2, df3):
+    # Normalisation colonnes
     df1.columns = [normaliser_texte(c) for c in df1.columns]
     df2.columns = [normaliser_texte(c) for c in df2.columns]
     df3.columns = [normaliser_texte(c) for c in df3.columns]
 
+    # Renommage cohérent
     df1 = df1.rename(columns={"c": "nom", "prénom": "prenom"})
     df2 = df2.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
     df3 = df3.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "ipp": "ipp"})
 
+    # Harmoniser nom/prénom
     for df in [df1, df2, df3]:
         for col in ["nom", "prenom"]:
             df[col] = df[col].astype(str).str.strip().str.upper()
 
+    # Nettoyage IPP
     df2["ipp"] = df2["ipp"].apply(nettoyer_ipp)
     df3["ipp"] = df3["ipp"].apply(nettoyer_ipp)
 
+    # Supprimer colonnes dupliquées
     df2 = df2.loc[:, ~df2.columns.duplicated()]
     df3 = df3.loc[:, ~df3.columns.duplicated()]
+
+    # Fusion F2 + F3
     ref = pd.concat([df2, df3], ignore_index=True)
     ref = ref.drop_duplicates(subset=["nom", "prenom", "ipp"])
 
+    # Intersection stricte avec F1
     df_merge = df1.merge(ref, on=["nom", "prenom"], how="inner")
 
+    # Formatage DDN
     df_merge["ddn"] = pd.to_datetime(df_merge["ddn"], errors="coerce", dayfirst=True)
     df_merge["ddn"] = df_merge["ddn"].dt.strftime("%d/%m/%Y")
+
     df_merge = df_merge.sort_values(by="nom").reset_index(drop=True)
 
     return df_merge[["nom", "prenom", "ddn", "ipp"]]
 
 # -------------------------
-# EXPORT EXCEL
+# Export Excel
 # -------------------------
-
-def generer_excel(df, chemin_fichier=None):
+def generer_excel(df, chemin=None):
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Croisement")
-        if chemin_fichier:
-            df.to_excel(chemin_fichier, index=False, sheet_name="Croisement")
-    return output.getvalue()
+    data = output.getvalue()
+    if chemin:
+        with open(chemin, "wb") as f:
+            f.write(data)
+    return data
 
 # -------------------------
-# GENERATION SQL AVEC IPP
+# Génération SQL BHRe avec IPP
 # -------------------------
-
 def generer_sql_bhre(fichier_sql_base, liste_ipps, fichier_sql_temp):
     ipps_txt = ",".join(f"'{ipp}'" for ipp in liste_ipps if ipp)
     sql_base = Path(fichier_sql_base).read_text(encoding="utf-8")
@@ -118,89 +137,96 @@ def generer_sql_bhre(fichier_sql_base, liste_ipps, fichier_sql_temp):
 # -------------------------
 # INTERFACE STREAMLIT
 # -------------------------
-
 def main():
-    st.title("Croisement Fichiers Excel BHRe")
-    st.write("### 🗂️ Importez les trois fichiers Excel et connectez-vous à Oracle")
+    st.title("BHRe : Croisement et extraction Oracle")
+    st.write("### 🔐 Connexion à Oracle")
 
-    # --- Connexion Oracle ---
+    # Connexion Oracle
     with st.form("connexion"):
-        st.subheader("Connexion Oracle")
         user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
         password = st.text_input("🔑 Mot de passe :", type="password")
         submitted = st.form_submit_button("🚀 Connexion")
-    
+
     if submitted:
-        if not user or not password:
-            st.error("Veuillez renseigner vos identifiants Oracle.")
-            st.stop()
-        else:
-            try:
-                # Test de connexion (optionnel simple, ici juste ping sqlplus)
-                result = subprocess.run(f"sqlplus -L {user}/{password}@SIP1CCH.WORLD exit",
-                                        shell=True, capture_output=True, text=True)
-                if "Connected" not in result.stdout:
-                    st.error("Connexion échouée. Vérifiez vos identifiants.")
-                    st.stop()
-                st.success("✅ Connexion Oracle réussie.")
-            except Exception as e:
-                st.error("Erreur lors de la connexion à Oracle.")
-                st.exception(e)
-                st.stop()
-
-    # --- Upload fichiers Excel ---
-    fichier1 = st.file_uploader("Fichier Indicateur (F1)", type=["xlsx"])
-    fichier2 = st.file_uploader("Fichier Suivi Terminé (F2)", type=["xlsx"])
-    fichier3 = st.file_uploader("Fichier Suivi (F3)", type=["xlsx"])
-    debug = st.checkbox("Afficher mode debug")
-
-    if fichier1 and fichier2 and fichier3:
+        tns_alias = "SIP1CCH.WORLD"
         try:
-            progress = st.progress(0)
-
-            # --- Détection Feuilles ---
-            df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(fichier1, ["c", "prénom"], debug=debug)
-            st.success(f"Fichier 1 → feuille : {feuil1} (header ligne {ligne1})")
-            progress.progress(20)
-
-            df2, feuil2, ligne2 = trouver_feuille_avec_colonnes(fichier2, ["nom", "prénom", "ddn", "nip"], debug=debug)
-            st.success(f"Fichier 2 → feuille : {feuil2} (header ligne {ligne2})")
-            progress.progress(40)
-
-            df3, feuil3, ligne3 = trouver_feuille_avec_colonnes(fichier3, ["nom", "prénom", "ddn", "ipp"], debug=debug)
-            st.success(f"Fichier 3 → feuille : {feuil3} (header ligne {ligne3})")
-            progress.progress(60)
-
-            # --- Fusion ---
-            st.info("🔗 Fusion des fichiers...")
-            df_result = fusion_excel(df1, df2, df3)
-            st.success("Fusion terminée !")
-            st.dataframe(df_result.head())
-            progress.progress(80)
-
-            # --- Export fusion ---
-            chemin_fusion = "C:/Users/4251352/Portail_outils/data/Fusion_excel.xlsx"
-            excel_data = generer_excel(df_result, chemin_fusion)
-            st.download_button("💾 Télécharger le fichier fusionné", data=excel_data,
-                               file_name="Fusion_excel.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-            # --- Génération SQL avec liste IPP ---
-            liste_ipps = df_result["ipp"].dropna().unique().tolist()
-            fichier_sql_base = "C:/Users/4251352/Portail_outils/SQL/BHRe.sql"
-            fichier_sql_temp = "C:/Users/4251352/Portail_outils/SQL/BHRe_temp.sql"
-            generer_sql_bhre(fichier_sql_base, liste_ipps, fichier_sql_temp)
-            progress.progress(90)
-
-            # --- Exécution SQL ---
-            st.info("🧠 Exécution de la requête SQL BHRe...")
-            cmd = f'sqlplus {user}/{password}@SIP1CCH.WORLD @{fichier_sql_temp}'
-            subprocess.run(cmd, shell=True)
-            progress.progress(100)
-            st.success("✅ Requête SQL terminée et fichier CSV généré.")
+            # Test de connexion simple
+            cmd_test = f'echo "SELECT 1 FROM dual;" | sqlplus -S {user}/{password}@{tns_alias}'
+            result = subprocess.run(cmd_test, shell=True, capture_output=True, text=True)
+            if "1" not in result.stdout:
+                st.error("❌ Connexion échouée. Vérifiez vos identifiants.")
+                st.stop()
+            st.success("✅ Connexion réussie !")
 
         except Exception as e:
             safe_show_exception(e)
+            st.stop()
 
-if __name__ == "__main__":
-    main()
+        # --- Import fichiers Excel ---
+        st.write("### 🗂️ Importez les trois fichiers Excel")
+        fichier1 = st.file_uploader("Fichier Indicateur (F1)", type=["xlsx"])
+        fichier2 = st.file_uploader("Fichier Suivi Terminé (F2)", type=["xlsx"])
+        fichier3 = st.file_uploader("Fichier Suivi (F3)", type=["xlsx"])
+        debug = st.checkbox("Afficher mode debug")
+
+        if fichier1 and fichier2 and fichier3:
+            try:
+                progress = st.progress(0)
+
+                # Détection F1
+                df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(fichier1, ["c", "prénom"], debug=debug)
+                st.success(f"Fichier 1 → feuille : {feuil1} (header ligne {ligne1})")
+                progress.progress(20)
+
+                # Détection F2
+                df2, feuil2, ligne2 = trouver_feuille_avec_colonnes(fichier2, ["nom", "prénom", "ddn", "nip"], debug=debug)
+                st.success(f"Fichier 2 → feuille : {feuil2} (header ligne {ligne2})")
+                progress.progress(40)
+
+                # Détection F3
+                df3, feuil3, ligne3 = trouver_feuille_avec_colonnes(fichier3, ["nom", "prénom", "ddn", "ipp"], debug=debug)
+                st.success(f"Fichier 3 → feuille : {feuil3} (header ligne {ligne3})")
+                progress.progress(60)
+
+                # Fusion
+                st.info("🔗 Fusion des fichiers...")
+                df_result = fusion_excel(df1, df2, df3)
+                st.success("Fusion terminée !")
+                st.dataframe(df_result.head())
+                progress.progress(80)
+
+                # Sauvegarde Fusion.xlsx
+                chemin_fusion = "C:/Users/4251352/Portail_outils/data/Fusion_excel.xlsx"
+                generer_excel(df_result, chemin=chemin_fusion)
+
+                # --- Génération SQL BHRe ---
+                st.info("🧠 Génération et exécution requête BHRe...")
+                fichier_sql_base = "C:/Users/4251352/Portail_outils/SQL/BHRe.sql"
+                fichier_sql_temp = "C:/Users/4251352/Portail_outils/SQL/BHRe_temp.sql"
+                liste_ipps = df_result["ipp"].dropna().unique().tolist()
+                generer_sql_bhre(fichier_sql_base, liste_ipps, fichier_sql_temp)
+
+                # Exécution SQL
+                cmd_sql = f"sqlplus {user}/{password}@{tns_alias} @{fichier_sql_temp}"
+                subprocess.run(cmd_sql, shell=True)
+
+                # Transformation CSV en Excel
+                csv_file = "C:/Users/4251352/Portail_outils/data/BHRe.csv"
+                excel_file = "C:/Users/4251352/Portail_outils/data/BHRe.xlsx"
+                if Path(csv_file).exists():
+                    df_csv = pd.read_csv(csv_file, sep=";")
+                    df_csv.to_excel(excel_file, index=False)
+                    os.remove(csv_file)
+
+                    st.success("✅ Requête BHRe terminée et fichier Excel généré !")
+                    st.download_button(
+                        label="💾 Télécharger BHRe.xlsx",
+                        data=open(excel_file, "rb").read(),
+                        file_name="BHRe.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
+
+                progress.progress(100)
+
+            except Exception as e:
+                safe_show_exception(e)
