@@ -1,16 +1,22 @@
-InvalidIndexError: Reindexing only valid with uniquely valued Index objects
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 156, in main
-    df_result = fusion_excel(df1, df2, df3)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\croisement_BHRe.py", line 91, in fusion_excel
-    ref = pd.concat([df2, df3], ignore_index=True)
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\reshape\concat.py", line 395, in concat
-    return op.get_result()
-           ^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\reshape\concat.py", line 680, in get_result
-    indexers[ax] = obj_labels.get_indexer(new_labels)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexes\base.py", line 3892, in get_indexer
-    raise InvalidIndexError(self._requires_unique_msg)
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:/Users/4251352/Portail_outils/data/BHRe.csv
+SET @IPP = [liste de nos IPP];
+SELECT DISTINCT S.KYNOIP AS IPP, R.NODA AS NDA
+FROM SDO S, RSS R
+WHERE S.KYNOIP IN (@IPP)
+AND S.KYNODA = R.KYNODA
+AND R.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+AND R.D8DEB <= TRUN(SYSDATE)
+AND R.DUSEJ >= 4
+AND (R.NODA('%2')
+OR R.NODA('%1'))
+ORDER BY NDA;
+SPOOL OFF
+EXIT;
