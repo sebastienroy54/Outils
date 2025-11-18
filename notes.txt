@@ -1,23 +1,193 @@
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:/Users/4251352/Portail_outils/data/BHRe.csv
-SELECT DISTINCT 
-    S.KYNOIP AS IPP,
-    R.NODA AS NDA,
-    R.CDGHM AS GHM,
-    R.DUSEJ AS duree_sejour
-FROM SDO S, RSS R
-WHERE S.KYNODA = R.NODA
-	AND S.KYNOIP IN ('liste')
-	AND R.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY') 
-    AND R.D8DEB <= SYSDATE
-	AND R.DUSEJ >= 4
-	AND SUBSTR(R.CDGHM, -1) IN ('1','2')
-ORDER BY R.NODA;
-SPOOL OFF
+import streamlit as st
+import pandas as pd
+import numpy as np
+import re
+from io import BytesIO
+import openpyxl
+import time
+
+# -------------------------
+# OUTILS
+# -------------------------
+
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
+        st.exception(e)
+
+def normaliser_texte(val):
+    if val is None:
+        return ""
+    return str(val).strip().lower().replace("\n", " ")
+
+
+# Détection dynamique de la feuille contenant les colonnes cibles
+def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50, debug=False):
+
+    fichier.seek(0)
+    wb = openpyxl.load_workbook(fichier, data_only=True)
+
+    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
+
+    for sheetname in wb.sheetnames:
+
+        fichier.seek(0)
+        df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
+
+        if debug:
+            st.write(f"--- FEUILLE : {sheetname} ---")
+            st.write(df.head())
+
+        for i in range(min(len(df), max_scan)):
+            row = df.iloc[i].tolist()
+            row_norm = [normaliser_texte(x) for x in row]
+
+            if any("=" in str(x) for x in row_norm):
+                continue
+
+            if sum(x.strip() not in ["", "none", "nan"] for x in row_norm) < 2:
+                continue
+
+            if all(col in row_norm for col in colonnes_norm):
+
+                fichier.seek(0)
+                df_final = pd.read_excel(
+                    fichier,
+                    sheet_name=sheetname,
+                    header=i,
+                    dtype=str,
+                    engine="openpyxl"
+                )
+                return df_final, sheetname, i
+
+    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
+
+
+# -------------------------
+# NETTOYAGE IPP
+# -------------------------
+
+def nettoyer_ipp(val):
+    if val is None:
+        return ""
+    val = re.sub(r"\D", "", str(val))
+    return val[-10:] if len(val) >= 10 else ""
+
+
+# -------------------------
+# FUSION DES DONNÉES
+# -------------------------
+
+def fusion_excel(df1, df2, df3):
+
+    df1.columns = [normaliser_texte(c) for c in df1.columns]
+    df2.columns = [normaliser_texte(c) for c in df2.columns]
+    df3.columns = [normaliser_texte(c) for c in df3.columns]
+
+    df1 = df1.rename(columns={"c": "nom", "prénom": "prenom"})
+    df2 = df2.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
+    df3 = df3.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "ipp": "ipp"})
+
+    for df in [df1, df2, df3]:
+        for col in ["nom", "prenom"]:
+            df[col] = df[col].astype(str).str.strip().str.upper()
+
+    df2["ipp"] = df2["ipp"].apply(nettoyer_ipp)
+    df3["ipp"] = df3["ipp"].apply(nettoyer_ipp)
+
+    df2 = df2.loc[:, ~df2.columns.duplicated()]
+    df3 = df3.loc[:, ~df3.columns.duplicated()]
+    ref = pd.concat([df2, df3], ignore_index=True)
+
+    ref = ref.drop_duplicates(subset=["nom", "prenom", "ipp"])
+
+    df_merge = df1.merge(ref, on=["nom", "prenom"], how="inner")
+
+    df_merge["ddn"] = pd.to_datetime(df_merge["ddn"], errors="coerce", dayfirst=True)
+    df_merge["ddn"] = df_merge["ddn"].dt.strftime("%d/%m/%Y")
+
+    df_merge = df_merge.sort_values(by="nom").reset_index(drop=True)
+
+    return df_merge[["nom", "prenom", "ddn", "ipp"]]
+
+
+# -------------------------
+# EXPORT EXCEL
+# -------------------------
+
+def generer_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Croisement")
+    return output.getvalue()
+
+
+# -------------------------
+# INTERFACE STREAMLIT
+# -------------------------
+
+def main():
+    st.title("Croisement Fichiers Excel BHRe")
+    st.write("### 🗂️ Importez les trois fichiers Excel")
+
+    fichier1 = st.file_uploader("Fichier Indicateur (F1)", type=["xlsx"])
+    fichier2 = st.file_uploader("Fichier Suivi Terminé (F2)", type=["xlsx"])
+    fichier3 = st.file_uploader("Fichier Suivi (F3)", type=["xlsx"])
+
+    debug = st.checkbox("Afficher mode debug")
+
+    if fichier1 and fichier2 and fichier3:
+
+        try:
+            progress = st.progress(0)
+            step = 0
+
+            st.info("🔍 Analyse des fichiers...")
+
+            # F1
+            df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(
+                fichier1, ["c", "prénom"], debug=debug
+            )
+            st.success(f"Fichier 1 → feuille : {feuil1} (header ligne {ligne1})")
+            progress.progress(20)
+
+            # F2
+            df2, feuil2, ligne2 = trouver_feuille_avec_colonnes(
+                fichier2, ["nom", "prénom", "ddn", "nip"], debug=debug
+            )
+            st.success(f"Fichier 2 → feuille : {feuil2} (header ligne {ligne2})")
+            progress.progress(40)
+
+            # F3
+            df3, feuil3, ligne3 = trouver_feuille_avec_colonnes(
+                fichier3, ["nom", "prénom", "ddn", "ipp"], debug=debug
+            )
+            st.success(f"Fichier 3 → feuille : {feuil3} (header ligne {ligne3})")
+            progress.progress(60)
+
+            # Fusion
+            st.info("🔗 Fusion des fichiers...")
+            df_result = fusion_excel(df1, df2, df3)
+
+            st.success("Fusion terminée !")
+            st.dataframe(df_result.head())
+            progress.progress(80)
+
+            # Export
+            excel_data = generer_excel(df_result)
+
+            st.download_button(
+                label="💾 Télécharger le fichier fusionné",
+                data=excel_data,
+                file_name="Croisement_BHRe.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+            progress.progress(100)
+
+        except Exception as e:
+            safe_show_exception(e)
+
+
+if __name__ == "__main__":
+    main()
