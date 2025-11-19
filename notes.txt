@@ -1,8 +1,88 @@
-# Bloc affiché même après rerun
-if "bhre_final" in st.session_state:
-    st.download_button(
-        "💾 Télécharger BHRe.xlsx",
-        st.session_state["bhre_final"],
-        file_name="BHRe_2025.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+def main():
+    st.title("Croisement BHRe")
+
+    # ---------------------------
+    # 1) LOGIN (si pas connecté)
+    # ---------------------------
+    if "logged" not in st.session_state:
+        st.session_state.logged = False
+
+    if not st.session_state.logged:
+        user = st.text_input("Utilisateur Oracle")
+        password = st.text_input("Mot de passe", type="password")
+        tns_alias = st.text_input("Alias TNS")
+
+        if st.button("Se connecter"):
+            if verifier_connexion_oracle(user, password, tns_alias):
+                st.session_state.logged = True
+                st.success("Connexion réussie !")
+                st.rerun()
+            else:
+                st.error("Échec de la connexion Oracle")
+        return  # IMPORTANT : on stoppe ici
+
+    # ---------------------------------------
+    # 2) INTERFACE SI L’UTILISATEUR EST LOGGÉ
+    # ---------------------------------------
+    st.subheader("Déposez les 3 fichiers BHRe")
+
+    f1 = st.file_uploader("Fichier 1", type=["xlsx"])
+    f2 = st.file_uploader("Fichier 2", type=["xlsx"])
+    f3 = st.file_uploader("Fichier 3", type=["xlsx"])
+
+    # Stockage du résultat dans le session_state
+    if "bhre_ready" not in st.session_state:
+        st.session_state.bhre_ready = False
+
+    # ------------------------------------------------
+    # 3) LANCEMENT MANUEL DU TRAITEMENT (BOUTON)
+    # ------------------------------------------------
+    if st.button("▶ Lancer le traitement BHRe"):
+        if f1 and f2 and f3:
+            try:
+                st.info("Traitement en cours…")
+
+                # --- fusion des fichiers ---
+                df_fusion = fusion_excel_depuis_streamlit(f1, f2, f3)
+
+                # Extraire IPP
+                liste_ipps = extraire_ipps(df_fusion)
+
+                # Générer SQL temporaire
+                fichier_sql_temp = generer_sql_bhre(
+                    fichier_sql_base="C:/Users/4251352/Portail_outils/SQL/BHRe.sql",
+                    liste_ipps=liste_ipps,
+                    fichier_sql_temp="C:/Users/4251352/Portail_outils/SQL/BHRe_temp.sql"
+                )
+
+                # Exécution
+                cmd_sql = f"sqlplus {user}/{password}@{tns_alias} @{fichier_sql_temp}"
+                subprocess.run(cmd_sql, shell=True)
+
+                # Convertir CSV → Excel
+                final_excel = convertir_csv_en_excel(
+                    "C:/Users/4251352/Portail_outils/data/BHRe.csv"
+                )
+
+                # Stockage en mémoire → pas de rerun du workflow
+                st.session_state["bhre_file"] = open(final_excel, "rb").read()
+                st.session_state.bhre_ready = True
+
+                st.success("✔ BHRe terminé ! Le fichier est prêt au téléchargement.")
+
+            except Exception as e:
+                st.error(f"Erreur : {e}")
+
+        else:
+            st.error("⚠ Merci de fournir les 3 fichiers Excel")
+
+    # ---------------------------------------------------------------------------
+    # 4) BOUTON DE TÉLÉCHARGEMENT — N’EXÉCUTE RIEN — NE PROVOQUE PLUS AUCUN RERUN
+    # ---------------------------------------------------------------------------
+    if st.session_state.bhre_ready:
+        st.download_button(
+            "💾 Télécharger BHRe.xlsx",
+            st.session_state["bhre_file"],
+            file_name="BHRe_2025.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
