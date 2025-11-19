@@ -1,88 +1,219 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import re
+from io import BytesIO
+import openpyxl
+import subprocess
+from pathlib import Path
+import os
+import time
+
+# OUTILS
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
+        st.exception(e)
+
+def normaliser_texte(val):
+    if val is None:
+        return ""
+    return str(val).strip().lower().replace("\n", " ")
+
+# Fonction permettant de trouver la bonne feuille de travail avec la bonne ligne de header
+def trouver_feuille_avec_colonnes(fichier, colonnes_attendues, max_scan=50, debug=False):
+    fichier.seek(0)
+    wb = openpyxl.load_workbook(fichier, data_only=True)
+    colonnes_norm = [normaliser_texte(c) for c in colonnes_attendues]
+
+    for sheetname in wb.sheetnames:
+        fichier.seek(0)
+        df = pd.read_excel(fichier, sheet_name=sheetname, header=None, dtype=str, engine="openpyxl")
+        if debug:
+            st.write(f"--- FEUILLE : {sheetname} ---")
+            st.write(df.head())
+        for i in range(min(len(df), max_scan)):
+            row = df.iloc[i].tolist()
+            row_norm = [normaliser_texte(x) for x in row]
+            if any("=" in str(x) for x in row_norm):
+                continue
+            if sum(x.strip() not in ["", "none", "nan"] for x in row_norm) < 2:
+                continue
+            if all(col in row_norm for col in colonnes_norm):
+                fichier.seek(0)
+                df_final = pd.read_excel(
+                    fichier,
+                    sheet_name=sheetname,
+                    header=i,
+                    dtype=str,
+                    engine="openpyxl"
+                )
+                return df_final, sheetname, i
+    raise ValueError(f"Aucune feuille ne contient les colonnes {colonnes_attendues}")
+
+# Fonction pour nettoyer les IPPs
+def nettoyer_ipp(val):
+    if val is None:
+        return ""
+    val = re.sub(r"\D", "", str(val))
+    return val[-10:] if len(val) >= 10 else ""
+
+# Fonction pour la fusion des fichiers excel en entrée
+def fusion_excel(df1, df2, df3):
+    for df in [df1, df2, df3]:
+        df.columns = [normaliser_texte(c) for c in df.columns]
+
+    df1 = df1.rename(columns={"c": "nom", "prénom": "prenom"})
+    df2 = df2.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "nip": "ipp"})
+    df3 = df3.rename(columns={"nom": "nom", "prénom": "prenom", "ddn": "ddn", "ipp": "ipp"})
+
+    for df in [df1, df2, df3]:
+        for col in ["nom", "prenom"]:
+            df[col] = df[col].astype(str).str.strip().str.upper()
+
+    df2["ipp"] = df2["ipp"].apply(nettoyer_ipp)
+    df3["ipp"] = df3["ipp"].apply(nettoyer_ipp)
+
+    df2 = df2.loc[:, ~df2.columns.duplicated()]
+    df3 = df3.loc[:, ~df3.columns.duplicated()]
+    ref = pd.concat([df2, df3], ignore_index=True)
+    ref = ref.drop_duplicates(subset=["nom", "prenom", "ipp"])
+
+    df_merge = df1.merge(ref, on=["nom", "prenom"], how="inner")
+    df_merge["ddn"] = pd.to_datetime(df_merge["ddn"], errors="coerce", dayfirst=True)
+    df_merge["ddn"] = df_merge["ddn"].dt.strftime("%d/%m/%Y")
+    df_merge = df_merge.sort_values(by="nom").reset_index(drop=True)
+    return df_merge[["nom", "prenom", "ddn", "ipp"]]
+
+# Fonction pour générer le fichier excel
+def generer_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="Croisement")
+    return output.getvalue()
+
+# Fonction pour remplacer le champ des IPPs dans la requête SQL
+def generer_sql_bhre(fichier_sql_base, liste_ipps, fichier_sql_temp):
+    ipps_txt = ",".join(f"'{ipp}'" for ipp in liste_ipps)
+    sql_base = Path(fichier_sql_base).read_text(encoding="utf-8")
+    sql_final = sql_base.replace("--IPP_PLACEHOLDER--", ipps_txt)
+    Path(fichier_sql_temp).write_text(sql_final, encoding="utf-8")
+    return fichier_sql_temp
+
+# INTERFACE STREAMLIT
 def main():
-    st.title("Croisement BHRe")
+    st.title("Croisement Fichiers Excel BHRe")
+    
+    # Connexion Oracle
+    if "oracle_connected" not in st.session_state:
+        st.session_state.oracle_connected = False
 
-    # ---------------------------
-    # 1) LOGIN (si pas connecté)
-    # ---------------------------
-    if "logged" not in st.session_state:
-        st.session_state.logged = False
+    if not st.session_state.oracle_connected:
+        with st.form("connexion"):
+            st.subheader("Connexion Oracle")
+            user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
+            password = st.text_input("🔑 Mot de passe :", type="password")
+            submitted = st.form_submit_button("🚀 Se connecter")
 
-    if not st.session_state.logged:
-        user = st.text_input("Utilisateur Oracle")
-        password = st.text_input("Mot de passe", type="password")
-        tns_alias = st.text_input("Alias TNS")
-
-        if st.button("Se connecter"):
-            if verifier_connexion_oracle(user, password, tns_alias):
-                st.session_state.logged = True
-                st.success("Connexion réussie !")
-                st.rerun()
+        if submitted:
+            if not user or not password:
+                st.error("Veuillez renseigner vos identifiants Oracle.")
+                st.stop()
             else:
-                st.error("Échec de la connexion Oracle")
-        return  # IMPORTANT : on stoppe ici
+                st.session_state.oracle_user = user
+                st.session_state.oracle_password = password
+                st.session_state.oracle_connected = True
+                st.success("✅ Connexion réussie !")
+                st.rerun()
+        return
 
-    # ---------------------------------------
-    # 2) INTERFACE SI L’UTILISATEUR EST LOGGÉ
-    # ---------------------------------------
-    st.subheader("Déposez les 3 fichiers BHRe")
+    st.write("### 🗂️ Importez les trois fichiers Excel")
+    fichier1 = st.file_uploader("Fichier Indicateur (F1)", type=["xlsx"])
+    fichier2 = st.file_uploader("Fichier Suivi Terminé (F2)", type=["xlsx"])
+    fichier3 = st.file_uploader("Fichier Suivi (F3)", type=["xlsx"])
+    debug = st.checkbox("Afficher mode debug")
 
-    f1 = st.file_uploader("Fichier 1", type=["xlsx"])
-    f2 = st.file_uploader("Fichier 2", type=["xlsx"])
-    f3 = st.file_uploader("Fichier 3", type=["xlsx"])
+    if fichier1 and fichier2 and fichier3:
+        try:
+            progress = st.progress(0)
 
-    # Stockage du résultat dans le session_state
-    if "bhre_ready" not in st.session_state:
-        st.session_state.bhre_ready = False
+            # Détection F1, F2 et F3
+            st.info("🔎 Détection des feuilles de travail...")
+            df1, feuil1, ligne1 = trouver_feuille_avec_colonnes(
+                fichier1, ["c", "prénom"], debug=debug
+            )
+            st.success(f"Fichier 1 → feuille : {feuil1} (header ligne {ligne1})")
+            progress.progress(20)
 
-    # ------------------------------------------------
-    # 3) LANCEMENT MANUEL DU TRAITEMENT (BOUTON)
-    # ------------------------------------------------
-    if st.button("▶ Lancer le traitement BHRe"):
-        if f1 and f2 and f3:
-            try:
-                st.info("Traitement en cours…")
+            df2, feuil2, ligne2 = trouver_feuille_avec_colonnes(
+                fichier2, ["nom", "prénom", "ddn", "nip"], debug=debug
+            )
+            st.success(f"Fichier 2 → feuille : {feuil2} (header ligne {ligne2})")
+            progress.progress(40)
 
-                # --- fusion des fichiers ---
-                df_fusion = fusion_excel_depuis_streamlit(f1, f2, f3)
+            df3, feuil3, ligne3 = trouver_feuille_avec_colonnes(
+                fichier3, ["nom", "prénom", "ddn", "ipp"], debug=debug
+            )
+            st.success(f"Fichier 3 → feuille : {feuil3} (header ligne {ligne3})")
+            progress.progress(60)
 
-                # Extraire IPP
-                liste_ipps = extraire_ipps(df_fusion)
+            # Fusion 
+            st.info("🔗 Fusion des fichiers...")
+            df_result = fusion_excel(df1, df2, df3)
+            st.success("Fusion terminée !")
+            #st.dataframe(df_result.head())
+            progress.progress(80)
 
-                # Générer SQL temporaire
-                fichier_sql_temp = generer_sql_bhre(
-                    fichier_sql_base="C:/Users/4251352/Portail_outils/SQL/BHRe.sql",
-                    liste_ipps=liste_ipps,
-                    fichier_sql_temp="C:/Users/4251352/Portail_outils/SQL/BHRe_temp.sql"
+            # Export Fusion Excel
+            fusion_path = "C:/Users/4251352/Portail_outils/data/Fusion_excel.xlsx"
+            with open(fusion_path, "wb") as f:
+                f.write(generer_excel(df_result))
+            st.success(f"Fichier Fusion enregistré !")
+
+            # Génération fichier SQL
+            SQL_BASE = "C:/Users/4251352/Portail_outils/SQL/BHRe.sql"
+            SQL_TEMP = "C:/Users/4251352/Portail_outils/SQL/BHRe_temp.sql"
+            liste_ipps = df_result["ipp"].dropna().unique().tolist()
+            ipps_txt = ",".join(f"'{ipp}'" for ipp in liste_ipps)
+            sql_base = Path(SQL_BASE).read_text(encoding="utf-8")
+            sql_final = sql_base.replace("--IPP_PLACEHOLDER--", ipps_txt)
+            Path(SQL_TEMP).write_text(sql_final, encoding="utf-8")
+
+            # Exécution SQL
+            st.info("🧠 Exécution de la requête SQL...")
+            tns_alias = "SIP1CCH.WORLD"
+            cmd_sql = f"sqlplus {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns_alias} @{SQL_TEMP}"
+            subprocess.run(cmd_sql, shell=True)
+            st.success("✅ Requête SQL terminée !")
+
+            # Conversion CSV -> Excel
+            csv_path = "C:/Users/4251352/Portail_outils/data/BHRe.csv"
+            excel_path = "C:/Users/4251352/Portail_outils/data/BHRe.xlsx"
+            df_csv = pd.read_csv(csv_path, sep=";", header=None, dtype=str)
+            df_csv.columns = ["IPP", "NDA", "GHM", "DUREE_SEJOUR"]
+            df_csv.to_excel(excel_path, index=False)
+            Path(csv_path).unlink()
+            st.success(f"✅ Fichier Excel généré !")
+            progress.progress(100)
+
+            with open(excel_path, "rb") as f:
+                st.session_state["bhre_final"] = f.read()
+            st.success("Fichier BHRe généré. Vous pouvez le télécharger.")
+
+            # st.download_button(
+            #     label="💾 Télécharger BHRe.xlsx",
+            #     data=open(excel_path, "rb").read(),
+            #     file_name="BHRe_2025.xlsx",
+            #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            # )
+
+            if "bhre_final" in st.session_state:
+                st.download_button(
+                "💾 Télécharger BHRe.xlsx",
+                st.session_state["bhre_final"],
+                file_name="BHRe_2025.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-
-                # Exécution
-                cmd_sql = f"sqlplus {user}/{password}@{tns_alias} @{fichier_sql_temp}"
-                subprocess.run(cmd_sql, shell=True)
-
-                # Convertir CSV → Excel
-                final_excel = convertir_csv_en_excel(
-                    "C:/Users/4251352/Portail_outils/data/BHRe.csv"
-                )
-
-                # Stockage en mémoire → pas de rerun du workflow
-                st.session_state["bhre_file"] = open(final_excel, "rb").read()
-                st.session_state.bhre_ready = True
-
-                st.success("✔ BHRe terminé ! Le fichier est prêt au téléchargement.")
-
-            except Exception as e:
-                st.error(f"Erreur : {e}")
-
-        else:
-            st.error("⚠ Merci de fournir les 3 fichiers Excel")
-
-    # ---------------------------------------------------------------------------
-    # 4) BOUTON DE TÉLÉCHARGEMENT — N’EXÉCUTE RIEN — NE PROVOQUE PLUS AUCUN RERUN
-    # ---------------------------------------------------------------------------
-    if st.session_state.bhre_ready:
-        st.download_button(
-            "💾 Télécharger BHRe.xlsx",
-            st.session_state["bhre_file"],
-            file_name="BHRe_2025.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+                
+        except Exception as e:
+            safe_show_exception(e)
