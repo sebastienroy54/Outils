@@ -10,3 +10,7 @@ tableaux pour 2025 ( pour la surveillance ISO ) merci+++
 Pour « essuyer les plâtres », merci de commencer par les néphrectomies :
 Tables RSM (IP, NDA, Date Entrée) et EPI (UH) et RAC (actes)
 Une fois l’IPP et le NDA du séjour index retrouvé, rechercher les autres NDA éventuels avec Date Entrée in 30 jours post index
+
+Voici tes 4 fichiers ; tout ce qui est en jaune concerne le séjour concernant l’intervention, suivi des données de(s) réhospit.
+Fais attention pour les ré-hospit car je t’ai mis tous les séjours <=30j par rapport au séjour index mais certains sont des hdJ pour autre chose qu’une infection.
+Les HdJ ont des NAS  sous la forme NDA+blanc+yyyymmjj de la date d’entrée de l’HdJ
