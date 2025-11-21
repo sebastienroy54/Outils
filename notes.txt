@@ -1,13 +1,12 @@
-Sortie SQL stdout
-Syntaxe : SQLPLUS [<option>] [connexion] [<démarrage>] ]
-où <option> ::= - | -? | [ [-M <o>] [-R <n>] [-S] ]
-      <connexion>  ::= <nom utilisateur>[/<mot de passe>][@<chaîne_de_connexion>] | / | /NOLOG }
-      <démarrage>  ::= @<nomfichier>[.<ext>] [<paramètre> ...]
-        "-" affiche la syntaxe
-        "-?" affiche le numéro de version de SQL*Plus
-        "-M <o>" utilise les options de balisage HTML <o>
-        "-R <n>" utilise le mode restreint <n>
-        "-S" utilise le mode silencieux
+tableaux pour 2025 ( pour la surveillance ISO ) merci+++
 
-Sortie SQL stderr
+1.	connaitre les re- hospitalisations : tous les séjours <=30j par rapport au séjour index
+2.	Pour les gestes
+•	Prosatectomies  Codes CCAM: JGFA, JGFC ,         UH que j’ai retenus = 021592,021580,021586,021598,021798,021171,021176,021330,021A02
+•	Néphrectomies  Codes CCAM: JAFA, JAFC,          UH que j’ai retenus = 021592,021580,021586,021598,021798,021171,021176,021330,021A02
+•	Hysterectomies Codes CCAM: JKFA, JKFC,           UH que j’ai retenus = 021500,021553,021564,021702,021804,021830,021831,021954,021465,021182,021401,021484
+•	césariennes  Codes CCAM: JQGA,                           UH que j’ai retenus = 021443,021877,021785,021875,021871,021863,021864,021435,021878,021776,021869,021886
 
+Pour « essuyer les plâtres », merci de commencer par les néphrectomies :
+Tables RSM (IP, NDA, Date Entrée) et EPI (UH) et RAC (actes)
+Une fois l’IPP et le NDA du séjour index retrouvé, rechercher les autres NDA éventuels avec Date Entrée in 30 jours post index
