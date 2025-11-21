@@ -1,31 +1,8 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ','
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:\Users\4251352\Documents\nephrectomie_2025_rehospi.csv
-SELECT DISTINCT
-    ri.NOIP                       AS IPP,
-    ri.NODA                       AS NDA_index,
-    ri.D8EEUE                     AS date_entree_index,
-    ei.UE                         AS UH_index,
-    rac.KYCDAC                    AS acte_ccam,
-    r2.NODA                       AS NDA_rehospi,
-    r2.D8EEUE                     AS date_entree_rehospi,
-    (r2.D8EEUE - ri.D8EEUE)       AS nb_jours_apres_index
-FROM RSM ri, EPI ei, RAC rac, RSM r2
+SELECT COUNT(DISTINCT ri.NODA)
+FROM RSM ri, EPI ei, RAC rac
 WHERE ri.NODA = ei.KYNODA
   AND ri.KYRES = rac.KYRES
   AND (rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%')
   AND ei.UE IN ('592','580','586','598','798','171','176','330','A02')
   AND ri.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND ri.D8EEUE <= TRUNC(SYSDATE)
-  AND r2.NOIP = ri.NOIP
-  AND r2.NODA <> ri.NODA
-  AND r2.D8EEUE > ri.D8EEUE
-  AND r2.D8EEUE <= ri.D8EEUE + 30
-ORDER BY ri.NOIP, ri.NODA, r2.D8EEUE;
-SPOOL OFF;
+  AND ri.D8EEUE <= TRUNC(SYSDATE);
