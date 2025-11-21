@@ -1,16 +1,32 @@
-tableaux pour 2025 ( pour la surveillance ISO ) merci+++
-
-1.	connaitre les re- hospitalisations : tous les séjours <=30j par rapport au séjour index
-2.	Pour les gestes
-•	Prosatectomies  Codes CCAM: JGFA, JGFC ,         UH que j’ai retenus = 021592,021580,021586,021598,021798,021171,021176,021330,021A02
-•	Néphrectomies  Codes CCAM: JAFA, JAFC,          UH que j’ai retenus = 021592,021580,021586,021598,021798,021171,021176,021330,021A02
-•	Hysterectomies Codes CCAM: JKFA, JKFC,           UH que j’ai retenus = 021500,021553,021564,021702,021804,021830,021831,021954,021465,021182,021401,021484
-•	césariennes  Codes CCAM: JQGA,                           UH que j’ai retenus = 021443,021877,021785,021875,021871,021863,021864,021435,021878,021776,021869,021886
-
-Pour « essuyer les plâtres », merci de commencer par les néphrectomies :
-Tables RSM (IP, NDA, Date Entrée) et EPI (UH) et RAC (actes)
-Une fois l’IPP et le NDA du séjour index retrouvé, rechercher les autres NDA éventuels avec Date Entrée in 30 jours post index
-
-Voici tes 4 fichiers ; tout ce qui est en jaune concerne le séjour concernant l’intervention, suivi des données de(s) réhospit.
-Fais attention pour les ré-hospit car je t’ai mis tous les séjours <=30j par rapport au séjour index mais certains sont des hdJ pour autre chose qu’une infection.
-Les HdJ ont des NAS  sous la forme NDA+blanc+yyyymmjj de la date d’entrée de l’HdJ
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ','
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:\Users\4251352\Documents\nephrectomie_2025_rehospi.csv
+SELECT DISTINCT
+    ri.NOIP                       AS IPP,
+    ri.NODA                       AS NDA_index,
+    ri.D8EEUE                     AS date_entree_index,
+    ei.UE                         AS UH_index,
+    rac.KYCDAC                    AS acte_ccam,
+    r2.NODA                       AS NDA_rehospi,
+    r2.D8EEUE                     AS date_entree_rehospi,
+    (r2.D8EEUE - ri.D8EEUE)       AS nb_jours_apres_index
+FROM RSM ri, EPI ei, RAC rac, RSM r2
+WHERE ri.KYNODA = ei.KYNODA
+  AND ri.KYRES = rac.KYRES
+  AND (rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%')
+  AND ei.UE IN ('021592','021580','021586','021598','021798',
+                '021171','021176','021330','021A02')
+  AND ri.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND ri.D8EEUE <= TRUNC(SYSDATE)
+  AND r2.NOIP = ri.NOIP
+  AND r2.NODA <> ri.NODA
+  AND r2.D8EEUE > ri.D8EEUE
+  AND r2.D8EEUE <= ri.D8EEUE + 30
+ORDER BY ri.NOIP, ri.NODA, r2.D8EEUE;
+SPOOL OFF;
