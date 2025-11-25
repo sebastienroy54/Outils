@@ -1,36 +1,44 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:\Users\4251352\Documents\nephrectomie_2025_rehospi.csv
 SELECT DISTINCT
     ri.NOIP                       AS IPP,
     ri.NODA                       AS NDA_index,
     ri.D8EEUE                     AS date_entree_index,
     ei.UE                         AS UH_index,
     rac.KYCDAC                    AS acte_ccam,
+    CASE
+        WHEN rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' THEN 'NEPHRECTOMIE'
+        WHEN rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%' THEN 'PROSTATECTOMIE'
+        WHEN rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%' THEN 'HYSTERECTOMIE'
+        WHEN rac.KYCDAC LIKE 'JQGA%' THEN 'CESARIENNE'
+        ELSE 'AUTRE'
+    END AS type_intervention,
     r2.NODA                       AS NDA_rehospi,
     r2.D8EEUE                     AS date_entree_rehospi,
-    ROUND(r2.D8EEUE - ri.D8EEUE)       AS nb_jours_apres_index
+    ROUND(r2.D8EEUE - ri.D8EEUE)  AS nb_jours_apres_index
 FROM RSM ri, EPI ei, RAC rac, RSM r2
 WHERE ri.NODA = ei.KYNODA
   AND ri.KYRES = rac.KYRES
-  AND (rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%')
-  AND ei.UE IN ('592','580','586','598','798','171','176','330','A02')
+  AND (
+        rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' OR
+        rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%' OR
+        rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%' OR
+        rac.KYCDAC LIKE 'JQGA%'
+      )
+  AND (
+        (rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' OR 
+         rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%')
+        AND ei.UE IN ('592','580','586','598','798','171','176','330','A02')
+        OR
+        (rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%')
+        AND ei.UE IN ('500','553','564','702','804','830','831','954','465','182','401','484')
+        OR
+        (rac.KYCDAC LIKE 'JQGA%')
+        AND ei.UE IN ('443','877','785','875','871','863','864','435','878','776','869','886')
+      )
   AND ri.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
   AND ri.D8EEUE <= TRUNC(SYSDATE)
   AND r2.NOIP = ri.NOIP
   AND r2.NODA <> ri.NODA
   AND r2.D8EEUE > ri.D8EEUE
   AND r2.D8EEUE <= ri.D8EEUE + 30
-ORDER BY ri.NOIP, ri.NODA, r2.D8EEUE;
-SPOOL OFF;
 
-•	Prosatectomies  Codes CCAM: JGFA, JGFC ,         UH que j’ai retenus = 021592,021580,021586,021598,021798,021171,021176,021330,021A02
-•	Néphrectomies  Codes CCAM: JAFA, JAFC,          UH que j’ai retenus = 021592,021580,021586,021598,021798,021171,021176,021330,021A02
-•	Hysterectomies Codes CCAM: JKFA, JKFC,           UH que j’ai retenus = 021500,021553,021564,021702,021804,021830,021831,021954,021465,021182,021401,021484
-•	césariennes  Codes CCAM: JQGA,                           UH que j’ai retenus = 021443,021877,021785,021875,021871,021863,021864,021435,021878,021776,021869,021886
+ORDER BY r2.D8EEUE;
