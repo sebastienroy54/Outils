@@ -1,19 +1,119 @@
-SELECT DISTINCT
-    t.NOIP AS IPP,
-    t.NODA AS NDA_1er_HDJ,
-    t.D8EEUE AS DATE_ENTREE_1er_HDJ
-FROM (
-    SELECT
-        r.NOIP,
-        r.NODA,
-        r.D8EEUE,
-        ROW_NUMBER() OVER (PARTITION BY r.NOIP ORDER BY r.D8EEUE ASC) AS rn
-    FROM RSM r, DGN d, EPI e
-    WHERE r.KYRES = d.KYRES
-      AND r.NODA = e.KYNODA
-      AND d.KYCDDG IN ('M321','M329')
-      AND e.CDURM_P = '010J'
-      AND r.D8EEUE >= TO_DATE('01/12/2018','DD/MM/YYYY')
-) t
-WHERE t.rn = 1
-ORDER BY t.D8EEUE;
+UMA
+080 Rhumatologie
+080S Rhumatologie HCS
+112 Chirurgie orthopédique
+112S Orthopédie HCS
+115 Chirurgie orthopédique UPOG
+310 Chirurgie traumatologique
+520 Rééducation fonctionnelle & réadaptation
+520S MPR HCS
+080J HDJ RHUMATO LITS
+081J Rhumatologie & explorations du métabolisme HDJ
+083J RHUMATO FAUTEUIL HDJ
+112C HDJ FERINJECT
+114C UCA Chirurgie orthopédique HDJ
+500J Douleur chronique 1 HDJ
+520J Rééducation et réadaptation fonctionnelle HDJ
+020 Cardiologie
+021 SI Cardiologie
+020J Cardiologie HDJ
+103 REA CHIR OLLIER
+104 USC OLLIER
+260J HDJ BILAN PRE OP
+500C HDJ UCA RADIOFREQ
+501J Douleur periop HDJ
+010 Urgences médico-chirurgicales (UHTCD)
+011 Unité MPA post UHCD
+013 CUSCO - Urgences médico-judiciaires
+340 Médecine Intensive Réanimation
+341 SC Médicale
+540 Accueil & Urgences 
+543 Unité Med Patho Aigu - Urgences
+384J Addictologie HDJ
+037 Chirurgie thoraco-pulmonaire Cochin
+037S Chirurgie thoraco-pulmonaire Cochin HCS
+060 Pneumologie
+060S Pneumologie HCS
+150 Centre du sommeil
+393 SC Pneumologie
+037J Chirurgie thoraco-pulmonaire Cochin HDJ
+060J Pneumologie HDJ
+061J Pneumologie diagnostic HDJ
+062C Pneumologie interventionnelle HDJ
+062J HDJ ONCOTHORAX
+063J Suivi post-greffe HDJ
+150J Centre du sommeil nuit HDJ
+151J Centre du sommeil jour HDJ
+152J HDJ PATHOLOGIES PROFESSIONNELLES ENV
+230J Réhabilitation par le sport HDJ
+510J HDJ Dermato patho pro
+018 Court-séjour gériatrique G1
+029 Court-séjour gériatrique G2
+029J Court-séjour gériatrique G2 HDJ
+022S Irathérapie HCS
+022J Radiothérapie Interne Vectorisée HDJ
+150C HDJ UCA POSE DE PAC
+150J Radio A HDJ
+320J Radio B HDJ
+206J HDJ MAISON DES FEMMES
+600 Médecine interne - Maison des Adolescents
+600J Médecine interne ambulatoire - Maison des Adolescents HDJ
+601J HDJ WEIJI MDA MCO
+010 Médecine interne
+010S Médecine interne HCS
+010J Médecine interne HDJ
+221J HTA et PCV HDJ
+222J Médecine spécialisée HDJ
+227J HDJ ESJ
+500J HDJ CASPER EVAL
+501J HDJ CASPER REHAB MCO
+503J HDJ BILAN CASPER REH MCO
+011 Oncologie
+040 Gastro-entérologie
+040S Gastro-entérologie HCS
+040X HDJ CHIMIOS GASTRO
+041 Chirurgie digestive et endocrinienne
+270 Urologie
+270S Urologie HCS
+450 Hématologie
+451 SI Hématologie
+670 Hépatologie médicale
+011J Oncologie HDJ
+040C Gastro-entérologie HDJ
+040J Biotherapie HDJ
+041J HDJ PREHAB CHIR DIG
+270J HDJ UROLOGIE
+271C UCA Urologie HDJ
+410C UCA Chirurgie digestive HDJ
+450J Hématologie HDJ
+670J Hépatologie médicale HDJ
+090 Néonatalogie Port-Royal
+091 Réanimation néonatale - Port-Royal
+092 SI Néonatalogie - Port-Royal
+130 Obstétrique Port-Royal - Suite de couche
+140 Gynécologie chirurgicale
+140S Gynécologie chirurgicale HCS
+591 Ophtalmologie
+090J Néonatalogie - HDJ NN vulnérables
+130J Obstétrique Port-Royal HDJ
+140C UCA Gynécologie chirugicale HDJ
+140J IVG A Port-Royal HDJ
+141J Médecine de la reproduction HDJ
+142J IVG B HDJ
+143C UCA Chirurgie réparatrice HDJ
+143J Gynécologie médicale HDJ
+146J HDJ AMP PF
+561C UCA chir plastie et rec
+591C Ophtalmologie HDJ
+591J HDJ BIRDSHOT
+Total DMU 516
+070 Endocrinologie
+071 Diabétologie Cochin
+071S Diabétologie Cochin HCS
+160 Dermatologie
+070J Endocrinologie HDJ
+071J Diabétologie Cochin HDJ
+072J Gynécologie - Endocrinologie HDJ
+073J Diabétologie - Pied - Cochin HDJ
+161J Dermatologie médicale (Tarnier) HDJ
+162C UCA Dermatologie HDJ
