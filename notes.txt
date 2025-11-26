@@ -1,12 +1,6 @@
-Liste des patients avec 
-•	Lupus systémique
-•	Néphrite lupique
-•	Code MSI : M32.1, M32.9
-•	1ère HDJ et date 
-•	dans les 7 dernières années,  date de début 1er décembre 2018
-•	IPP
-
-
-Je note que l’UMA cible à Cochin est la 010J (HDJ med int) et que les 3 variables en sortie dont tu as besoin sont :
--	IPP
--	NDA et date du 1er HDJ retrouvé
+SELECT
+  SUM(CASE WHEN KYCDDG LIKE 'M32.1%' THEN 1 ELSE 0 END) AS nb_M321,
+  SUM(CASE WHEN KYCDDG LIKE 'M32.9%' THEN 1 ELSE 0 END) AS nb_M329,
+  COUNT(*) AS total_lignes_dgn
+FROM DGN
+WHERE KYCDDG LIKE 'M32.%';
