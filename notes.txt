@@ -1,14 +1,18 @@
-SELECT 
-    COUNT(DISTINCT R.NOIP) AS nb_patients_DP,
-    COUNT(DISTINCT R.NOIP) AS nb_patients_DR,
-    COUNT(DISTINCT R.NOIP) AS nb_patients_DAS
-FROM RSM R, DGN D, EPI E
-WHERE R.NODA = E.KYNODA
-  AND D.KYRES = R.KYRES(+)
-  AND E.CDURM_P = '010J'
-  AND (
-        R.CDDNC9 IN ('M321','M329')   -- DP
-     OR R.CDRELIE IN ('M321','M329')  -- DR
-     OR D.KYCDDG IN ('M321','M329')   -- DAS
-  )
-  AND R.D8EEUE >= TO_DATE('01/12/2018','DD/MM/YYYY');
+SELECT COUNT(*)
+FROM (
+    SELECT R.NOIP,
+           R.NODA,
+           R.D8EEUE,
+           ROW_NUMBER() OVER (PARTITION BY R.NOIP ORDER BY R.D8EEUE ASC) AS rn
+    FROM RSM R, DGN D, EPI E
+    WHERE R.NODA = E.KYNODA
+      AND D.KYRES = R.KYRES(+)
+      AND E.CDURM_P = '010J'
+      AND (
+            R.CDDNC9 IN ('M321','M329')
+         OR R.CDRELIE IN ('M321','M329')
+         OR D.KYCDDG IN ('M321','M329')
+      )
+      AND R.D8EEUE >= TO_DATE('01/12/2018','DD/MM/YYYY')
+) T
+WHERE T.rn = 1;
