@@ -1,145 +1,22 @@
-import streamlit as st
-import pandas as pd
-import subprocess
-import os
-from io import BytesIO
-from datetime import datetime
-
-def main():
-    SQL_PATH = "C:/Users/4251352/Portail_outils/SQL/contigus.sql"
-    CSV_PATH = "C:/Users/4251352/Portail_outils/data/resultat.csv"
-    OUTPUT_PATH = "C:/Users/4251352/Portail_outils/data/doublons.xlsx"
-
-    st.set_page_config(page_title="Analyse des Séjours Contigus & Doublons", layout="centered")
-
-    st.title("Détection des Doublons, Contigus et Chevauchements")
-    st.markdown("Cet outil exécute la requête SQL, analyse les séjours et génère un fichier Excel structuré.")
-
-
-    with st.form("connexion"):
-        st.subheader("Connexion Oracle")
-        user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
-        password = st.text_input("🔑 Mot de passe :", type="password")
-        execute_sql = st.checkbox("Exécuter la requête SQL avant analyse", value=False)
-        submitted = st.form_submit_button("🚀 Lancer le traitement")
-
-    if submitted:
-        if not user or not password:
-            st.error("Veuillez renseigner vos identifiants Oracle.")
-            st.stop()
-
-        if execute_sql:
-            with st.spinner("🧠 Exécution de la requête SQL, veuillez patienter..."):
-                tns_alias = "SIP1CCH.WORLD"
-                cmd = f'sqlplus {user}/{password}@{tns_alias} @{SQL_PATH}'
-                subprocess.run(cmd, shell=True)
-            st.success("✅ Requête SQL terminée et fichier CSV généré.")
-            st.divider()
-
-        if not os.path.exists(CSV_PATH):
-            st.error(f"❌ Le fichier {CSV_PATH} n'existe pas. Veuillez exécuter la requête SQL.")
-            st.stop()
-
-        with st.spinner("🔎 Analyse des séjours en cours..."):
-            #df = pd.read_csv(CSV_PATH, sep=';', skip_blank_lines=True, dtype=str)
-            df = pd.read_csv(CSV_PATH, sep=';', skip_blank_lines=True, dtype=str, encoding='latin-1')
-            df = df.dropna(how='all')
-            df.columns = [col.strip().upper() for col in df.columns]
-
-            expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]
-            if df.shape[1] >= len(expected_cols):
-                df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
-
-            df['IPP'] = df['IPP'].astype(str).str.strip()
-            df['UMA'] = df['UMA'].astype(str).str.strip()
-            df['NDA'] = df['NDA'].astype(str).str.strip()
-            df['DATE_ENTREE'] = pd.to_datetime(df['DATE_ENTREE'], dayfirst=True, errors='coerce')
-            df['DATE_SORTIE'] = pd.to_datetime(df['DATE_SORTIE'], dayfirst=True, errors='coerce')
-
-            df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
-            df = df.sort_values(['IPP', 'DATE_ENTREE', 'DATE_SORTIE']).reset_index(drop=True)
-
-            rows = []
-            for ipp, group in df.groupby('IPP', sort=False):
-                g = group.reset_index(drop=True)
-                n = len(g)
-                for i in range(n):
-                    nda1, uma1, de1, ds1 = g.loc[i, ['NDA', 'UMA', 'DATE_ENTREE', 'DATE_SORTIE']]
-                    j = i + 1
-                    while j < n:
-                        de2 = g.loc[j, 'DATE_ENTREE']
-                        if pd.isna(de2):
-                            j += 1
-                            continue
-                        if de2 > ds1 and de2 != ds1:
-                            break
-                        nda2, uma2, ds2 = g.loc[j, ['NDA', 'UMA', 'DATE_SORTIE']]
-                        if nda1 == nda2:
-                            j += 1
-                            continue
-
-                        rel = None
-                        if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                            rel = "VRAI_DOUBLON"
-                        elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                            rel = "DOUBLON_0_NUIT"
-                        elif (uma1 != uma2) and ((ds1 == de2) or (ds2 == de1)):
-                            rel = "CONTIGUS"
-                        elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
-                            rel = "CHEVAUCHEMENT"
-
-                        if rel:
-                            rows.append({
-                                "IPP": ipp,
-                                "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
-                                "NDA1": nda1,
-                                "UMA1": uma1,
-                                "DATEE1": de1,
-                                "DATES1": ds1,
-                                "NDA2": nda2,
-                                "UMA2": uma2,
-                                "DATEE2": de2,
-                                "DATES2": ds2,
-                                "TYPE_RELATION": rel
-                            })
-                        j += 1
-
-            res = pd.DataFrame(rows).drop_duplicates()
-            cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "DATEE1", "DATES1", "NDA2", "UMA2", "DATEE2", "DATES2"]
-
-            with pd.ExcelWriter(OUTPUT_PATH, engine='openpyxl') as writer:
-                for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
-                    subset = res[res["TYPE_RELATION"] == groupe].drop(columns=["TYPE_RELATION"], errors='ignore')
-
-                    if subset.empty:
-                        df_to_write = pd.DataFrame([{col: "N/A" for col in cols}])
-                    else:
-                        df_to_write = subset.copy()
-                        for c in ["DATEE1", "DATES1", "DATEE2", "DATES2"]:
-                            df_to_write[c] = pd.to_datetime(df_to_write[c], errors='coerce').dt.strftime("%d/%m/%Y")
-
-                    df_to_write.to_excel(writer, sheet_name=groupe[:31], index=False)
-
-                    worksheet = writer.sheets[groupe[:31]]
-                    for i, col in enumerate(df_to_write.columns):
-                        max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
-                        worksheet.column_dimensions[
-                            worksheet.cell(row=1, column=i + 1).column_letter
-                        ].width = max_len
-
-        st.success("✅ Analyse terminée avec succès !")
-
-        with open(OUTPUT_PATH, "rb") as f:
-            st.download_button(
-                label="📥 Télécharger le fichier Excel",
-                data=f,
-                file_name=f"doublons_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
--	VRAI_DOUBLON : supprimer l’UH 383 car PSY (vous devriez avoir un champ qui indique : MCO/SMR/PSY)
--	DOUBLON_0_NUIT : ne pas prendre en compte les doublons mono-UHCD 540 / 543
--	CONTIGUS :
-o	ne pas prendre en compte les doublons mono-UHCD 540 / 543
-o	prendre en compte une même racine de GHM (5 premiers digits)
--	CHEVAUCHEMENT : RAS 
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:/Users/4251352/Portail_outils/data/resultat.csv
+SELECT DISTINCT S.KYNOIP AS IPP,
+       S.DANAIS AS DATE_NAISSANCE,
+       E.KYNODA AS NDA,
+       E.CDURM_P AS UMA,
+       TO_CHAR(E.D8EEUE, 'DD/MM/YYYY') AS DATE_ENTREE,
+       TO_CHAR(E.D8SOUE, 'DD/MM/YYYY') AS DATE_SORTIE
+FROM EPI E, SDO S
+WHERE E.KYNODA = S.KYNODA
+  AND E.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND E.D8EEUE <= TRUNC(SYSDATE)
+ORDER BY S.KYNOIP;
+SPOOL OFF
+EXIT;
