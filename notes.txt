@@ -1,4 +1,7 @@
-SELECT COUNT(DISTINCT R.NOIP) AS nb_patients_tous_HDJs
+SELECT 
+    COUNT(DISTINCT R.NOIP) AS nb_patients_DP,
+    COUNT(DISTINCT R.NOIP) AS nb_patients_DR,
+    COUNT(DISTINCT R.NOIP) AS nb_patients_DAS
 FROM RSM R, DGN D, EPI E
 WHERE R.NODA = E.KYNODA
   AND D.KYRES = R.KYRES(+)
@@ -6,6 +9,6 @@ WHERE R.NODA = E.KYNODA
   AND (
         R.CDDNC9 IN ('M321','M329')   -- DP
      OR R.CDRELIE IN ('M321','M329')  -- DR
-     OR D.KYCDDG IN ('M321','M329')   -- DAS (jointure externe)
+     OR D.KYCDDG IN ('M321','M329')   -- DAS
   )
   AND R.D8EEUE >= TO_DATE('01/12/2018','DD/MM/YYYY');
