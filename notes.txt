@@ -1,17 +1,10 @@
-# RUM_TIM.py
 import streamlit as st
 import pandas as pd
 import subprocess
 import time
 from pathlib import Path
 from datetime import datetime
-from openpyxl import load_workbook
-from openpyxl.styles import Border, Side
-from openpyxl.utils import get_column_letter
 
-# --------------------------
-# CONFIG — adapte si besoin
-# --------------------------
 BASE_DIR = Path("C:/Users/4251352/Portail_outils")
 DATA_DIR = BASE_DIR / "data"
 SQL_DIR = BASE_DIR / "SQL"
@@ -24,9 +17,6 @@ TNS_MAP = {
     "HTD": "SIP_HTD.WORLD"
 }
 
-# --------------------------
-# OUTILS / UTILITAIRES
-# --------------------------
 def safe_show_exception(e):
     st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
     if st.checkbox("Afficher détails techniques"):
@@ -108,188 +98,52 @@ def read_spool_csv_to_df(spool_path):
                 rows.append({"UMA": a.strip(), "COUNT": int(b.strip() or 0)})
         return pd.DataFrame(rows)
 
-# --------------------------
-# EXCEL: totaux, bordures, autofit
-# --------------------------
-def compute_dmu_totals_in_df(df):
-    """
-    Parcourt df (dans l'ordre) et pour chaque ligne UMAs with UMA starting with 'Total DMU'
-    calcule la somme des lignes précédentes (même site) jusqu'au précédent 'Total DMU' ou changement de site.
-    Mets à jour df in-place pour les colonnes 'RUM du mois' et 'RUM cumulés'.
-    """
-    # normalize NaNs and ensure numeric columns
-    df["RUM du mois"] = pd.to_numeric(df["RUM du mois"].fillna(0), errors="coerce").fillna(0).astype(int)
-    df["RUM cumulés"] = pd.to_numeric(df["RUM cumulés"].fillna(0), errors="coerce").fillna(0).astype(int)
-
-    for idx, row in df.iterrows():
-        uma = str(row.get("UMA", "")).strip()
-        if uma.startswith("Total DMU"):
-            site = str(row.get("Site", "")).strip()
-            sum_mois = 0
-            sum_cum = 0
-            j = idx - 1
-            while j >= 0:
-                uma_j = str(df.at[j, "UMA"]).strip()
-                site_j = str(df.at[j, "Site"]).strip()
-                # stop if we hit another Total DMU or different site
-                if uma_j.startswith("Total DMU"):
-                    break
-                if site_j != site:
-                    break
-                # accumulate numeric values only
-                try:
-                    sum_mois += int(df.at[j, "RUM du mois"])
-                except Exception:
-                    pass
-                try:
-                    sum_cum += int(df.at[j, "RUM cumulés"])
-                except Exception:
-                    pass
-                j -= 1
-            df.at[idx, "RUM du mois"] = int(sum_mois)
-            df.at[idx, "RUM cumulés"] = int(sum_cum)
-
-def write_values_back_to_patron(df, patron_path):
-    """
-    Ecrit les colonnes 'RUM du mois' et 'RUM cumulés' du dataframe df
-    dans le fichier Excel patron_path en conservant le style existant.
-    Applique bordures et auto-fit.
-    """
-    wb = load_workbook(filename=str(patron_path))
-    # on prend la première feuille par défaut (si tu veux une autre feuille, on peut la détecter)
-    ws = wb.active
-
-    # trouver la ligne d'entête (on cherche les colonnes Site et UMA sur une même ligne)
-    header_row = None
-    max_scan = 20
-    for r in range(1, min(ws.max_row, max_scan) + 1):
-        row_vals = [str(ws.cell(row=r, column=c).value).strip() if ws.cell(row=r, column=c).value is not None else "" for c in range(1, min(ws.max_column, 30)+1)]
-        if "site" in [v.lower() for v in row_vals] and "uma" in [v.lower() for v in row_vals]:
-            header_row = r
-            break
-    if header_row is None:
-        # fallback: assume header is row 1
-        header_row = 1
-
-    # map header names to column indexes
-    header_map = {}
-    for c in range(1, ws.max_column + 1):
-        val = ws.cell(row=header_row, column=c).value
-        if val is None:
-            continue
-        vn = str(val).strip()
-        header_map[vn] = c
-
-    # check expected headers exist
-    expected = ["Site", "UMA", "Type", "RUM du mois", "RUM cumulés"]
-    col_idx = {}
-    for name in expected:
-        # case-insensitive lookup
-        found = None
-        for k, v in header_map.items():
-            if k.strip().lower() == name.lower():
-                found = v
-                break
-        if not found:
-            raise ValueError(f"En-tête '{name}' introuvable dans le fichier patron.")
-        col_idx[name] = found
-
-    # écrire les valeurs df dans les lignes correspondantes du workbook
-    # On suppose que df est dans le même ordre que les lignes du patron (après l'entête)
-    start_row = header_row + 1
-    for i in range(len(df)):
-        target_row = start_row + i
-        # si la feuille est plus courte, on ne crée pas de nouvelles lignes en modifiant seulement les cellules existantes
-        # mais openpyxl va étendre la feuille si nécessaire
-        val_mois = int(df.at[i, "RUM du mois"])
-        val_cum = int(df.at[i, "RUM cumulés"])
-        ws.cell(row=target_row, column=col_idx["RUM du mois"], value=val_mois)
-        ws.cell(row=target_row, column=col_idx["RUM cumulés"], value=val_cum)
-
-    # Appliquer bordures sur la plage utilisée (de start_row jusqu'à last data row, et sur les colonnes 1..max col)
-    thin = Side(border_style="thin", color="000000")
-    border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    last_row = start_row + len(df) - 1
-    last_col = ws.max_column
-    for r in range(header_row, last_row + 1):
-        for c in range(1, last_col + 1):
-            cell = ws.cell(row=r, column=c)
-            # on applique la bordure en préservant éventuellement les bordures existantes
-            cell.border = Border(
-                left=cell.border.left or border.left,
-                right=cell.border.right or border.right,
-                top=cell.border.top or border.top,
-                bottom=cell.border.bottom or border.bottom,
-            )
-
-    # Auto-fit approximation : calculer largeur max par colonne
-    for c in range(1, last_col + 1):
-        max_length = 0
-        for r in range(header_row, last_row + 1):
-            val = ws.cell(row=r, column=c).value
-            if val is None:
-                length = 0
-            else:
-                length = len(str(val))
-            if length > max_length:
-                max_length = length
-        col_letter = get_column_letter(c)
-        # facteur empirique : +2 padding
-        ws.column_dimensions[col_letter].width = (max_length + 2)
-
-    # Sauvegarde
-    wb.save(str(patron_path))
-
-# --------------------------
-# PAGES STREAMLIT
-# --------------------------
 def page_connexion():
     st.title("Connexion Oracle")
-    if "oracle_connected" not in st.session_state:
-        st.session_state.oracle_connected = False
-    tns_to_test = TNS_MAP.get("CCH")
 
-    if not st.session_state.oracle_connected:
+    if not st.session_state.logged_in:  # SI PAS CONNECTÉ
         with st.form("connexion"):
             st.subheader("Connexion Oracle")
-            user = st.text_input("👤 Nom d'utilisateur Oracle :", value="", key="conn_user")
+            user = st.text_input("👤 Nom d'utilisateur Oracle :", key="conn_user")
             password = st.text_input("🔑 Mot de passe :", type="password", key="conn_pwd")
             submitted = st.form_submit_button("🚀 Se connecter")
 
         if submitted:
             if not user or not password:
                 st.error("Veuillez renseigner vos identifiants Oracle.")
-                st.stop()
+                return
 
             try:
                 st.info("Test de connexion...")
+                tns_alias = TNS_MAP["CCH"]
                 test_sql_path = SQL_DIR / "test_connexion.sql"
                 test_sql_path.write_text("select 1 from dual;\nexit;", encoding="utf-8")
-                test_cmd = f"sqlplus -S {user}/{password}@{tns_to_test} @{test_sql_path}"
 
-                out = run_sqlplus_and_wait(test_cmd, timeout=3)
-                try:
-                    test_sql_path.unlink()
-                except Exception:
-                    pass
+                cmd = f"sqlplus -S {user}/{password}@{tns_alias} @{test_sql_path}"
+                out = run_sqlplus_and_wait(cmd, timeout=3)
 
                 if "1" in out:
-                    st.session_state.oracle_user = user
-                    st.session_state.oracle_password = password
                     st.session_state.oracle_connected = True
                     st.session_state.logged_in = True
+                    st.session_state.oracle_user = user
+                    st.session_state.oracle_password = password
                     st.session_state.page = "rum"
-                    st.experimental_rerun()
+                    st.rerun()
                 else:
                     st.error("Connexion échouée. Vérifiez vos identifiants Oracle.")
             except Exception as e:
                 safe_show_exception(e)
-                return
-    else:
-        st.success("Vous êtes déjà connecté (identifiants en session).")
-        if st.button("Aller à la page RUM"):
+            finally:
+                try:
+                    test_sql_path.unlink()
+                except:
+                    pass
+
+    else:  # SI DÉJÀ CONNECTÉ
+        st.success("Connexion active.")
+        if st.button("➡ Aller à la page RUM"):
             st.session_state.page = "rum"
-            st.experimental_rerun()
+            st.rerun()
 
 def page_rum():
     st.title("Remplissage RUM — TIM")
@@ -298,7 +152,6 @@ def page_rum():
         st.error("Vous devez d'abord vous connecter sur la page Connexion.")
         return
 
-    # Sélecteurs mois/année
     mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
     annees = list(range(2020, datetime.now().year + 1))
     annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
@@ -315,27 +168,20 @@ def page_rum():
         progress = st.progress(0)
         progress.progress(5)
 
-        # Lecture du patron excel
         if not PATRON_XLSX.exists():
             st.error(f"Fichier patron introuvable : {PATRON_XLSX}")
             return
 
-        # Lire le patron en pandas (pour le mapping logique)
         df_patron = pd.read_excel(PATRON_XLSX, engine="openpyxl", dtype=str)
-        # S'assurer de l'ordre et des colonnes attendues
-        expected_cols = ["Site", "UMA", "Type", "RUM du mois", "RUM cumulés", "TIM Référent", "Relance"]
-        for c in expected_cols:
-            if c not in df_patron.columns:
-                st.error(f"Colonne attendue introuvable dans le patron : '{c}'")
-                return
+        if "RUM du mois" not in df_patron.columns or "RUM cumulés" not in df_patron.columns:
+            st.error("Colonnes 'RUM du mois' et/ou 'RUM cumulés' absentes du patron.")
+            return
 
-        # Normalisation des colonnes numériques
-        df_patron["RUM du mois"] = pd.to_numeric(df_patron["RUM du mois"].fillna(0), errors="coerce").fillna(0).astype(int)
-        df_patron["RUM cumulés"] = pd.to_numeric(df_patron["RUM cumulés"].fillna(0), errors="coerce").fillna(0).astype(int)
+        df_patron["RUM du mois"] = df_patron["RUM du mois"].astype(object)
+        df_patron["RUM cumulés"] = df_patron["RUM cumulés"].astype(object)
 
         progress.progress(10)
 
-        # Pour chaque site : créer SQL temp, exécuter via sqlplus, lire CSV
         results_mois = {}
         results_cumule = {}
 
@@ -363,15 +209,12 @@ def page_rum():
                 out_c = run_sqlplus_and_wait(cmd_cum, timeout=60)
                 time.sleep(0.2)
 
-                # Lire les spools
                 df_m = read_spool_csv_to_df(spool_mois)
                 df_c = read_spool_csv_to_df(spool_cumule)
 
-                # stocker en dict pour lookup rapide (clé = UMA code)
                 results_mois[site_label] = {row["UMA"]: int(row["COUNT"]) for _, row in df_m.iterrows()}
                 results_cumule[site_label] = {row["UMA"]: int(row["COUNT"]) for _, row in df_c.iterrows()}
 
-                # cleanup temp sql files (on garde spools pour debug)
                 try:
                     tmp_sql_mois.unlink()
                     tmp_sql_cum.unlink()
@@ -385,7 +228,6 @@ def page_rum():
                 results_cumule[site_label] = {}
                 continue
 
-        # Maintenant on mappe les résultats dans le df_patron (pandas)
         for idx, row in df_patron.iterrows():
             try:
                 site = str(row.get("Site", "")).strip()
@@ -396,6 +238,8 @@ def page_rum():
                     continue
 
                 uma_code = uma_full.split()[0].strip()
+                val_mois = 0
+                val_cum = 0
                 val_mois = results_mois.get(site, {}).get(uma_code, 0)
                 val_cum = results_cumule.get(site, {}).get(uma_code, 0)
 
@@ -408,64 +252,54 @@ def page_rum():
 
         progress.progress(95)
 
-        # Calculer les totaux DMU automatiquement (mise à jour dans df_patron)
-        compute_dmu_totals_in_df(df_patron)
-
-        # Écrire les valeurs calculées dans le fichier patron (conserve style)
+        sortie_name = DATA_DIR / f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx"
         try:
-            write_values_back_to_patron(df_patron, PATRON_XLSX)
+            df_patron.to_excel(sortie_name, index=False, engine="openpyxl")
         except Exception as e_save:
             safe_show_exception(e_save)
-            st.error("Erreur lors de la mise à jour du fichier Excel.")
+            st.error("Erreur lors de la sauvegarde du fichier Excel.")
             return
 
         progress.progress(100)
-        st.success(f"Traitement terminé — fichier modifié : {PATRON_XLSX.name}")
+        st.success(f"Traitement terminé — fichier sauvegardé : {sortie_name.name}")
 
-        # proposer le téléchargement (on renvoie le patron modifié)
-        with open(PATRON_XLSX, "rb") as f:
+        with open(sortie_name, "rb") as f:
             st.download_button(
-                "Télécharger le fichier rempli (patron mis à jour)",
+                "Télécharger le fichier rempli",
                 data=f.read(),
-                file_name=f"{PATRON_XLSX.stem}_rempli_{mois:02d}_{annee}.xlsx",
+                file_name=sortie_name.name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
     except Exception as e:
         safe_show_exception(e)
 
-# --------------------------
-# SESSION / MAIN
-# --------------------------
 def ensure_session_vars():
     defaults = {
         "logged_in": False,
         "page": "connexion",
         "oracle_user": "",
-        "oracle_password": "",
-        "oracle_connected": False,
+        "oracle_password": ""
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
-    if st.session_state.get("oracle_connected", False):
-        st.session_state["logged_in"] = True
-
 def main():
-    st.set_page_config(page_title="RUM TIM", layout="wide")
+    st.set_page_config(page_title="RUM TIM", layout="centered")
+
     ensure_session_vars()
 
-    if "page" not in st.session_state:
+    if st.session_state.page == "connexion":
+        page_connexion()
+
+    elif st.session_state.page == "rum":
+        if not st.session_state.logged_in:
+            st.session_state.page = "connexion"
+            st.rerun()
+        page_rum()
+    else:
         st.session_state.page = "connexion"
-
-    try:
-        if st.session_state.page == "connexion":
-            page_connexion()
-        else:
-            page_rum()
-    except Exception as e:
-        safe_show_exception(e)
-
+        st.rerun()
 if __name__ == "__main__":
     main()
