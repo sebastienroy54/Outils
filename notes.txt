@@ -1,30 +1,339 @@
-SET HEADING ON
+# RUM_TIM.py
+import streamlit as st
+import pandas as pd
+import subprocess
+import time
+from pathlib import Path
+from datetime import datetime
+
+# --------------------------
+# CONFIG — adapte si besoin
+# --------------------------
+BASE_DIR = Path("C:/Users/4251352/Portail_outils")
+DATA_DIR = BASE_DIR / "data"
+SQL_DIR = BASE_DIR / "SQL"
+
+PATRON_XLSX = DATA_DIR / "tableau_rum_tim.xlsx"
+
+TNS_MAP = {
+    "CCH": "SIP1CCH.WORLD",
+    "BRC": "SIP1BRC.WORLD",
+    "HTD": "SIP_HTD.WORLD"
+}
+
+# --------------------------
+# OUTILS / UTILITAIRES
+# --------------------------
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if st.checkbox("Afficher détails techniques"):
+        st.exception(e)
+
+def run_sqlplus_and_wait(cmd, timeout=30):
+    """
+    Lance une commande sqlplus via subprocess.Popen et récupère stdout.
+    Retourne stdout (str). Lance exception si timeout.
+    """
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    start = time.time()
+    output = ""
+    while True:
+        if proc.poll() is not None:
+            out, _ = proc.communicate()
+            output += (out or "")
+            break
+        if time.time() - start > timeout:
+            proc.kill()
+            raise TimeoutError("Timeout lors de l'exécution de sqlplus.")
+        time.sleep(0.1)
+    return output
+
+def test_connection_with_sqlplus(user, password, tns_alias, timeout=3):
+    """
+    Test de connexion simple via sqlplus. Utilise 'select 1 from dual;'
+    """
+    test_sql = SQL_DIR / "test_connexion.sql"
+    test_sql.write_text("set heading off\nset feedback off\nselect 1 from dual;\nexit;\n", encoding="utf-8")
+    cmd = f'sqlplus -S {user}/{password}@{tns_alias} @{test_sql}'
+    try:
+        out = run_sqlplus_and_wait(cmd, timeout=timeout)
+    except Exception as e:
+        raise
+    finally:
+        try:
+            test_sql.unlink()
+        except Exception:
+            pass
+    return "1" in out
+
+def build_sql_spool_rum(site_label, file_spool_path, mode, month, year):
+    """
+    mode: "mois" or "cumule"
+    file_spool_path: path to spool CSV (string)
+    """
+    # date boundaries
+    if mode == "mois":
+        start = f"01/{int(month):02d}/{year}"
+        # use LAST_DAY on the first day of the chosen month
+        end_expr = f"LAST_DAY(TO_DATE('01/{int(month):02d}/{year}','DD/MM/YYYY'))"
+        where_clause = (f"D8EEUE BETWEEN TO_DATE('{start}','DD/MM/YYYY') "
+                        f"AND {end_expr}")
+    else:  # cumule
+        start = f"01/01/{year}"
+        end_expr = f"LAST_DAY(TO_DATE('01/{int(month):02d}/{year}','DD/MM/YYYY'))"
+        where_clause = (f"D8EEUE BETWEEN TO_DATE('{start}','DD/MM/YYYY') "
+                        f"AND {end_expr}")
+
+    sql = f"""
+SET HEADING OFF
 SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 300
-SET COLSEP ';'
+SET PAGESIZE 0
+SET LINESIZE 2000
 SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\appendicectomie_2025.csv
-SELECT DISTINCT
-    ri.NOIP AS IPP,
-    ri.NODA AS NDA_index,
-    ri.D8EEUE AS date_entree_index,
-    rac.KYCDAC AS acte_ccam,
-    'APPENDICECTOMIE' AS type_intervention,
-    r2.NODA AS NDA_rehospi,
-    r2.D8EEUE AS date_entree_rehospi,
-    ROUND(r2.D8EEUE - ri.D8EEUE) AS nb_jours_apres_index
-FROM RSM ri, EPI ei, RAC rac, RSM r2
-WHERE ri.NODA = ei.KYNODA
-  AND ri.KYRES = rac.KYRES
-  AND rac.KYCDAC = 'HHFA016'
-  AND ri.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND ri.D8EEUE <= TRUNC(SYSDATE)
-  AND r2.NOIP = ri.NOIP
-  AND r2.NODA <> ri.NODA
-  AND r2.D8EEUE > ri.D8EEUE
-  AND r2.D8EEUE <= ri.D8EEUE + 30
-ORDER BY ri.NOIP, ri.NODA, r2.D8EEUE;
-SPOOL OFF;
+spool {file_spool_path}
+SELECT CDURM_P || ';' || COUNT(*)
+FROM RSM
+WHERE {where_clause}
+GROUP BY CDURM_P;
+spool off
+exit;
+"""
+    return sql
+
+def read_spool_csv_to_df(spool_path):
+    """
+    Lit un fichier spool produit par la SQL (format: UMA;COUNT) et renvoie un dataframe UMA, COUNT
+    Si le fichier n'existe pas, retourne empty df.
+    """
+    p = Path(spool_path)
+    if not p.exists():
+        return pd.DataFrame(columns=["UMA", "COUNT"])
+    # certaines lignes vides peuvent être présentes, on filtre.
+    try:
+        df = pd.read_csv(p, sep=';', header=None, dtype=str, names=["UMA", "COUNT"], engine="python")
+        df["UMA"] = df["UMA"].astype(str).str.strip()
+        df["COUNT"] = pd.to_numeric(df["COUNT"].astype(str).str.strip().replace("", "0"), errors="coerce").fillna(0).astype(int)
+        return df
+    except Exception:
+        # fallback: lire ligne par ligne
+        lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+        rows = []
+        for line in lines:
+            if ";" in line:
+                a, b = line.split(";", 1)
+                rows.append({"UMA": a.strip(), "COUNT": int(b.strip() or 0)})
+        return pd.DataFrame(rows)
+
+# --------------------------
+# PAGES STREAMLIT
+# --------------------------
+def page_connexion():
+    st.title("Connexion Oracle")
+    if "oracle_connected" not in st.session_state:
+        st.session_state.oracle_connected = False
+
+    if not st.session_state.oracle_connected:
+        with st.form("connexion"):
+            st.subheader("Connexion Oracle")
+            user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
+            password = st.text_input("🔑 Mot de passe :", type="password")
+            submitted = st.form_submit_button("🚀 Se connecter")
+
+        if submitted:
+            if not user or not password:
+                st.error("Veuillez renseigner vos identifiants Oracle.")
+                return
+
+            # On test les 3 TNS successivement (au moins un doit répondre)
+            ok_any = False
+            test_errors = {}
+            for site_label, tns in TNS_MAP.items():
+                try:
+                    ok = test_connection_with_sqlplus(user, password, tns, timeout=3)
+                    if ok:
+                        ok_any = True
+                    test_errors[site_label] = ok
+                except Exception as e:
+                    test_errors[site_label] = False
+
+            if ok_any:
+                st.session_state.oracle_user = user
+                st.session_state.oracle_password = password
+                st.session_state.oracle_connected = True
+                st.success("Connexion Oracle enregistrée. Vous pouvez maintenant aller sur la page RUM.")
+                st.experimental_rerun()
+            else:
+                st.error("Connexion échouée pour tous les TNS. Vérifiez vos identifiants ou la connectivité.")
+                if st.checkbox("Voir détails des tentatives"):
+                    st.write(test_errors)
+        else:
+            st.info("Entrez vos identifiants Oracle pour continuer.")
+
+    else:
+        st.success("Vous êtes déjà connecté (identifiants en session).")
+        if st.button("Aller à la page RUM"):
+            st.experimental_rerun()
+
+def page_rum():
+    st.title("Remplissage RUM — TIM")
+
+    if "oracle_connected" not in st.session_state or not st.session_state.oracle_connected:
+        st.error("Vous devez d'abord vous connecter sur la page Connexion.")
+        return
+
+    # Sélecteurs mois/année
+    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
+    annees = list(range(2020, datetime.now().year + 1))
+    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
+
+    bouton = st.button("Lancer le traitement RUM")
+
+    st.markdown("**Remarque :** le script va interroger les 3 TNS (CCH, BRC, HTD) et spooler 2 CSV par site (mois + cumul).")
+    st.info(f"Fichiers lus/écrits dans : `{DATA_DIR}`")
+
+    if not bouton:
+        return
+
+    try:
+        progress = st.progress(0)
+        progress.progress(5)
+
+        # Lecture du patron excel
+        if not PATRON_XLSX.exists():
+            st.error(f"Fichier patron introuvable : {PATRON_XLSX}")
+            return
+
+        df_patron = pd.read_excel(PATRON_XLSX, engine="openpyxl", dtype=str)
+        # On garde les colonnes existantes et on s'assure que les champs RUM sont présent
+        if "RUM du mois" not in df_patron.columns or "RUM cumulés" not in df_patron.columns:
+            st.error("Colonnes 'RUM du mois' et/ou 'RUM cumulés' absentes du patron.")
+            return
+
+        # Normalisation affichage
+        df_patron["RUM du mois"] = df_patron["RUM du mois"].astype(object)
+        df_patron["RUM cumulés"] = df_patron["RUM cumulés"].astype(object)
+
+        progress.progress(10)
+
+        # Pour chaque site : créer SQL temp, exécuter via sqlplus, lire CSV
+        results_mois = {}
+        results_cumule = {}
+
+        for i, site_label in enumerate(["CCH", "BRC", "HTD"], start=1):
+            try:
+                tns = TNS_MAP.get(site_label)
+                spool_mois = DATA_DIR / f"RUM_MOIS_{site_label}.csv"
+                spool_cumule = DATA_DIR / f"RUM_CUMULE_{site_label}.csv"
+
+                sql_mois = build_sql_spool_rum(site_label, str(spool_mois), mode="mois", month=mois, year=annee)
+                sql_cum = build_sql_spool_rum(site_label, str(spool_cumule), mode="cumule", month=mois, year=annee)
+
+                tmp_sql_mois = SQL_DIR / f"rum_mois_{site_label}.sql"
+                tmp_sql_cum = SQL_DIR / f"rum_cumule_{site_label}.sql"
+                tmp_sql_mois.write_text(sql_mois, encoding="utf-8")
+                tmp_sql_cum.write_text(sql_cum, encoding="utf-8")
+
+                st.info(f"Exécution SQL pour {site_label} (mois)...")
+                cmd_mois = f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}"
+                out_m = run_sqlplus_and_wait(cmd_mois, timeout=60)
+                # small sleep to ensure spool file flushed
+                time.sleep(0.2)
+
+                st.info(f"Exécution SQL pour {site_label} (cumulé)...")
+                cmd_cum = f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}"
+                out_c = run_sqlplus_and_wait(cmd_cum, timeout=60)
+                time.sleep(0.2)
+
+                # Lire les spools
+                df_m = read_spool_csv_to_df(spool_mois)
+                df_c = read_spool_csv_to_df(spool_cumule)
+
+                # stocker en dict pour lookup rapide (clé = UMA code)
+                results_mois[site_label] = {row["UMA"]: int(row["COUNT"]) for _, row in df_m.iterrows()}
+                results_cumule[site_label] = {row["UMA"]: int(row["COUNT"]) for _, row in df_c.iterrows()}
+
+                # cleanup temp sql files (on garde spools pour debug)
+                try:
+                    tmp_sql_mois.unlink()
+                    tmp_sql_cum.unlink()
+                except Exception:
+                    pass
+
+                progress.progress(int(10 + i * 25))
+            except Exception as e_site:
+                safe_show_exception(e_site)
+                # continuer vers les autres sites malgré l'erreur
+                results_mois[site_label] = {}
+                results_cumule[site_label] = {}
+                continue
+
+        # Maintenant on mappe les résultats dans le df_patron
+        for idx, row in df_patron.iterrows():
+            try:
+                site = str(row.get("Site", "")).strip()
+                uma_full = str(row.get("UMA", "")).strip()
+                if uma_full == "" or site == "":
+                    df_patron.at[idx, "RUM du mois"] = 0
+                    df_patron.at[idx, "RUM cumulés"] = 0
+                    continue
+
+                uma_code = uma_full.split()[0].strip()
+
+                val_mois = 0
+                val_cum = 0
+                # safety: if site key not present, we still have dicts (empty)
+                val_mois = results_mois.get(site, {}).get(uma_code, 0)
+                val_cum = results_cumule.get(site, {}).get(uma_code, 0)
+
+                df_patron.at[idx, "RUM du mois"] = int(val_mois)
+                df_patron.at[idx, "RUM cumulés"] = int(val_cum)
+            except Exception as e_map:
+                # afficher l'erreur user-friendly, et continuer
+                safe_show_exception(e_map)
+                df_patron.at[idx, "RUM du mois"] = 0
+                df_patron.at[idx, "RUM cumulés"] = 0
+
+        progress.progress(95)
+
+        # Sauvegarde : on garde même nom structure, on ajoute suffixe
+        sortie_name = DATA_DIR / f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx"
+        try:
+            df_patron.to_excel(sortie_name, index=False, engine="openpyxl")
+        except Exception as e_save:
+            safe_show_exception(e_save)
+            st.error("Erreur lors de la sauvegarde du fichier Excel.")
+            return
+
+        progress.progress(100)
+        st.success(f"Traitement terminé — fichier sauvegardé : {sortie_name.name}")
+
+        # proposer le téléchargement
+        with open(sortie_name, "rb") as f:
+            st.download_button(
+                "Télécharger le fichier rempli",
+                data=f.read(),
+                file_name=sortie_name.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    except Exception as e:
+        safe_show_exception(e)
+
+# --------------------------
+# ENTRYPOINT
+# --------------------------
+def main():
+    st.set_page_config(page_title="RUM TIM", layout="wide")
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio("Pages", ["Connexion", "Remplissage RUM"])
+
+    try:
+        if page == "Connexion":
+            page_connexion()
+        else:
+            page_rum()
+    except Exception as e:
+        safe_show_exception(e)
+
+if __name__ == "__main__":
+    main()
