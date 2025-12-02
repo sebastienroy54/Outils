@@ -102,133 +102,68 @@ def read_spool_csv_to_df(spool_path):
         return pd.DataFrame(rows)
 
 def compute_dmu_totals_in_df(df):
-    """
-    Parcourt df (dans l'ordre) et pour chaque ligne UMAs with UMA starting with 'Total DMU'
-    calcule la somme des lignes précédentes (même site) jusqu'au précédent 'Total DMU' ou changement de site.
-    Mets à jour df in-place pour les colonnes 'RUM du mois' et 'RUM cumulés'.
-    """
-    # normalize NaNs and ensure numeric columns
-    df["RUM du mois"] = pd.to_numeric(df["RUM du mois"].fillna(0), errors="coerce").fillna(0).astype(int)
-    df["RUM cumulés"] = pd.to_numeric(df["RUM cumulés"].fillna(0), errors="coerce").fillna(0).astype(int)
+    # Charger une copie du patron
+    wb = load_workbook(PATRON_XLSX)
 
-    for idx, row in df.iterrows():
-        uma = str(row.get("UMA", "")).strip()
-        if uma.startswith("Total DMU"):
-            site = str(row.get("Site", "")).strip()
-            sum_mois = 0
-            sum_cum = 0
-            j = idx - 1
-            while j >= 0:
-                uma_j = str(df.at[j, "UMA"]).strip()
-                site_j = str(df.at[j, "Site"]).strip()
-                # stop if we hit another Total DMU or different site
-                if uma_j.startswith("Total DMU"):
-                    break
-                if site_j != site:
-                    break
-                # accumulate numeric values only
-                try:
-                    sum_mois += int(df.at[j, "RUM du mois"])
-                except Exception:
-                    pass
-                try:
-                    sum_cum += int(df.at[j, "RUM cumulés"])
-                except Exception:
-                    pass
-                j -= 1
-            df.at[idx, "RUM du mois"] = int(sum_mois)
-            df.at[idx, "RUM cumulés"] = int(sum_cum)
+    # Écrire les données dans la copie
+    write_values_back_to_patron(df_patron, wb)
 
-def write_values_back_to_patron(df, patron_path):
+    # Sauvegarde en mémoire uniquement
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    # Téléchargement du fichier généré
+    file_name = f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx"
+    st.download_button(
+        "Télécharger le fichier rempli",
+        data=output,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    st.success("Traitement terminé — fichier prêt au téléchargement 🎉")
+
+def write_values_back_to_patron(df, wb):
     """
-    Ecrit les colonnes 'RUM du mois' et 'RUM cumulés' du dataframe df
-    dans le fichier Excel patron_path en conservant le style existant.
-    Applique bordures et auto-fit.
+    Écrit les valeurs RUM dans le workbook fourni (copie du patron).
+    Ne sauvegarde pas le fichier ici.
     """
-    wb = load_workbook(filename=str(patron_path))
-    # on prend la première feuille par défaut (si tu veux une autre feuille, on peut la détecter)
     ws = wb.active
 
-    # trouver la ligne d'entête (on cherche les colonnes Site et UMA sur une même ligne)
+    # Identifier ligne d’en-tête
     header_row = None
-    max_scan = 20
-    for r in range(1, min(ws.max_row, max_scan) + 1):
-        row_vals = [str(ws.cell(row=r, column=c).value).strip() if ws.cell(row=r, column=c).value is not None else "" for c in range(1, min(ws.max_column, 30)+1)]
-        if "site" in [v.lower() for v in row_vals] and "uma" in [v.lower() for v in row_vals]:
+    for r in range(1, 30):
+        vals = [str(ws.cell(row=r, column=c).value).strip().lower() if ws.cell(row=r, column=c).value else "" 
+                for c in range(1, ws.max_column + 1)]
+        if "site" in vals and "uma" in vals:
             header_row = r
             break
     if header_row is None:
-        # fallback: assume header is row 1
         header_row = 1
 
-    # map header names to column indexes
-    header_map = {}
-    for c in range(1, ws.max_column + 1):
-        val = ws.cell(row=header_row, column=c).value
-        if val is None:
-            continue
-        vn = str(val).strip()
-        header_map[vn] = c
-
-    # check expected headers exist
-    expected = ["Site", "UMA", "Type", "RUM du mois", "RUM cumulés"]
+    # Association colonnes
     col_idx = {}
-    for name in expected:
-        # case-insensitive lookup
-        found = None
-        for k, v in header_map.items():
-            if k.strip().lower() == name.lower():
-                found = v
+    for name in ["RUM du mois", "RUM cumulés"]:
+        for c in range(1, ws.max_column + 1):
+            if ws.cell(row=header_row, column=c).value and \
+               str(ws.cell(row=header_row, column=c).value).strip().lower() == name.lower():
+                col_idx[name] = c
                 break
-        if not found:
-            raise ValueError(f"En-tête '{name}' introuvable dans le fichier patron.")
-        col_idx[name] = found
 
-    # écrire les valeurs df dans les lignes correspondantes du workbook
-    # On suppose que df est dans le même ordre que les lignes du patron (après l'entête)
+    # Remplissage des valeurs
     start_row = header_row + 1
-    for i in range(len(df)):
-        target_row = start_row + i
-        # si la feuille est plus courte, on ne crée pas de nouvelles lignes en modifiant seulement les cellules existantes
-        # mais openpyxl va étendre la feuille si nécessaire
-        val_mois = int(df.at[i, "RUM du mois"])
-        val_cum = int(df.at[i, "RUM cumulés"])
-        ws.cell(row=target_row, column=col_idx["RUM du mois"], value=val_mois)
-        ws.cell(row=target_row, column=col_idx["RUM cumulés"], value=val_cum)
+    for i, row in df.iterrows():
+        ws.cell(row=start_row + i, column=col_idx["RUM du mois"]).value = int(row["RUM du mois"])
+        ws.cell(row=start_row + i, column=col_idx["RUM cumulés"]).value = int(row["RUM cumulés"])
 
-    # Appliquer bordures sur la plage utilisée (de start_row jusqu'à last data row, et sur les colonnes 1..max col)
-    thin = Side(border_style="thin", color="000000")
-    border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    last_row = start_row + len(df) - 1
-    last_col = ws.max_column
-    for r in range(header_row, last_row + 1):
-        for c in range(1, last_col + 1):
-            cell = ws.cell(row=r, column=c)
-            # on applique la bordure en préservant éventuellement les bordures existantes
-            cell.border = Border(
-                left=cell.border.left or border.left,
-                right=cell.border.right or border.right,
-                top=cell.border.top or border.top,
-                bottom=cell.border.bottom or border.bottom,
-            )
-
-    # Auto-fit approximation : calculer largeur max par colonne
-    for c in range(1, last_col + 1):
-        max_length = 0
-        for r in range(header_row, last_row + 1):
-            val = ws.cell(row=r, column=c).value
-            if val is None:
-                length = 0
-            else:
-                length = len(str(val))
-            if length > max_length:
-                max_length = length
-        col_letter = get_column_letter(c)
-        # facteur empirique : +2 padding
-        ws.column_dimensions[col_letter].width = (max_length + 2)
-
-    # Sauvegarde
-    wb.save(str(patron_path))
+    # Ajustement auto des colonnes (garde le style existant)
+    for c in range(1, ws.max_column + 1):
+        max_len = 0
+        for r in range(1, ws.max_row + 1):
+            v = ws.cell(row=r, column=c).value
+            max_len = max(max_len, len(str(v)) if v else 0)
+        ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = max_len + 2
 
 def page_connexion():
     st.title("Connexion Oracle")
