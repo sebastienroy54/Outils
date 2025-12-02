@@ -1,25 +1,6 @@
-def compute_dmu_totals_in_df(df):
-    df["RUM du mois"] = pd.to_numeric(df["RUM du mois"], errors="coerce").fillna(0).astype(int)
-    df["RUM cumulés"] = pd.to_numeric(df["RUM cumulés"], errors="coerce").fillna(0).astype(int)
-
-    for idx, row in df.iterrows():
-        uma = str(row.get("UMA", "")).strip()
-
-        if uma.startswith("Total DMU"):
-            sum_mois = 0
-            sum_cum = 0
-            j = idx - 1
-
-            while j >= 0:
-                row_uma = str(df.at[j, "UMA"]).strip()
-
-                # Stop quand on atteint un autre Total DMU ou la ligne d’en-tête
-                if row_uma.startswith("Total DMU") or row_uma.lower() == "uma":
-                    break
-
-                sum_mois += df.at[j, "RUM du mois"]
-                sum_cum += df.at[j, "RUM cumulés"]
-                j -= 1
-
-            df.at[idx, "RUM du mois"] = sum_mois
-            df.at[idx, "RUM cumulés"] = sum_cum
+SELECT COUNT(*) AS NB_RUM_2025
+FROM RSM R, RUM M, RSS
+WHERE R.KYRES = M.NORES
+  AND M.KYRSS = RSS.KYRSS
+  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY');
