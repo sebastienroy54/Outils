@@ -285,7 +285,7 @@ def page_rum():
         return
 
     mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
-    annees = list(range(2020, datetime.now().year + 1))
+    annees = list(range(2013, datetime.now().year + 1))
     annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
 
     bouton = st.button("Lancer le traitement RUM")
@@ -389,7 +389,7 @@ def page_rum():
         sortie_name = DATA_DIR / f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx"
         try:
             #df_patron.to_excel(sortie_name, index=False, engine="openpyxl")
-            write_values_back_to_patron(df_patron, PATRON_XLSX)
+            write_values_back_to_patron(df_patron, sortie_name)
         except Exception as e_save:
             safe_show_exception(e_save)
             st.error("Erreur lors de la sauvegarde du fichier Excel.")
