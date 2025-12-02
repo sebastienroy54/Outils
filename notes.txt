@@ -1,33 +1,3 @@
-def compute_dmu_totals_in_df(df):
-    df["RUM du mois"] = pd.to_numeric(df["RUM du mois"], errors="coerce").fillna(0).astype(int)
-    df["RUM cumulés"] = pd.to_numeric(df["RUM cumulés"], errors="coerce").fillna(0).astype(int)
-
-    for idx, row in df.iterrows():
-        uma = str(row.get("UMA", "")).strip()
-        if uma.startswith("Total DMU"):
-            site = str(row.get("Site", "")).strip()
-            sum_mois = 0
-            sum_cum = 0
-            j = idx - 1
-
-            while j >= 0:
-                row_site = str(df.at[j, "Site"]).strip()
-                row_uma = str(df.at[j, "UMA"]).strip()
-
-                if row_uma.startswith("Total DMU"):  # On s'arrête au total précédent
-                    break
-                if row_site != site:  # On s'arrête si changement de site
-                    break
-
-                sum_mois += df.at[j, "RUM du mois"]
-                sum_cum += df.at[j, "RUM cumulés"]
-                j -= 1
-
-            df.at[idx, "RUM du mois"] = sum_mois
-            df.at[idx, "RUM cumulés"] = sum_cum
-
-from shutil import copyfile
-
 def write_copy_with_values_to_patron(df, patron_path, output_path):
 
     copyfile(patron_path, output_path)
