@@ -3,35 +3,52 @@ from pathlib import Path
 
 PATRON_XLSX = Path("C:/Users/4251352/Portail_outils/data/tableau_rum_tim.xlsx")
 
-def build_uma_dict_from_patron(patron_path):
-    df = pd.read_excel(patron_path, engine="openpyxl", dtype=str)
+def extract_uma_code(uma):
+    if not isinstance(uma, str):
+        return ""
+    if "-" in uma:
+        return uma.split("-")[0].strip()
+    return uma.split()[0].strip()
 
-    # Recadrage propre
+def extract_tim_list(value):
+    if not isinstance(value, str):
+        return []
+    # Sépare sur "/" et nettoie
+    parts = [v.strip() for v in value.split("/") if v.strip()]
+    return parts
+
+def build_tim_uma_dict(patron_path):
+    df = pd.read_excel(patron_path, engine="openpyxl", dtype=str)
     df["Site"] = df["Site"].astype(str).str.strip()
     df["UMA"] = df["UMA"].astype(str).str.strip()
 
-    # On prend le code UMA (ex: "060" depuis "060 - Médecine ...")
-    df["UMA_CODE"] = df["UMA"].apply(lambda x: x.split()[0])
-
-    # Dictionnaire final
     tim_dict = {}
 
     for _, row in df.iterrows():
-        tim = row.get("TIM", "").strip()
-        if not tim:
+        site = row["Site"]
+        uma = row["UMA"]
+
+        if not uma or uma.startswith("Total DMU"):
             continue
 
-        site = row["Site"]
-        uma = row["UMA_CODE"]
+        uma_code = extract_uma_code(uma)
 
-        if tim not in tim_dict:
-            tim_dict[tim] = {}
+        # Récupération TIM référent + relance
+        tims_ref = extract_tim_list(row.get("TIM référent", ""))
+        tims_rel = extract_tim_list(row.get("Relance", ""))
 
-        tim_dict[tim][site] = uma
+        tims = set(tims_ref + tims_rel)
+        tims.discard("")  # on enlève vide
+
+        for tim in tims:
+            if tim not in tim_dict:
+                tim_dict[tim] = {}
+            tim_dict[tim][site] = uma_code
 
     return tim_dict
 
+
 if __name__ == "__main__":
-    dico = build_uma_dict_from_patron(PATRON_XLSX)
-    for tim, sites in dico.items():
+    result = build_tim_uma_dict(PATRON_XLSX)
+    for tim, sites in result.items():
         print(f"{tim} = {sites}")
