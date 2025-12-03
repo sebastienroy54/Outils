@@ -1,6 +1,37 @@
-SELECT COUNT(*) AS NB_RUM_2025
-FROM RSM R, RUM M, RSS
-WHERE R.KYRES = M.NORES
-  AND M.KYRSS = RSS.KYRSS
-  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY');
+import pandas as pd
+from pathlib import Path
+
+PATRON_XLSX = Path("C:/Users/4251352/Portail_outils/data/tableau_rum_tim.xlsx")
+
+def build_uma_dict_from_patron(patron_path):
+    df = pd.read_excel(patron_path, engine="openpyxl", dtype=str)
+
+    # Recadrage propre
+    df["Site"] = df["Site"].astype(str).str.strip()
+    df["UMA"] = df["UMA"].astype(str).str.strip()
+
+    # On prend le code UMA (ex: "060" depuis "060 - Médecine ...")
+    df["UMA_CODE"] = df["UMA"].apply(lambda x: x.split()[0])
+
+    # Dictionnaire final
+    tim_dict = {}
+
+    for _, row in df.iterrows():
+        tim = row.get("TIM", "").strip()
+        if not tim:
+            continue
+
+        site = row["Site"]
+        uma = row["UMA_CODE"]
+
+        if tim not in tim_dict:
+            tim_dict[tim] = {}
+
+        tim_dict[tim][site] = uma
+
+    return tim_dict
+
+if __name__ == "__main__":
+    dico = build_uma_dict_from_patron(PATRON_XLSX)
+    for tim, sites in dico.items():
+        print(f"{tim} = {sites}")
