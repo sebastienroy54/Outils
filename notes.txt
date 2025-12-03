@@ -97,7 +97,7 @@ def build_tim_uma_dict(patron_path):
 
     return result_listified
 
-if __name__ == "__main__":
-    d = build_tim_uma_dict(PATRON_XLSX)
-    for tim, sites in sorted(d.items()):
-        print(f"{tim} = {json.dumps(sites, ensure_ascii=False)}")
+
+d = build_tim_uma_dict(PATRON_XLSX)
+for tim, sites in sorted(d.items()):
+    print(f"{tim} = {json.dumps(sites, ensure_ascii=False)}")
