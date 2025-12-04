@@ -1,2 +1,2 @@
-du 1er janvier à ce  jour pour tous les séjours dont la durée est supérieure ou égale à 3 jours en fichier excel avec  comme colonnes :
+du 1er janvier à ce  jour pour tous les séjours dont la durée est supérieure ou égale à 3 jours avec  comme colonnes :
 NIP / NDA/ UH /URMP /Sexe /Age /Date entree / Mode ent provenance /Date sortie /Mode sortie Destination /Durée de séjour/ GHM séjour / GHS  séjour / CA Séjour (+EX et forfait /GHM Apres  / GHS Après /   CA Séjour apres /Delta avant-apres /Commentaire DIM / Commentaire Clinicien  Nb URM  /Indic Rsm princ /  Diag principal /Diag Relie/ DAS 1 /DAS 2 /DAS 3 /DAS 4 /CCAM 1 / CCAM 2 / CCAM 3 
