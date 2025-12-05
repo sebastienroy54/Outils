@@ -1,147 +1,40 @@
-def page_rum():
-    st.title("Remplissage RUM — TIM")
-    if "oracle_connected" not in st.session_state or not st.session_state.oracle_connected:
-        st.error("Vous devez d'abord vous connecter sur la page Connexion.")
-        return
+# Calcul RUM
+st.write("🔹 Calcul RUM par UMA...")
+for tim, sites in tim_dict.items():
+    for site, dmus in sites.items():
+        for dmu, umas in dmus.items():
+            for uma in umas:
+                uma_code = uma["code"]
+                uma_type = uma["type"]
+                base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
+                base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
+                default_count = uma_to_tim_count.get(uma_code, 1)
+                weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count if default_count > 0 else 1.0)
+                assigned_m = base_m * weight
+                assigned_c = base_c * weight
 
-    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
-    annees = list(range(2013, datetime.now().year + 1))
-    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
-    bouton = st.button("Lancer le traitement RUM")
-    st.markdown("**Remarque :** le script va interroger les 3 bases (CCH, BRC, HTD) et générer un tableau par TIM.")
-    if not bouton:
-        return
+                # Logs pour debug
+                print(f"SITE={site}, DMU={dmu}, UMA={uma_code}, TYPE={uma_type}")
+                print(f"  base_m={base_m}, base_c={base_c}, default_count={default_count}, weight={weight}")
+                print(f"  assigned_m={assigned_m}, assigned_c={assigned_c}")
 
-    try:
-        progress = st.progress(0)
-        progress.progress(5)
-
-        st.write("🔹 Construction du dictionnaire TIM/UMA...")
-        tim_dict = build_tim_uma_dict(PATRON_TIM_XLSX)
-        st.write(f"✅ TIM dict construit, {len(tim_dict)} TIM trouvés.")
-
-        UMA_WEIGHTS = {
-            ("130", "Clara HEBRARD"): 1/3,
-            ("130", "Maria Louisa ESTEVES"): 2/3
-        }
-
-        st.write("🔹 Construction du DataFrame df_patron...")
-        # --- DataFrame patron construction ---
-        rows = []
-        for tim, sites in tim_dict.items():
-            for site, dmus in sites.items():
-                for dmu, umas in dmus.items():
-                    for uma in umas:
-                        rows.append({
-                            "TIM": tim,
-                            "SITE": site,
-                            "UMA HC": uma["libelle"] if uma["type"] == "HC" else "",
-                            "RUM codés mois": 0.0 if uma["type"] == "HC" else np.nan,
-                            "RUM codés cumulés": 0.0 if uma["type"] == "HC" else np.nan,
-                            "UMA HDJ": uma["libelle"] if uma["type"] == "HDJ" else "",
-                            "DMU": dmu,
-                            "RUM relancés mois": 0.0 if uma["type"] == "HDJ" else np.nan,
-                            "RUM relancés cumulés": 0.0 if uma["type"] == "HDJ" else np.nan,
-                        })
-        df_patron = pd.DataFrame(rows)
-        st.write(f"✅ df_patron créé : {df_patron.shape[0]} lignes")
-        progress.progress(30)
-
-        st.write("🔹 Extraction des codes UMA pour correspondance...")
-        df_patron["UMA_HC_code"] = df_patron["UMA HC"].apply(extract_uma_code_by_space)
-        df_patron["UMA_HDJ_code"] = df_patron["UMA HDJ"].apply(extract_uma_code_by_space)
-
-        st.write("🔹 Comptage du nombre de TIM par UMA_code...")
-        uma_to_tim_count = defaultdict(int)
-        for tim, sites in tim_dict.items():
-            for site, dmus in sites.items():
-                for dmu, umas in dmus.items():
-                    for uma in umas:
-                        uma_to_tim_count[uma["code"]] += 1
-        st.write(f"✅ UMA counts: {len(uma_to_tim_count)} codes UMA")
-
-        # Exécution SQL (par site)
-        for idx_site, (site_label, tns) in enumerate(TNS_MAP.items()):
-            st.write(f"🔹 Traitement site {site_label} ({idx_site+1}/{len(TNS_MAP)})")
-            spool_mois = DATA_DIR / f"RUM_MOIS_{site_label}.csv"
-            spool_cum = DATA_DIR / f"RUM_CUMULE_{site_label}.csv"
-            sql_mois = build_sql_spool_rum(site_label, str(spool_mois), "mois", mois, annee)
-            sql_cum = build_sql_spool_rum(site_label, str(spool_cum), "cumule", mois, annee)
-            tmp_sql_mois = SQL_DIR / f"rum_mois_{site_label}.sql"
-            tmp_sql_cum = SQL_DIR / f"rum_cumule_{site_label}.sql"
-            tmp_sql_mois.write_text(sql_mois, encoding="utf-8")
-            tmp_sql_cum.write_text(sql_cum, encoding="utf-8")
-
-            st.write("📡 Lancement sqlplus mois...")
-            out_m = run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}", timeout=60)
-            st.write("📡 Lancement sqlplus cumulé...")
-            out_c = run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}", timeout=60)
-
-            df_m = read_spool_csv_to_df(spool_mois)
-            df_c = read_spool_csv_to_df(spool_cum)
-            st.write(f"📊 Spool df_m : {df_m.shape[0]} lignes, df_c : {df_c.shape[0]} lignes")
-
-            # Calcul RUM
-            st.write("🔹 Calcul RUM par UMA...")
-            for tim, sites in tim_dict.items():
-                for site, dmus in sites.items():
-                    for dmu, umas in dmus.items():
-                        for uma in umas:
-                            uma_code = uma["code"]
-                            uma_type = uma["type"]
-                            base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
-                            base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
-                            default_count = uma_to_tim_count.get(uma_code, 1)
-                            weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count if default_count > 0 else 1.0)
-                            assigned_m = base_m * weight
-                            assigned_c = base_c * weight
-
-                            if uma_type == "HC":
-                                mask = (
-                                    (df_patron["TIM"] == tim) &
-                                    (df_patron["SITE"] == site) &
-                                    (df_patron["DMU"] == dmu) &
-                                    (df_patron["UMA_HC_code"] == uma_code)
-                                )
-                                df_patron.loc[mask, "RUM codés mois"] = assigned_m
-                                df_patron.loc[mask, "RUM codés cumulés"] = assigned_c
-                            else:  # HDJ
-                                mask = (
-                                    (df_patron["TIM"] == tim) &
-                                    (df_patron["SITE"] == site) &
-                                    (df_patron["DMU"] == dmu) &
-                                    (df_patron["UMA_HDJ_code"] == uma_code)
-                                )
-                                df_patron.loc[mask, "RUM relancés mois"] = assigned_m
-                                df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
-
-            try:
-                tmp_sql_mois.unlink()
-                tmp_sql_cum.unlink()
-            except:
-                st.warning(f"⚠ Impossible de supprimer {tmp_sql_mois} ou {tmp_sql_cum}")
-
-            progress.progress(30 + idx_site * 20)
-
-        st.write("🔹 Application des exceptions UMA...")
-        df_patron = apply_uma_exceptions(df_patron)
-
-        # --- suppression colonnes temporaires ---
-        df_patron.drop(columns=["UMA_HC_code", "UMA_HDJ_code"], inplace=True)
-
-        st.write("🔹 Écriture dans le patron Excel en mémoire...")
-        output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
-        st.write("✅ Fichier prêt en mémoire")
-        progress.progress(100)
-
-        st.success(f"Traitement terminé — fichier prêt au téléchargement")
-        st.download_button(
-            "Télécharger le fichier rempli",
-            data=output,
-            file_name=f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-    except Exception as e:
-        st.write("❌ Exception capturée ! :", e)
-        safe_show_exception(e)
+                if uma_type == "HC":
+                    mask = (
+                        (df_patron["TIM"] == tim) &
+                        (df_patron["SITE"] == site) &
+                        (df_patron["DMU"] == dmu) &
+                        (df_patron["UMA_HC_code"] == uma_code)
+                    )
+                    df_patron.loc[mask, "RUM codés mois"] = assigned_m
+                    df_patron.loc[mask, "RUM codés cumulés"] = assigned_c
+                    print(f"  Updated df_patron rows (HC): {mask.sum()}")
+                else:  # HDJ
+                    mask = (
+                        (df_patron["TIM"] == tim) &
+                        (df_patron["SITE"] == site) &
+                        (df_patron["DMU"] == dmu) &
+                        (df_patron["UMA_HDJ_code"] == uma_code)
+                    )
+                    df_patron.loc[mask, "RUM relancés mois"] = assigned_m
+                    df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
+                    print(f"  Updated df_patron rows (HDJ): {mask.sum()}")
