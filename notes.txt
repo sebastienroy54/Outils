@@ -1,128 +1,14 @@
-def apply_uma_exceptions(df_patron):
-    """
-    Applique les exceptions spécifiques :
-    - 150 HTD : transférer RUM vers TIM 'Cliniciens' si présent
-    - 040X CCH et autres : transferts HC <-> HDJ si nécessaire
-    Ne jamais mettre 0, laisser vide si aucun RUM.
-    """
-    df = df_patron.copy()
-
-    # --- 150 HTD vers Cliniciens ---
-    mask_150 = (df["UMA_code"] == "150") & (df["SITE"] == "HTD") & (df["UMA_type"] == "HC")
-    mask_cliniciens = df["TIM"] == "Cliniciens"
-
-    # Transférer RUM codes HC -> TIM Cliniciens
-    for col in ["RUM_codes_mois", "RUM_codes_cumulés"]:
-        vals = df.loc[mask_150, col].values
-        if len(vals) != len(df.loc[mask_cliniciens, col]):
-            # Correspondance ligne par ligne par index
-            vals = vals[0:len(df.loc[mask_cliniciens, col])]  # ne pas dépasser
-        df.loc[mask_cliniciens, col] = vals
-
-    # --- 040X CCH transfert codés -> relancés HC ---
-    mask_040X = (df["UMA_code"].str.startswith("040X")) & (df["SITE"] == "CCH")
-    for col_from, col_to in [("RUM_codes_mois", "RUM_relancés mois"),
-                             ("RUM_codes_cumulés", "RUM_relancés cumulés")]:
-        df.loc[mask_040X, col_to] = df.loc[mask_040X, col_from].values
-        # On vide l’ancienne colonne
-        df.loc[mask_040X, col_from] = None
-
-    # --- 561C, 591C, 591J CCH : codés par TIM pour HDJ ---
-    for uma in ["561C", "591C", "591J"]:
-        mask = (df["UMA_code"] == uma) & (df["SITE"] == "CCH") & (df["UMA_type"] == "HDJ")
-        for col_from, col_to in [("RUM_relancés mois", "RUM_codes_mois"),
-                                 ("RUM_relancés cumulés", "RUM_codes_cumulés")]:
-            df.loc[mask, col_to] = df.loc[mask, col_from].values
-            df.loc[mask, col_from] = None
-
-    return df
-
-def write_copy_with_values_to_patron(df, patron_path):
-    """
-    Écrit le DataFrame dans le patron Excel et retourne un BytesIO pour téléchargement.
-    Corrige :
-    - RUM correctement rempli
-    - DMU toujours rempli
-    - Bordures verticales pour toutes les colonnes
-    - Centrage uniquement TIM/SITE/DMU
-    """
-    from io import BytesIO
-    wb = load_workbook(filename=str(patron_path))
-    ws = wb.active
-
-    # --- Identifier header_row ---
-    header_row = None
-    for r in range(1, 30):
-        values = [(ws.cell(row=r, column=c).value or "").strip().lower() for c in range(1, ws.max_column+1)]
-        if "tim" in values and "site" in values:
-            header_row = r
-            break
-    if not header_row:
-        header_row = 1
-
-    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip(): c for c in range(1, ws.max_column+1)}
-
-    # Colonnes Excel
-    col_map = {
-        "TIM": name_to_col.get("TIM"),
-        "SITE": name_to_col.get("SITE"),
-        "UMA_HC": name_to_col.get("UMA HC"),
-        "RUM_codes_mois": name_to_col.get("RUM codés mois"),
-        "RUM_codes_cumulés": name_to_col.get("RUM codés cumulés"),
-        "UMA_HDJ": name_to_col.get("UMA HDJ"),
-        "DMU": name_to_col.get("DMU"),
-        "RUM_rel_mois": name_to_col.get("RUM relancés mois"),
-        "RUM_rel_cum": name_to_col.get("RUM relancés cumulés")
-    }
-
-    start = header_row + 1
-    df_sorted = df.sort_values(by=["TIM", "SITE", "DMU", "UMA_code"]).reset_index(drop=True)
-
-    # --- Remplissage des cellules ---
-    for idx, row in df_sorted.iterrows():
-        excel_row = start + idx
-        ws.cell(row=excel_row, column=col_map["TIM"]).value = row["TIM"]
-        ws.cell(row=excel_row, column=col_map["SITE"]).value = row["SITE"]
-        ws.cell(row=excel_row, column=col_map["DMU"]).value = row["DMU"]  # toujours rempli
-
-        if row["UMA_type"] == "HC":
-            ws.cell(row=excel_row, column=col_map["UMA_HC"]).value = row["UMA_libelle"]
-            ws.cell(row=excel_row, column=col_map["RUM_codes_mois"]).value = int(row["RUM_codes_mois"]) if row["RUM_codes_mois"] is not None else None
-            ws.cell(row=excel_row, column=col_map["RUM_codes_cumulés"]).value = int(row["RUM_codes_cumulés"]) if row["RUM_codes_cumulés"] is not None else None
-        else:
-            ws.cell(row=excel_row, column=col_map["UMA_HDJ"]).value = row["UMA_libelle"]
-            ws.cell(row=excel_row, column=col_map["RUM_rel_mois"]).value = int(row["RUM_rel_mois"]) if row["RUM_rel_mois"] is not None else None
-            ws.cell(row=excel_row, column=col_map["RUM_rel_cum"]).value = int(row["RUM_rel_cum"]) if row["RUM_rel_cum"] is not None else None
-
-    # --- Fusion et bordures ---
-    merge_vertical_conditionnel(ws, col_map["TIM"], df_sorted["TIM"], start)
-    merge_vertical_conditionnel(ws, col_map["SITE"], df_sorted["SITE"], start, group_col=df_sorted["TIM"])
-    merge_vertical_conditionnel(ws, col_map["DMU"], df_sorted["DMU"], start, group_col=df_sorted["TIM"])
-
-    draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_map["SITE"])
-
-    # --- Bordures verticales pour toutes les colonnes ---
-    thin = Side(border_style="thin", color="000000")
-    for r in range(1, ws.max_row+1):
-        for c in range(1, ws.max_column+1):
-            cell = ws.cell(row=r, column=c)
-            cell.border = Border(left=thin, right=thin,
-                                 top=cell.border.top, bottom=cell.border.bottom)
-
-    # --- Centrage uniquement TIM, SITE, DMU ---
-    for idx, row in df_sorted.iterrows():
-        excel_row = start + idx
-        for c in [col_map["TIM"], col_map["SITE"], col_map["DMU"]]:
-            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
-
-    # --- TIM bold ---
-    tim_positions = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
-    for tim, (start_idx, _) in tim_positions.items():
-        ws.cell(row=start + start_idx, column=col_map["TIM"]).font = Font(bold=True)
-
-    # --- Export en mémoire ---
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return output
-
+ValueError: Must have equal len keys and value when setting with an iterable
+Traceback:
+File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 505, in page_rum
+    df_patron = apply_uma_exceptions(df_patron)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 281, in apply_uma_exceptions
+    df.loc[mask_cliniciens, col] = vals
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 912, in __setitem__
+    iloc._setitem_with_indexer(indexer, value, self.name)
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 1943, in _setitem_with_indexer
+    self._setitem_with_indexer_split_path(indexer, value, name)
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 1999, in _setitem_with_indexer_split_path
+    raise ValueError(
