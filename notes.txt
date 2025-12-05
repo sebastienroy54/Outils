@@ -1,14 +1,32 @@
-ValueError: Must have equal len keys and value when setting with an iterable
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 505, in page_rum
-    df_patron = apply_uma_exceptions(df_patron)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 281, in apply_uma_exceptions
-    df.loc[mask_cliniciens, col] = vals
-    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 912, in __setitem__
-    iloc._setitem_with_indexer(indexer, value, self.name)
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 1943, in _setitem_with_indexer
-    self._setitem_with_indexer_split_path(indexer, value, name)
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 1999, in _setitem_with_indexer_split_path
-    raise ValueError(
+def apply_uma_exceptions(df):
+    # --- 150 HTD -> TIM Cliniciens ---
+    mask_150 = (df["UMA_code"] == "150") & (df["SITE"] == "HTD") & (df["UMA_type"] == "HC")
+    mask_cliniciens = df["TIM"] == "Cliniciens"
+
+    if mask_150.any() and mask_cliniciens.any():
+        # somme des RUM codés pour 150 HTD
+        val_codes_mois = df.loc[mask_150, "RUM codés mois"].sum()
+        val_codes_cum = df.loc[mask_150, "RUM codés cumulés"].sum()
+        # appliquer à toutes les lignes TIM Cliniciens
+        df.loc[mask_cliniciens, "RUM codés mois"] = val_codes_mois
+        df.loc[mask_cliniciens, "RUM codés cumulés"] = val_codes_cum
+        # laisser 150 HTD vide après transfert
+        df.loc[mask_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+    # --- 040X CCH : transférer codés -> relancés ---
+    mask_040X = df["UMA_code"].str.startswith("040X") & (df["SITE"] == "CCH")
+    if mask_040X.any():
+        df.loc[mask_040X, "RUM relancés mois"] = df.loc[mask_040X, "RUM codés mois"]
+        df.loc[mask_040X, "RUM relancés cumulés"] = df.loc[mask_040X, "RUM codés cumulés"]
+        # vider les codés
+        df.loc[mask_040X, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+    # --- 561C, 591C, 591J CCH : codés par TIM (HDJ) ---
+    for uma_code in ["561C", "591C", "591J"]:
+        mask = (df["UMA_code"] == uma_code) & (df["SITE"] == "CCH") & (df["UMA_type"] == "HDJ")
+        if mask.any():
+            df.loc[mask, "RUM codés mois"] = df.loc[mask, "RUM relancés mois"]
+            df.loc[mask, "RUM codés cumulés"] = df.loc[mask, "RUM relancés cumulés"]
+            df.loc[mask, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
+
+    return df
