@@ -1,8 +1,94 @@
-ValueError: cannot convert float NaN to integer
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 513, in page_rum
-    output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 364, in write_copy_with_values_to_patron
-    ws.cell(row=excel_row, column=col_rum_rel_mois).value = int(round(row["RUM_rel_mois"]))
-                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+def write_copy_with_values_to_patron(df, patron_path):
+    """
+    Écrit le dataframe dans le patron Excel et retourne un BytesIO pour téléchargement Streamlit.
+    Gère les NaN en laissant les cellules vides au lieu de convertir en int.
+    """
+    from io import BytesIO
+    from openpyxl import load_workbook
+    from openpyxl.styles import Border, Side, Alignment, Font
+
+    wb = load_workbook(filename=str(patron_path))
+    ws = wb.active
+
+    # repérer header_row
+    header_row = None
+    for r in range(1, 30):
+        values = [(ws.cell(row=r, column=c).value or "").strip().lower() for c in range(1, ws.max_column + 1)]
+        if "tim" in values and "site" in values:
+            header_row = r
+            break
+    if not header_row:
+        header_row = 1
+
+    # mapping des en-têtes (avec accents)
+    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip().lower(): c
+                   for c in range(1, ws.max_column + 1) if ws.cell(row=header_row, column=c).value}
+
+    # assignation colonnes
+    col_tim = name_to_col.get("tim")
+    col_site = name_to_col.get("site")
+    col_uma_hc = name_to_col.get("uma hc")
+    col_rum_codes_mois = name_to_col.get("rum codés mois")
+    col_rum_codes_cum = name_to_col.get("rum codés cumulés")
+    col_uma_hdj = name_to_col.get("uma hdj")
+    col_dmu = name_to_col.get("dmu")
+    col_rum_rel_mois = name_to_col.get("rum relancés mois")
+    col_rum_rel_cum = name_to_col.get("rum relancés cumulés")
+
+    start = header_row + 1
+    df_sorted = df.sort_values(by=["TIM", "SITE", "DMU", "UMA_code"]).reset_index(drop=True)
+
+    # fonction pour écrire une cellule numérique en gérant NaN
+    def set_int_cell(row_idx, col_idx, value):
+        if pd.isna(value):
+            ws.cell(row=row_idx, column=col_idx).value = None
+        else:
+            ws.cell(row=row_idx, column=col_idx).value = int(round(value))
+
+    # remplir les données
+    for idx, row in df_sorted.iterrows():
+        excel_row = start + idx
+        ws.cell(row=excel_row, column=col_tim).value = row["TIM"]
+        ws.cell(row=excel_row, column=col_site).value = row["SITE"]
+
+        if row["UMA_type"] == "HC":
+            ws.cell(row=excel_row, column=col_uma_hc).value = row["UMA_libelle"]
+            set_int_cell(excel_row, col_rum_codes_mois, row["RUM_codes_mois"])
+            set_int_cell(excel_row, col_rum_codes_cum, row["RUM_codes_cum"])
+            # DMU pour HC : on peut aussi l'afficher si besoin, sinon laisser vide
+            ws.cell(row=excel_row, column=col_dmu).value = None
+            set_int_cell(excel_row, col_rum_rel_mois, None)
+            set_int_cell(excel_row, col_rum_rel_cum, None)
+        else:  # HDJ
+            ws.cell(row=excel_row, column=col_uma_hdj).value = row["UMA_libelle"]
+            ws.cell(row=excel_row, column=col_dmu).value = row["DMU"]
+            set_int_cell(excel_row, col_rum_rel_mois, row["RUM_rel_mois"])
+            set_int_cell(excel_row, col_rum_rel_cum, row["RUM_rel_cum"])
+            set_int_cell(excel_row, col_rum_codes_mois, None)
+            set_int_cell(excel_row, col_rum_codes_cum, None)
+
+    # Fusion TIM / SITE / DMU
+    merge_vertical_conditionnel(ws, col_tim, df_sorted["TIM"], start)
+    merge_vertical_conditionnel(ws, col_site, df_sorted["SITE"], start, group_col=df_sorted["TIM"])
+    merge_vertical_conditionnel(ws, col_dmu, df_sorted["DMU"], start, group_col=df_sorted["TIM"])
+
+    # Bordures
+    draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_site)
+
+    # Align center
+    for idx, row in df_sorted.iterrows():
+        excel_row = start + idx
+        for c in [col_tim, col_site, col_dmu]:
+            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
+
+    # TIM bold
+    tim_positions = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
+    for tim, (start_idx, _) in tim_positions.items():
+        excel_row = start + start_idx
+        ws.cell(row=excel_row, column=col_tim).font = Font(bold=True)
+
+    # exporter en mémoire
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
