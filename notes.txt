@@ -1,27 +1,14 @@
-# Pour chaque UMA dans tim_dict, récupérer sa base et appliquer pondération / type
-for tim, sites in tim_dict.items():
-    for site, dmus in sites.items():
-        for dmu, umas in dmus.items():
-            for uma in umas:
-                uma_code = uma["code"]
-                uma_type = uma["type"]
-                # base counts (0 si absent)
-                base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
-                base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
-                # poids personnalisé sinon 1 / nTIM
-                default_count = uma_to_tim_count.get(uma_code, 1)
-                weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count if default_count > 0 else 1.0)
-                assigned_m = base_m * weight
-                assigned_c = base_c * weight
-
-                # Ajouter aux lignes correspondantes dans df_patron
-                mask = (df_patron["TIM"] == tim) & (df_patron["SITE"] == site) & (df_patron["DMU"] == dmu) & (df_patron["UMA_code"] == uma_code)
-                if uma_type == "HC":
-                    df_patron.loc[mask, "RUM_codes_mois"] = assigned_m
-                    df_patron.loc[mask, "RUM_codes_cumulés"] = assigned_c
-                else:  # HDJ
-                    df_patron.loc[mask, "RUM relancés mois"] = assigned_m
-                    df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
-
-# Appliquer les exceptions (transfert vers Cliniciens, etc.)
-df_patron = apply_uma_exceptions(df_patron)
+ValueError: Must have equal len keys and value when setting with an iterable
+Traceback:
+File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 516, in page_rum
+    df_patron = apply_uma_exceptions(df_patron)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 280, in apply_uma_exceptions
+    df_patron.loc[mask_cliniciens, col] = df_patron.loc[mask_150, col].values
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 912, in __setitem__
+    iloc._setitem_with_indexer(indexer, value, self.name)
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 1943, in _setitem_with_indexer
+    self._setitem_with_indexer_split_path(indexer, value, name)
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\indexing.py", line 1999, in _setitem_with_indexer_split_path
+    raise ValueError(
