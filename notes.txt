@@ -191,7 +191,6 @@ def build_tim_uma_dict(patron_path):
     }
     return result_listified
 
-# --- utilitaires d'écriture Excel ---
 def merge_vertical_conditionnel(ws, col_idx, df_col, start_row, group_col=None):
     if len(df_col) == 0:
         return
@@ -230,15 +229,6 @@ def draw_border_lines_for_tim_blocks(ws, start_row, df_sorted, first_col, last_c
             cell.border = Border(left=cell.border.left, right=cell.border.right, top=cell.border.top, bottom=bottom_border.bottom)
 
 def write_copy_with_values_to_patron(df, patron_path, output_path):
-    """
-    Attendu : df a une ligne par UMA/TIM/site/dmu avec colonnes:
-    'TIM','SITE','UMA_libelle','UMA_code','UMA_type','DMU',
-    'RUM_codes_mois','RUM_codes_cum','RUM_rel_mois','RUM_rel_cum'
-    On mappe vers le patron qui doit contenir en en-tête:
-    TIM, SITE,
-    UMA HC, DMU HC, RUM codés mois, RUM codés cumulés,
-    UMA HDJ, DMU HDJ, RUM relancés mois, RUM relancés cumulés
-    """
     copyfile(patron_path, output_path)
     wb = load_workbook(filename=str(output_path))
     ws = wb.active
@@ -269,11 +259,11 @@ def write_copy_with_values_to_patron(df, patron_path, output_path):
         "tim": ["tim"],
         "site": ["site"],
         "uma_hc": ["uma hc", "uma_hc", "uma-hc"],
-        "dmu_hc": ["dmu hc", "dmu_hc", "dmu-hc", "dmu"],
+        "dmu": ["dmu hc", "dmu_hc", "dmu-hc", "dmu"],
         "rum_codes_mois": ["rum codés mois", "rum codes mois", "rum_codes_mois"],
         "rum_codes_cum": ["rum codés cumulés", "rum codes cumulés", "rum_codes_cumulés", "rum_codes_cum"],
         "uma_hdj": ["uma hdj", "uma_hdj", "uma-hdj"],
-        "dmu_hdj": ["dmu hdj", "dmu_hdj", "dmu-hdj", "dmu"],
+        "dmu": ["dmu hdj", "dmu_hdj", "dmu-hdj", "dmu"],
         "rum_rel_mois": ["rum relancés mois", "rum relances mois", "rum_rel_mois"],
         "rum_rel_cum": ["rum relancés cumulés", "rum relances cumulés", "rum_rel_cum"]
     }
@@ -287,11 +277,11 @@ def write_copy_with_values_to_patron(df, patron_path, output_path):
     col_tim = find_col(expected_headers_map["tim"])
     col_site = find_col(expected_headers_map["site"])
     col_uma_hc = find_col(expected_headers_map["uma_hc"])
-    col_dmu_hc = find_col(expected_headers_map["dmu_hc"])
+    col_dmu_hc = find_col(expected_headers_map["dmu"])
     col_rum_codes_mois = find_col(expected_headers_map["rum_codes_mois"])
     col_rum_codes_cum = find_col(expected_headers_map["rum_codes_cum"])
     col_uma_hdj = find_col(expected_headers_map["uma_hdj"])
-    col_dmu_hdj = find_col(expected_headers_map["dmu_hdj"])
+    col_dmu_hdj = find_col(expected_headers_map["dmu"])
     col_rum_rel_mois = find_col(expected_headers_map["rum_rel_mois"])
     col_rum_rel_cum = find_col(expected_headers_map["rum_rel_cum"])
 
