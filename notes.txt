@@ -476,18 +476,18 @@ def page_rum():
                 df_patron[col] = df_patron[col].fillna(0.0).astype(float)
 
         # Écrire dans le patron de sortie
-        sortie_path = DATA_DIR / f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx"
-        write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX, sortie_path)
+        output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
+        #sortie_path = DATA_DIR / f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx"
         progress.progress(100)
 
-        st.success(f"Traitement terminé — fichier prêt au téléchargement : {sortie_path.name}")
-        with open(sortie_path, "rb") as f:
-            st.download_button(
-                "Télécharger le fichier rempli",
-                data=f.read(),
-                file_name=sortie_path.name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+        st.success(f"Traitement terminé — fichier prêt au téléchargement")
+
+        st.download_button(
+            "Télécharger le fichier rempli",
+            data=output,
+            file_name=f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
     except Exception as e:
         safe_show_exception(e)
