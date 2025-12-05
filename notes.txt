@@ -1,245 +1,84 @@
-def page_rum():
-    st.title("Remplissage RUM — TIM")
-    if "oracle_connected" not in st.session_state or not st.session_state.oracle_connected:
-        st.error("Vous devez d'abord vous connecter sur la page Connexion.")
-        return
+========== BUILD_TIM_UMA_DICT ==========
+▶ Nombre de lignes patron TIM : 132
+▶ Colonnes reconnues : ['DMU', 'Site', 'UMA', 'Type', 'RUM du mois', 'RUM cumulés', 'TIM Référent', 'Relance']
+▶ TIM trouvés : 17
+=========================================
 
-    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
-    annees = list(range(2013, datetime.now().year + 1))
-    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
-    bouton = st.button("Lancer le traitement RUM")
-    st.markdown("**Remarque :** le script va interroger les 3 bases (CCH, BRC, HTD) et générer un tableau par TIM.")
-    if not bouton:
-        return
+====== DEBUG df_patron INITIAL ======
+Nombre de lignes : 129
+Colonnes : ['TIM', 'SITE', 'UMA HC', 'RUM codés mois', 'RUM codés cumulés', 'UMA HDJ', 'DMU', 'RUM relancés mois', 'RUM relancés cumulés']
+Sites présents dans df_patron : ['CCH' 'BRC' 'HTD']
+=====================================
+====== DEBUG UMA_to_TIM_count (quelques exemples) ======
+Code UMA 080 -> utilisé par 1 TIM
+Code UMA 080S -> utilisé par 1 TIM
+Code UMA 520 -> utilisé par 1 TIM
+Code UMA 520S -> utilisé par 1 TIM
+Code UMA 080J -> utilisé par 1 TIM
+Code UMA 081J -> utilisé par 1 TIM
+Code UMA 083J -> utilisé par 1 TIM
+Code UMA 500J -> utilisé par 2 TIM
+Code UMA 520J -> utilisé par 1 TIM
+Code UMA 018 -> utilisé par 2 TIM
+Code UMA 029 -> utilisé par 2 TIM
+Code UMA 029J -> utilisé par 2 TIM
+Code UMA 112 -> utilisé par 1 TIM
+Code UMA 112S -> utilisé par 1 TIM
+Code UMA 115 -> utilisé par 1 TIM
+========================================================
+====== DEBUG SPOOL POUR SITE CCH ======
+df_m (mois) : nb lignes = 99 , somme COUNT = 11029
+df_c (cumul) : nb lignes = 102 , somme COUNT = 126307
+Quelques UMA mois : [{'UMA': '010', 'COUNT': 88}, {'UMA': '010J', 'COUNT': 193}, {'UMA': '010S', 'COUNT': 70}, {'UMA': '011', 'COUNT': 93}, {'UMA': '011J', 'COUNT': 654}, {'UMA': '020', 'COUNT': 5}, {'UMA': '020J', 'COUNT': 201}, {'UMA': '021', 'COUNT': 96}, {'UMA': '022J', 'COUNT': 47}, {'UMA': '022S', 'COUNT': 6}]
+Quelques UMA cumul : [{'UMA': '010', 'COUNT': 1495}, {'UMA': '010J', 'COUNT': 2357}, {'UMA': '010S', 'COUNT': 773}, {'UMA': '011', 'COUNT': 1166}, {'UMA': '011J', 'COUNT': 7459}, {'UMA': '020', 'COUNT': 41}, {'UMA': '020J', 'COUNT': 2408}, {'UMA': '021', 'COUNT': 1162}, {'UMA': '022J', 'COUNT': 285}, {'UMA': '022S', 'COUNT': 88}]
+===============================================
 
-    try:
-        progress = st.progress(0)
-        progress.progress(5)
+====== DEBUG AFFECTATION DF_PATRON POUR SITE CCH ======
+Total RUM codés mois (df_patron)   = 4481.5
+Total RUM codés cumulés (df_patron)= 56370.5
+Total RUM relancés mois (df_patron)   = 5770.0
+Total RUM relancés cumulés (df_patron)= 62644.5
+Total assigned_m calculé           = 10251.5
+Total assigned_c calculé           = 119015.0
+==============================================================
 
-        # --- 1. Dictionnaire TIM / UMA depuis tableau_rum_tim.xlsx ---
-        st.write("🔹 Construction du dictionnaire TIM/UMA...")
-        tim_dict = build_tim_uma_dict(PATRON_TIM_XLSX)
-        st.write(f"✅ TIM dict construit, {len(tim_dict)} TIM trouvés.")
+====== DEBUG SPOOL POUR SITE BRC ======
+df_m (mois) : nb lignes = 7 , somme COUNT = 622
+df_c (cumul) : nb lignes = 6 , somme COUNT = 7031
+Quelques UMA mois : [{'UMA': '018', 'COUNT': 30}, {'UMA': '019M', 'COUNT': 7}, {'UMA': '029', 'COUNT': 44}, {'UMA': '029J', 'COUNT': 335}, {'UMA': '029K', 'COUNT': 168}, {'UMA': '029M', 'COUNT': 2}, {'UMA': 'nan', 'COUNT': 36}]
+Quelques UMA cumul : [{'UMA': '018', 'COUNT': 518}, {'UMA': '019M', 'COUNT': 461}, {'UMA': '029', 'COUNT': 750}, {'UMA': '029J', 'COUNT': 3568}, {'UMA': '029K', 'COUNT': 1605}, {'UMA': '029M', 'COUNT': 129}]
+===============================================
 
-        # Pondérations spéciales
-        UMA_WEIGHTS = {
-            ("130", "Clara HEBRARD"): 1/3,
-            ("130", "Maria Louisa ESTEVES"): 2/3
-        }
+====== DEBUG AFFECTATION DF_PATRON POUR SITE BRC ======
+Total RUM codés mois (df_patron)   = 74.0
+Total RUM codés cumulés (df_patron)= 1268.0
+Total RUM relancés mois (df_patron)   = 335.0
+Total RUM relancés cumulés (df_patron)= 3568.0
+Total assigned_m calculé           = 409.0
+Total assigned_c calculé           = 4836.0
+==============================================================
 
-        # --- 2. Construction du df_patron (structure cible) ---
-        st.write("🔹 Construction du DataFrame df_patron...")
-        rows = []
-        for tim, sites in tim_dict.items():
-            for site, dmus in sites.items():
-                for dmu, umas in dmus.items():
-                    for uma in umas:
-                        rows.append({
-                            "TIM": tim,
-                            "SITE": site,
-                            "UMA HC": uma["libelle"] if uma["type"] == "HC" else "",
-                            "RUM codés mois": 0.0 if uma["type"] == "HC" else np.nan,
-                            "RUM codés cumulés": 0.0 if uma["type"] == "HC" else np.nan,
-                            "UMA HDJ": uma["libelle"] if uma["type"] == "HDJ" else "",
-                            "DMU": dmu,
-                            "RUM relancés mois": 0.0 if uma["type"] == "HDJ" else np.nan,
-                            "RUM relancés cumulés": 0.0 if uma["type"] == "HDJ" else np.nan,
-                        })
-        df_patron = pd.DataFrame(rows)
-        st.write(f"✅ df_patron créé : {df_patron.shape[0]} lignes")
+====== DEBUG SPOOL POUR SITE HTD ======
+df_m (mois) : nb lignes = 18 , somme COUNT = 628
+df_c (cumul) : nb lignes = 19 , somme COUNT = 7524
+Quelques UMA mois : [{'UMA': '010', 'COUNT': 54}, {'UMA': '011', 'COUNT': 22}, {'UMA': '013', 'COUNT': 43}, {'UMA': '150', 'COUNT': 74}, {'UMA': '150J', 'COUNT': 9}, {'UMA': '151J', 'COUNT': 90}, {'UMA': '204', 'COUNT': 17}, {'UMA': '205', 'COUNT': 1}, {'UMA': '206J', 'COUNT': 1}, {'UMA': '221J', 'COUNT': 115}]
+Quelques UMA cumul : [{'UMA': '010', 'COUNT': 688}, {'UMA': '011', 'COUNT': 518}, {'UMA': '013', 'COUNT': 522}, {'UMA': '150', 'COUNT': 768}, {'UMA': '150J', 'COUNT': 106}, {'UMA': '151J', 'COUNT': 1083}, {'UMA': '152J', 'COUNT': 191}, {'UMA': '203', 'COUNT': 1}, {'UMA': '204', 'COUNT': 336}, {'UMA': '205', 'COUNT': 2}]
+===============================================
 
-        # DEBUG console
-        print("====== DEBUG df_patron INITIAL ======")
-        print("Nombre de lignes :", len(df_patron))
-        print("Colonnes :", list(df_patron.columns))
-        print("Sites présents dans df_patron :", df_patron["SITE"].unique())
-        print("=====================================")
+====== DEBUG AFFECTATION DF_PATRON POUR SITE HTD ======
+Total RUM codés mois (df_patron)   = 155.0
+Total RUM codés cumulés (df_patron)= 1893.0
+Total RUM relancés mois (df_patron)   = 379.0
+Total RUM relancés cumulés (df_patron)= 4411.0
+Total assigned_m calculé           = 534.0
+Total assigned_c calculé           = 6304.0
+==============================================================
 
-        progress.progress(20)
-
-        # --- 3. Ajout colonnes code UMA pour la correspondance avec les CSV ---
-        st.write("🔹 Extraction des codes UMA pour correspondance...")
-        df_patron["UMA_HC_code"] = df_patron["UMA HC"].apply(extract_uma_code_by_space)
-        df_patron["UMA_HDJ_code"] = df_patron["UMA HDJ"].apply(extract_uma_code_by_space)
-
-        # --- 4. Comptage du nombre de TIM par code UMA (répartition des RUM) ---
-        st.write("🔹 Comptage du nombre de TIM par code UMA...")
-        uma_to_tim_count = defaultdict(int)
-        for tim, sites in tim_dict.items():
-            for site, dmus in sites.items():
-                for dmu, umas in dmus.items():
-                    for uma in umas:
-                        uma_to_tim_count[uma["code"]] += 1
-        st.write(f"✅ UMA counts: {len(uma_to_tim_count)} codes UMA")
-
-        # DEBUG console
-        print("====== DEBUG UMA_to_TIM_count (quelques exemples) ======")
-        for i, (code, n) in enumerate(uma_to_tim_count.items()):
-            if i >= 15:
-                break
-            print(f"Code UMA {code} -> utilisé par {n} TIM")
-        print("========================================================")
-
-        progress.progress(30)
-
-        # --- 5. Pour chaque site (CCH/BRC/HTD) : lire les CSV + affecter les RUM ---
-        for idx_site, (site_label, tns) in enumerate(TNS_MAP.items()):
-            st.write(f"🔹 Traitement site {site_label} ({idx_site+1}/{len(TNS_MAP)})")
-
-            # 5.1 SQL + spool
-            spool_mois = DATA_DIR / f"RUM_MOIS_{site_label}.csv"
-            spool_cum = DATA_DIR / f"RUM_CUMULE_{site_label}.csv"
-
-            sql_mois = build_sql_spool_rum(site_label, str(spool_mois), "mois", mois, annee)
-            sql_cum = build_sql_spool_rum(site_label, str(spool_cum), "cumule", mois, annee)
-
-            tmp_sql_mois = SQL_DIR / f"rum_mois_{site_label}.sql"
-            tmp_sql_cum = SQL_DIR / f"rum_cumule_{site_label}.sql"
-
-            tmp_sql_mois.write_text(sql_mois, encoding="utf-8")
-            tmp_sql_cum.write_text(sql_cum, encoding="utf-8")
-
-            st.write("📡 Lancement sqlplus mois...")
-            out_m = run_sqlplus_and_wait(
-                f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}",
-                timeout=60
-            )
-            st.write("📡 Lancement sqlplus cumulé...")
-            out_c = run_sqlplus_and_wait(
-                f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}",
-                timeout=60
-            )
-
-            # 5.2 Lecture des CSV (sans en-tête, UMA;COUNT)
-            df_m = read_spool_csv_to_df(spool_mois)
-            df_c = read_spool_csv_to_df(spool_cum)
-            st.write(f"📊 Spool df_m : {df_m.shape[0]} lignes, df_c : {df_c.shape[0]} lignes")
-
-            # DEBUG console sur les fichiers spool
-            print(f"\n====== DEBUG SPOOL POUR SITE {site_label} ======")
-            print("df_m (mois) : nb lignes =", len(df_m), ", somme COUNT =", df_m['COUNT'].sum())
-            print("df_c (cumul) : nb lignes =", len(df_c), ", somme COUNT =", df_c['COUNT'].sum())
-            print("Quelques UMA mois :", df_m.head(10).to_dict(orient='records'))
-            print("Quelques UMA cumul :", df_c.head(10).to_dict(orient='records'))
-            print("===============================================")
-
-            # 5.3 On ne traite que les TIM / DMU qui concernent CE site
-            #     (sinon on mélange les bases et on écrase les valeurs)
-            tims_for_site = {
-                tim: sites
-                for tim, sites in tim_dict.items()
-                if site_label in sites
-            }
-
-            total_assigned_m = 0.0
-            total_assigned_c = 0.0
-
-            st.write("🔹 Calcul RUM par UMA pour ce site...")
-
-            for tim, sites in tims_for_site.items():
-                dmus = sites[site_label]  # uniquement le dict pour ce site
-                for dmu, umas in dmus.items():
-                    for uma in umas:
-                        uma_code = uma["code"]
-                        uma_type = uma["type"]  # "HC" ou "HDJ"
-
-                        # Récupérer les RUM dans les CSV pour ce code UMA
-                        base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
-                        base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
-
-                        if base_m == 0 and base_c == 0:
-                            continue  # rien à affecter
-
-                        # Répartition entre TIM (1 / nombre de TIM qui utilisent ce code UMA)
-                        default_count = uma_to_tim_count.get(uma_code, 1)
-                        weight = UMA_WEIGHTS.get(
-                            (uma_code, tim),
-                            1.0 / default_count if default_count > 0 else 1.0
-                        )
-
-                        assigned_m = base_m * weight
-                        assigned_c = base_c * weight
-
-                        total_assigned_m += assigned_m
-                        total_assigned_c += assigned_c
-
-                        # DEBUG limité en console : on affiche quelques UMA non nulles par site
-                        if random.random() < 0.001:  # environ 0.1 % des cas
-                            print(
-                                f"[DEBUG] SITE={site_label}, UMA={uma_code}, "
-                                f"type={uma_type}, base_m={base_m}, base_c={base_c}, "
-                                f"weight={weight:.3f}, assigned_m={assigned_m}, assigned_c={assigned_c}"
-                            )
-
-                        # Affectation dans df_patron (sans afficher le TIM)
-                        if uma_type == "HC":
-                            mask = (
-                                (df_patron["TIM"] == tim) &
-                                (df_patron["SITE"] == site_label) &
-                                (df_patron["DMU"] == dmu) &
-                                (df_patron["UMA_HC_code"] == uma_code)
-                            )
-                            df_patron.loc[mask, "RUM codés mois"] = assigned_m
-                            df_patron.loc[mask, "RUM codés cumulés"] = assigned_c
-                        else:  # HDJ
-                            mask = (
-                                (df_patron["TIM"] == tim) &
-                                (df_patron["SITE"] == site_label) &
-                                (df_patron["DMU"] == dmu) &
-                                (df_patron["UMA_HDJ_code"] == uma_code)
-                            )
-                            df_patron.loc[mask, "RUM relancés mois"] = assigned_m
-                            df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
-
-            # DEBUG résumé affectation pour le site
-            mask_site_patron = (df_patron["SITE"] == site_label)
-            print(f"\n====== DEBUG AFFECTATION DF_PATRON POUR SITE {site_label} ======")
-            print("Total RUM codés mois (df_patron)   =", df_patron.loc[mask_site_patron, "RUM codés mois"].sum())
-            print("Total RUM codés cumulés (df_patron)=", df_patron.loc[mask_site_patron, "RUM codés cumulés"].sum())
-            print("Total RUM relancés mois (df_patron)   =", df_patron.loc[mask_site_patron, "RUM relancés mois"].sum())
-            print("Total RUM relancés cumulés (df_patron)=", df_patron.loc[mask_site_patron, "RUM relancés cumulés"].sum())
-            print("Total assigned_m calculé           =", total_assigned_m)
-            print("Total assigned_c calculé           =", total_assigned_c)
-            print("==============================================================")
-
-            # Nettoyage fichiers SQL temporaires
-            try:
-                tmp_sql_mois.unlink()
-                tmp_sql_cum.unlink()
-            except:
-                st.warning(f"⚠ Impossible de supprimer {tmp_sql_mois} ou {tmp_sql_cum}")
-
-            progress.progress(30 + int((idx_site + 1) * 20))
-
-        # --- 6. Exceptions UMA (150 HTD, 040X CCH, 561C/591C/591J CCH) ---
-        st.write("🔹 Application des exceptions UMA...")
-        print("\n====== DEBUG AVANT apply_uma_exceptions ======")
-        print("Total RUM codés mois global   =", df_patron["RUM codés mois"].sum())
-        print("Total RUM relancés mois global=", df_patron["RUM relancés mois"].sum())
-        print("==============================================")
-        df_patron = apply_uma_exceptions(df_patron)
-        print("====== DEBUG APRES apply_uma_exceptions ======")
-        print("Total RUM codés mois global   =", df_patron["RUM codés mois"].sum())
-        print("Total RUM relancés mois global=", df_patron["RUM relancés mois"].sum())
-        print("==============================================\n")
-
-        # --- 7. Suppression des colonnes techniques de code UMA ---
-        df_patron.drop(columns=["UMA_HC_code", "UMA_HDJ_code"], inplace=True)
-
-        # --- 8. Écriture du fichier Excel final ---
-        st.write("🔹 Écriture dans le patron Excel en mémoire...")
-        output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
-        st.write("✅ Fichier prêt en mémoire")
-        progress.progress(100)
-
-        st.success(f"Traitement terminé — fichier prêt au téléchargement")
-        st.download_button(
-            "Télécharger le fichier rempli",
-            data=output,
-            file_name=f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-    except Exception as e:
-        st.write("❌ Exception capturée ! :", e)
-        safe_show_exception(e)
+====== DEBUG AVANT apply_uma_exceptions ======
+Total RUM codés mois global   = 4710.5
+Total RUM relancés mois global= 6484.0
+==============================================
+====== DEBUG APRES apply_uma_exceptions ======
+Total RUM codés mois global   = 5407.5
+Total RUM relancés mois global= 5748.0
+==============================================
