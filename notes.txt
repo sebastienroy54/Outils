@@ -259,11 +259,10 @@ def write_copy_with_values_to_patron(df, patron_path, output_path):
         "tim": ["tim"],
         "site": ["site"],
         "uma_hc": ["uma hc", "uma_hc", "uma-hc"],
-        "dmu": ["dmu hc", "dmu_hc", "dmu-hc", "dmu"],
         "rum_codes_mois": ["rum codés mois", "rum codes mois", "rum_codes_mois"],
         "rum_codes_cum": ["rum codés cumulés", "rum codes cumulés", "rum_codes_cumulés", "rum_codes_cum"],
         "uma_hdj": ["uma hdj", "uma_hdj", "uma-hdj"],
-        "dmu": ["dmu hdj", "dmu_hdj", "dmu-hdj", "dmu"],
+        "dmu": ["dmu"],
         "rum_rel_mois": ["rum relancés mois", "rum relances mois", "rum_rel_mois"],
         "rum_rel_cum": ["rum relancés cumulés", "rum relances cumulés", "rum_rel_cum"]
     }
@@ -277,16 +276,15 @@ def write_copy_with_values_to_patron(df, patron_path, output_path):
     col_tim = find_col(expected_headers_map["tim"])
     col_site = find_col(expected_headers_map["site"])
     col_uma_hc = find_col(expected_headers_map["uma_hc"])
-    col_dmu_hc = find_col(expected_headers_map["dmu"])
     col_rum_codes_mois = find_col(expected_headers_map["rum_codes_mois"])
     col_rum_codes_cum = find_col(expected_headers_map["rum_codes_cum"])
     col_uma_hdj = find_col(expected_headers_map["uma_hdj"])
-    col_dmu_hdj = find_col(expected_headers_map["dmu"])
+    col_dmu = find_col(expected_headers_map["dmu"])
     col_rum_rel_mois = find_col(expected_headers_map["rum_rel_mois"])
     col_rum_rel_cum = find_col(expected_headers_map["rum_rel_cum"])
 
-    required = [col_tim, col_site, col_uma_hc, col_dmu_hc, col_rum_codes_mois, col_rum_codes_cum,
-                col_uma_hdj, col_dmu_hdj, col_rum_rel_mois, col_rum_rel_cum]
+    required = [col_tim, col_site, col_uma_hc, col_rum_codes_mois, col_rum_codes_cum,
+                col_uma_hdj, col_dmu, col_rum_rel_mois, col_rum_rel_cum]
     if not all(required):
         missing = [k for k, v in zip(expected_headers_map.keys(), required) if v is None]
         raise KeyError(f"Colonnes attendues absentes ou mal nommées dans le patron : {missing}")
@@ -303,13 +301,12 @@ def write_copy_with_values_to_patron(df, patron_path, output_path):
         ws.cell(row=excel_row, column=col_site).value = row["SITE"]
         if row["UMA_type"] == "HC":
             ws.cell(row=excel_row, column=col_uma_hc).value = row["UMA_libelle"]
-            ws.cell(row=excel_row, column=col_dmu_hc).value = row["DMU"]
             ws.cell(row=excel_row, column=col_rum_codes_mois).value = int(round(row["RUM_codes_mois"]))
             ws.cell(row=excel_row, column=col_rum_codes_cum).value = int(round(row["RUM_codes_cum"]))
             # leave HDJ columns empty
         else:  # HDJ
             ws.cell(row=excel_row, column=col_uma_hdj).value = row["UMA_libelle"]
-            ws.cell(row=excel_row, column=col_dmu_hdj).value = row["DMU"]
+            ws.cell(row=excel_row, column=col_dmu).value = row["DMU"]
             ws.cell(row=excel_row, column=col_rum_rel_mois).value = int(round(row["RUM_rel_mois"]))
             ws.cell(row=excel_row, column=col_rum_rel_cum).value = int(round(row["RUM_rel_cum"]))
 
@@ -352,8 +349,7 @@ def page_rum():
     annees = list(range(2013, datetime.now().year + 1))
     annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
     bouton = st.button("Lancer le traitement RUM")
-    st.markdown("**Remarque :** le script va interroger les 3 TNS (CCH, BRC, HTD) et générer un tableau par TIM.")
-    st.info(f"Fichiers lus/écrits dans : `{DATA_DIR}`")
+    st.markdown("**Remarque :** le script va interroger les 3 bases (CCH, BRC, HTD) et générer un tableau par TIM.")
     if not bouton:
         return
 
