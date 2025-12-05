@@ -1,72 +1,45 @@
-# --- Écriture Excel ---
-def write_copy_with_values_to_patron(df, patron_path):
-    from io import BytesIO
-    wb = load_workbook(filename=str(patron_path))
-    ws = wb.active
+def apply_uma_exceptions(df):
+    """
+    Applique les exceptions UMA sans inventer de colonnes.
+    - Transfert UMA '150' HTD -> TIM Cliniciens
+    - Transfert 040X CCH : codés -> relancés
+    - Transfert 561C, 591C, 591J CCH : codés par TIM HDJ
+    """
+    # --- 150 HTD -> TIM Cliniciens ---
+    mask_150 = df["UMA HC"].str.startswith("150") & (df["SITE"] == "HTD")
+    mask_cliniciens = df["TIM"] == "Cliniciens"
 
-    # Header detection
-    header_row = None
-    for r in range(1, 30):
-        values = [(ws.cell(row=r, column=c).value or "").strip().lower() for c in range(1, ws.max_column+1)]
-        if "tim" in values and "site" in values:
-            header_row = r
-            break
-    if not header_row:
-        header_row = 1
+    if mask_150.any() and mask_cliniciens.any():
+        # somme des RUM codés pour 150 HTD
+        val_codes_mois = df.loc[mask_150, "RUM codés mois"].sum()
+        val_codes_cum = df.loc[mask_150, "RUM codés cumulés"].sum()
+        # appliquer à toutes les lignes TIM Cliniciens
+        df.loc[mask_cliniciens, "RUM codés mois"] = val_codes_mois
+        df.loc[mask_cliniciens, "RUM codés cumulés"] = val_codes_cum
+        # laisser 150 HTD vide après transfert
+        df.loc[mask_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
 
-    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip(): c for c in range(1, ws.max_column+1)}
+    # --- 040X CCH : transférer codés -> relancés ---
+    mask_040X = df["UMA HC"].str.startswith("040X") & (df["SITE"] == "CCH")
+    if mask_040X.any():
+        df.loc[mask_040X, "RUM relancés mois"] = df.loc[mask_040X, "RUM codés mois"]
+        df.loc[mask_040X, "RUM relancés cumulés"] = df.loc[mask_040X, "RUM codés cumulés"]
+        # vider les codés
+        df.loc[mask_040X, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
 
-    col_map = {
-        "TIM": name_to_col.get("TIM"),
-        "SITE": name_to_col.get("SITE"),
-        "UMA_HC": name_to_col.get("UMA HC"),
-        "RUM_codes_mois": name_to_col.get("RUM codés mois"),
-        "RUM_codes_cumulés": name_to_col.get("RUM codés cumulés"),
-        "UMA_HDJ": name_to_col.get("UMA HDJ"),
-        "DMU": name_to_col.get("DMU"),
-        "RUM_rel_mois": name_to_col.get("RUM relancés mois"),
-        "RUM_rel_cum": name_to_col.get("RUM relancés cumulés")
-    }
+    # --- 561C, 591C, 591J CCH : codés par TIM (HDJ) ---
+    for code in ["561C", "591C", "591J"]:
+        mask = df["UMA HDJ"].str.startswith(code) & (df["SITE"] == "CCH")
+        if mask.any():
+            df.loc[mask, "RUM codés mois"] = df.loc[mask, "RUM relancés mois"]
+            df.loc[mask, "RUM codés cumulés"] = df.loc[mask, "RUM relancés cumulés"]
+            df.loc[mask, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
 
-    start = header_row + 1
-    df_sorted = df.sort_values(by=["TIM", "SITE", "DMU", "UMA_HC", "UMA_HDJ"]).reset_index(drop=True)
+    return df
 
-    # Fill cells
-    for idx, row in df_sorted.iterrows():
-        excel_row = start + idx
-        ws.cell(row=excel_row, column=col_map["TIM"]).value = row["TIM"]
-        ws.cell(row=excel_row, column=col_map["SITE"]).value = row["SITE"]
-        ws.cell(row=excel_row, column=col_map["DMU"]).value = row["DMU"]
-
-        if row["UMA_HC"]:
-            ws.cell(row=excel_row, column=col_map["UMA_HC"]).value = row["UMA_HC"]
-            ws.cell(row=excel_row, column=col_map["RUM_codes_mois"]).value = int(row["RUM codés mois"]) if pd.notna(row["RUM codés mois"]) else None
-            ws.cell(row=excel_row, column=col_map["RUM_codes_cumulés"]).value = int(row["RUM codés cumulés"]) if pd.notna(row["RUM codés cumulés"]) else None
-        if row["UMA_HDJ"]:
-            ws.cell(row=excel_row, column=col_map["UMA_HDJ"]).value = row["UMA_HDJ"]
-            ws.cell(row=excel_row, column=col_map["RUM_rel_mois"]).value = int(row["RUM relancés mois"]) if pd.notna(row["RUM relancés mois"]) else None
-            ws.cell(row=excel_row, column=col_map["RUM_rel_cum"]).value = int(row["RUM relancés cumulés"]) if pd.notna(row["RUM relancés cumulés"]) else None
-
-    # Fusion et bordures horizontales
-    merge_vertical_conditionnel(ws, col_map["TIM"], df_sorted["TIM"], start)
-    merge_vertical_conditionnel(ws, col_map["SITE"], df_sorted["SITE"], start, group_col=df_sorted["TIM"])
-    merge_vertical_conditionnel(ws, col_map["DMU"], df_sorted["DMU"], start, group_col=df_sorted["TIM"])
-    draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_map["SITE"])
-
-    # Bordures verticales pour toutes les colonnes
-    thin = Side(border_style="thin", color="000000")
-    for r in range(1, ws.max_row+1):
-        for c in range(1, ws.max_column+1):
-            cell = ws.cell(row=r, column=c)
-            cell.border = Border(left=thin, right=thin, top=cell.border.top, bottom=cell.border.bottom)
-
-    # Centrage uniquement TIM, SITE, DMU
-    for idx, row in df_sorted.iterrows():
-        excel_row = start + idx
-        for c in [col_map["TIM"], col_map["SITE"], col_map["DMU"]]:
-            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
-
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return output
+if uma_type == "HC":
+    df_patron.loc[mask, "RUM codés mois"] = assigned_m
+    df_patron.loc[mask, "RUM codés cumulés"] = assigned_c
+else:  # HDJ
+    df_patron.loc[mask, "RUM relancés mois"] = assigned_m
+    df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
