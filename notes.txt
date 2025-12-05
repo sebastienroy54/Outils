@@ -1,10 +1,44 @@
+def apply_uma_exceptions(df_patron):
+    """
+    Applique les exceptions UMA spécifiques et transfert RUM :
+    - UMA 150 HTD : RUM codés transférés au TIM 'Cliniciens' pour HTD
+    - Transfert RUM codés <-> relancés si nécessaire (040X CCH, 561C/591C/591J CCH)
+    - Ne jamais mettre 0, laisser vide si pas de RUM
+    """
+    df = df_patron.copy()
+
+    # --- 150 HTD transféré à TIM Cliniciens ---
+    mask_150 = (df["UMA_code"] == "150") & (df["SITE"] == "HTD") & (df["UMA_type"] == "HC")
+    mask_cliniciens = (df["TIM"].str.lower() == "cliniciens") & (df["SITE"] == "HTD") & (df["UMA_type"] == "HC")
+    for col_from, col_to in [("RUM_codes_mois", "RUM_codes_mois"), ("RUM_codes_cum", "RUM_codes_cum")]:
+        vals = df.loc[mask_150, col_from].values
+        if len(vals) == mask_cliniciens.sum():
+            df.loc[mask_cliniciens, col_to] = vals
+        else:
+            # Si il y a un seul TIM Cliniciens mais plusieurs UMA 150
+            df.loc[mask_cliniciens, col_to] = df.loc[mask_150, col_from].sum()
+
+    # --- 040X CCH : transférer codés -> relancés ---
+    mask_040X = (df["UMA_code"].str.startswith("040X")) & (df["SITE"] == "CCH")
+    df.loc[mask_040X, ["RUM_rel_mois", "RUM_rel_cum"]] = df.loc[mask_040X, ["RUM_codes_mois", "RUM_codes_cum"]].values
+    df.loc[mask_040X, ["RUM_codes_mois", "RUM_codes_cum"]] = None
+
+    # --- 561C, 591C, 591J CCH : codés par TIM HDJ ---
+    for uma in ["561C", "591C", "591J"]:
+        mask_hdj = (df["UMA_code"] == uma) & (df["SITE"] == "CCH") & (df["UMA_type"] == "HDJ")
+        df.loc[mask_hdj, ["RUM_codes_mois", "RUM_codes_cum"]] = df.loc[mask_hdj, ["RUM_rel_mois", "RUM_rel_cum"]].values
+        df.loc[mask_hdj, ["RUM_rel_mois", "RUM_rel_cum"]] = None
+
+    return df
+
+
 def write_copy_with_values_to_patron(df, patron_path):
     """
     Écrit le dataframe dans le patron Excel et retourne un BytesIO pour téléchargement Streamlit.
-    Gère les NaN en laissant les cellules vides au lieu de convertir en int.
+    - Remplit DMU pour HC et HDJ
+    - Gère les bordures verticales et horizontales
     """
     from io import BytesIO
-    from openpyxl import load_workbook
     from openpyxl.styles import Border, Side, Alignment, Font
 
     wb = load_workbook(filename=str(patron_path))
@@ -20,74 +54,74 @@ def write_copy_with_values_to_patron(df, patron_path):
     if not header_row:
         header_row = 1
 
-    # mapping des en-têtes (avec accents)
-    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip().lower(): c
+    # mapping des en-têtes exacts avec accents
+    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip(): c
                    for c in range(1, ws.max_column + 1) if ws.cell(row=header_row, column=c).value}
 
     # assignation colonnes
-    col_tim = name_to_col.get("tim")
-    col_site = name_to_col.get("site")
-    col_uma_hc = name_to_col.get("uma hc")
-    col_rum_codes_mois = name_to_col.get("rum codés mois")
-    col_rum_codes_cum = name_to_col.get("rum codés cumulés")
-    col_uma_hdj = name_to_col.get("uma hdj")
-    col_dmu = name_to_col.get("dmu")
-    col_rum_rel_mois = name_to_col.get("rum relancés mois")
-    col_rum_rel_cum = name_to_col.get("rum relancés cumulés")
+    col_tim = name_to_col.get("TIM")
+    col_site = name_to_col.get("SITE")
+    col_uma_hc = name_to_col.get("UMA HC")
+    col_rum_codes_mois = name_to_col.get("RUM codés mois")
+    col_rum_codes_cum = name_to_col.get("RUM codés cumulés")
+    col_uma_hdj = name_to_col.get("UMA HDJ")
+    col_dmu = name_to_col.get("DMU")
+    col_rum_rel_mois = name_to_col.get("RUM relancés mois")
+    col_rum_rel_cum = name_to_col.get("RUM relancés cumulés")
 
     start = header_row + 1
+
     df_sorted = df.sort_values(by=["TIM", "SITE", "DMU", "UMA_code"]).reset_index(drop=True)
 
-    # fonction pour écrire une cellule numérique en gérant NaN
-    def set_int_cell(row_idx, col_idx, value):
-        if pd.isna(value):
-            ws.cell(row=row_idx, column=col_idx).value = None
-        else:
-            ws.cell(row=row_idx, column=col_idx).value = int(round(value))
-
-    # remplir les données
+    # --- Remplissage des cellules ---
     for idx, row in df_sorted.iterrows():
         excel_row = start + idx
         ws.cell(row=excel_row, column=col_tim).value = row["TIM"]
         ws.cell(row=excel_row, column=col_site).value = row["SITE"]
+        ws.cell(row=excel_row, column=col_dmu).value = row["DMU"]
 
         if row["UMA_type"] == "HC":
             ws.cell(row=excel_row, column=col_uma_hc).value = row["UMA_libelle"]
-            set_int_cell(excel_row, col_rum_codes_mois, row["RUM_codes_mois"])
-            set_int_cell(excel_row, col_rum_codes_cum, row["RUM_codes_cum"])
-            # DMU pour HC : on peut aussi l'afficher si besoin, sinon laisser vide
-            ws.cell(row=excel_row, column=col_dmu).value = None
-            set_int_cell(excel_row, col_rum_rel_mois, None)
-            set_int_cell(excel_row, col_rum_rel_cum, None)
+            if pd.notna(row["RUM_codes_mois"]):
+                ws.cell(row=excel_row, column=col_rum_codes_mois).value = int(round(row["RUM_codes_mois"]))
+            if pd.notna(row["RUM_codes_cum"]):
+                ws.cell(row=excel_row, column=col_rum_codes_cum).value = int(round(row["RUM_codes_cum"]))
         else:  # HDJ
             ws.cell(row=excel_row, column=col_uma_hdj).value = row["UMA_libelle"]
-            ws.cell(row=excel_row, column=col_dmu).value = row["DMU"]
-            set_int_cell(excel_row, col_rum_rel_mois, row["RUM_rel_mois"])
-            set_int_cell(excel_row, col_rum_rel_cum, row["RUM_rel_cum"])
-            set_int_cell(excel_row, col_rum_codes_mois, None)
-            set_int_cell(excel_row, col_rum_codes_cum, None)
+            if pd.notna(row["RUM_rel_mois"]):
+                ws.cell(row=excel_row, column=col_rum_rel_mois).value = int(round(row["RUM_rel_mois"]))
+            if pd.notna(row["RUM_rel_cum"]):
+                ws.cell(row=excel_row, column=col_rum_rel_cum).value = int(round(row["RUM_rel_cum"]))
 
-    # Fusion TIM / SITE / DMU
+    # --- Fusion verticale ---
     merge_vertical_conditionnel(ws, col_tim, df_sorted["TIM"], start)
     merge_vertical_conditionnel(ws, col_site, df_sorted["SITE"], start, group_col=df_sorted["TIM"])
     merge_vertical_conditionnel(ws, col_dmu, df_sorted["DMU"], start, group_col=df_sorted["TIM"])
 
-    # Bordures
+    # --- Bordures horizontales et verticales ---
+    thin = Side(border_style="thin", color="000000")
+
+    # Bordures horizontales TIM/SITE
     draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_site)
 
-    # Align center
-    for idx, row in df_sorted.iterrows():
-        excel_row = start + idx
-        for c in [col_tim, col_site, col_dmu]:
-            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
+    # Bordures verticales entre toutes les colonnes
+    for r in range(start, start + len(df_sorted)):
+        for c in range(1, ws.max_column + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.border = Border(
+                left=cell.border.left or thin,
+                right=cell.border.right or thin,
+                top=cell.border.top or thin,
+                bottom=cell.border.bottom or thin
+            )
+            cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # TIM bold
+    # TIM en gras
     tim_positions = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
     for tim, (start_idx, _) in tim_positions.items():
-        excel_row = start + start_idx
-        ws.cell(row=excel_row, column=col_tim).font = Font(bold=True)
+        ws.cell(row=start + start_idx, column=col_tim).font = Font(bold=True)
 
-    # exporter en mémoire
+    # --- Export mémoire ---
     output = BytesIO()
     wb.save(output)
     output.seek(0)
