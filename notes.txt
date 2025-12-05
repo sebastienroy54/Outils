@@ -1,96 +1,63 @@
-SITE	UMA HC	RUM codés mois	RUM codés cumulés	UMA HDJ	DMU	RUM relancés mois	RUM relancés cumulés
-CCH	340 Médecine Intensive Réanimation	18	321		504		
-	341 SC Médicale	26	225				
-	540 Accueil & Urgences 	304	3723				
-	543 Unité Med Patho Aigu - Urgences	101	2048				
-				071J Diabétologie Cochin HDJ	517	158	1722
-				073J Diabétologie - Pied - Cochin HDJ		25	337
-HTD	013 CUSCO - Urgences médico-judiciaires	21	261		504		
-				152J HDJ PATHOLOGIES PROFESSIONNELLES ENV	505	0	191
-				510J HDJ Dermato patho pro		26	107
-				227J HDJ ESJ	514	8	72
-CCH				130J Obstétrique Port-Royal HDJ	516	98	1245
-				143C UCA Chirurgie réparatrice HDJ		0	1
-				561C UCA chir plastie et rec			
-				591C Ophtalmologie HDJ			
-				591J HDJ BIRDSHOT			
-	130 Obstétrique Port-Royal - Suite de couche	316	3816				
-	591 Ophtalmologie	85	863				
-CCH	071 Diabétologie Cochin	36	613		517		
-	071S Diabétologie Cochin HCS	77	843				
-HTD	150 Centre du sommeil	74	768		505		
-CCH	270 Urologie	165	1720		515		
-	270S Urologie HCS	52	891				
-	450 Hématologie	45	622				
-	451 SI Hématologie	25	264				
-	670 Hépatologie médicale	27	403				
-BRC				029J Court-séjour gériatrique G2 HDJ	506	167	1784
-	018 Court-séjour gériatrique G1	15	259				
-	029 Court-séjour gériatrique G2	22	375				
-CCH				112C HDJ FERINJECT	501	5	76
-				114C UCA Chirurgie orthopédique HDJ		78	754
-	112 Chirurgie orthopédique	230	2865				
-	112S Orthopédie HCS	83	866				
-	115 Chirurgie orthopédique UPOG	24	336				
-	310 Chirurgie traumatologique	0	0				
-BRC				029J Court-séjour gériatrique G2 HDJ	506	167	1784
-	018 Court-séjour gériatrique G1	15	259				
-	029 Court-séjour gériatrique G2	22	375				
-CCH				080J HDJ RHUMATO LITS	501	161	1826
-				081J Rhumatologie & explorations du métabolisme HDJ		109	999
-				083J RHUMATO FAUTEUIL HDJ		226	2192
-				500J Douleur chronique 1 HDJ		66	597
-				520J Rééducation et réadaptation fonctionnelle HDJ		292	3406
-	080 Rhumatologie	46	678				
-	080S Rhumatologie HCS	60	649				
-	520 Rééducation fonctionnelle & réadaptation	57	620				
-	520S MPR HCS	24	256				
-CCH				060J Pneumologie HDJ	505	108	1157
-				061J Pneumologie diagnostic HDJ		3	678
-				062C Pneumologie interventionnelle HDJ		0	10
-				062J HDJ ONCOTHORAX		3	720
-				063J Suivi post-greffe HDJ		32	395
-	060 Pneumologie	133	1660				
-	060S Pneumologie HCS	75	907				
-CCH				011J Oncologie HDJ	515	654	7459
-				040C Gastro-entérologie HDJ		330	3641
-				040J Biotherapie HDJ		108	1199
-				041J HDJ PREHAB CHIR DIG		0	1
-	011 Oncologie	46	583				
-	040S Gastro-entérologie HCS	71	758				
-	040X HDJ CHIMIOS GASTRO						
-				161J Dermatologie médicale (Tarnier) HDJ	517	207	2480
-				162C UCA Dermatologie HDJ		97	851
-	160 Dermatologie	48	540				
-CCH				010J Médecine interne HDJ	514	193	2357
-	010 Médecine interne	44	747				
-	010S Médecine interne HCS	70	773				
-HTD				221J HTA et PCV HDJ		115	1289
-				222J Médecine spécialisée HDJ		57	606
-CCH	040 Gastro-entérologie	27	498		515		
-	040S Gastro-entérologie HCS	71	758				
-	041 Chirurgie digestive et endocrinienne	201	2366				
-CCH	130 Obstétrique Port-Royal - Suite de couche	632	7632		516		
-CCH				384J Addictologie HDJ	504	73	341
-				022J Radiothérapie Interne Vectorisée HDJ	507	47	285
-				"150C HDJ UCA POSE DE PAC				"		23	305
-				150J Radio A HDJ		10	113
-				320J Radio B HDJ		30	175
-	022S Irathérapie HCS	6	88				
-				270J HDJ UROLOGIE	515	27	251
-				271C UCA Urologie HDJ		110	1075
-				410C UCA Chirurgie digestive HDJ		43	481
-				450J Hématologie HDJ		434	5031
-				670J Hépatologie médicale HDJ		30	504
-CCH				600J Médecine interne ambulatoire - Maison des Adolescents HDJ	513	136	1259
-	600 Médecine interne - Maison des Adolescents	5	150				
-				070J Endocrinologie HDJ	517	184	1822
-				072J Gynécologie - Endocrinologie HDJ		13	141
-	070 Endocrinologie	113	1267				
-HTD				150J Centre du sommeil nuit HDJ	505		
-				151J Centre du sommeil jour HDJ		90	1083
-	150 Centre du sommeil						
-				206J HDJ MAISON DES FEMMES	510	1	29
-				500J HDJ CASPER EVAL	514	16	171
-				501J HDJ CASPER REHAB MCO		4	53
-				503J HDJ BILAN CASPER REH MCO		2	23
+def apply_uma_exceptions(df):
+    """
+    Exceptions UMA avec match EXACT (code + libellé complet).
+    - 150 (HC) HTD → transférer codés vers Cliniciens
+    - 040X (HC) CCH → transférer codés → relancés
+    - 561C, 591C, 591J (HDJ) CCH → relancés → codés
+    """
+
+    # ----- 1️⃣ Exception 150 HC HTD → Cliniciens -----
+    # On cible EXACTEMENT l'UMA HC "150 ..." du patron, pas 150J, pas 150C.
+    mask_150_hc = (df["SITE"] == "HTD") & df["UMA HC"].str.match(r"^150\b")
+    # (match r"^150\b" = commence par 150 + frontière de mot → match exact du code,
+    # mais laisse le libellé intact)
+
+    mask_cliniciens = df["TIM"] == "Cliniciens"
+
+    if mask_150_hc.any() and mask_cliniciens.any():
+
+        # Récupération des valeurs codées
+        val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
+        val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
+
+        # Écriture chez les Cliniciens (colonnes codés car ce sont eux qui codent)
+        df.loc[mask_cliniciens, "RUM codés mois"] = val_mois
+        df.loc[mask_cliniciens, "RUM codés cumulés"] = val_cum
+
+        # Pour les autres TIM affectés à cette UMA :
+        # 150 doit apparaître dans les RELANCÉS
+        other_tim_mask = mask_150_hc & (~mask_cliniciens)
+        df.loc[other_tim_mask, "RUM relancés mois"] = df.loc[other_tim_mask, "RUM codés mois"]
+        df.loc[other_tim_mask, "RUM relancés cumulés"] = df.loc[other_tim_mask, "RUM codés cumulés"]
+
+        # On vide les codés pour ces autres TIM
+        df.loc[other_tim_mask, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+
+
+    # ----- 2️⃣ Exception 040X CCH →  codés → relancés -----
+    mask_040x = (df["SITE"] == "CCH") & df["UMA HC"].str.match(r"^040X\b")
+
+    if mask_040x.any():
+        df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
+        df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
+        df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+
+
+    # ----- 3️⃣ Exceptions HDJ codés par TIM (561C, 591C, 591J) → relancés → codés -----
+    special_codes = ["561C", "591C", "591J"]
+
+    for code in special_codes:
+        mask = (df["SITE"] == "CCH") & df["UMA HDJ"].str.match(fr"^{code}\b")
+
+        if mask.any():
+            # Les RUM étaient en relancés → doivent aller dans codés
+            df.loc[mask, "RUM codés mois"] = df.loc[mask, "RUM relancés mois"]
+            df.loc[mask, "RUM codés cumulés"] = df.loc[mask, "RUM relancés cumulés"]
+
+            # Et on vide les relancés
+            df.loc[mask, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
+
+
+    return df
