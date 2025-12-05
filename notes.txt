@@ -1,71 +1,352 @@
-def apply_uma_exceptions(df):
-    """
-    Exceptions UMA basées UNIQUEMENT sur les codes UMA,
-    MAIS appliquées uniquement aux lignes concernées (TIM + SITE + UMA),
-    et non à toutes les lignes d’un TIM.
-    """
+========== BUILD_TIM_UMA_DICT ==========
+▶ Nombre de lignes patron TIM : 132
+▶ Colonnes reconnues : ['DMU', 'Site', 'UMA', 'Type', 'RUM du mois', 'RUM cumulés', 'TIM Référent', 'Relance']
+▶ TIM trouvés : 17
+=========================================
 
-    print("\n======= DEBUG APPLY_UMA_EXCEPTIONS (corrigée) =======")
+====== DEBUG df_patron INITIAL ======
+Nombre de lignes : 129
+Colonnes : ['TIM', 'SITE', 'UMA HC', 'RUM codés mois', 'RUM codés cumulés', 'UMA HDJ', 'DMU', 'RUM relancés mois', 'RUM relancés cumulés']
+Sites présents dans df_patron : ['CCH' 'BRC' 'HTD']
+=====================================
+====== DEBUG UMA_to_TIM_count (15 max) ======
+080 → 1 TIM
+080S → 1 TIM
+520 → 1 TIM
+520S → 1 TIM
+080J → 1 TIM
+081J → 1 TIM
+083J → 1 TIM
+500J → 2 TIM
+520J → 1 TIM
+018 → 2 TIM
+029 → 2 TIM
+029J → 2 TIM
+112 → 1 TIM
+112S → 1 TIM
+115 → 1 TIM
+============================================
 
-    # Aperçu utile
-    print("UMA HC (codes) :", df["UMA_HC_code"].unique()[:20])
-    print("UMA HDJ (codes):", df["UMA_HDJ_code"].unique()[:20])
+====== DEBUG SPOOL CCH ======
+df_m: 99 lignes, somme = 11029
+df_c: 102 lignes, somme = 126307
+=====================================
 
-    # ----------------------------------------------------------------------
-    # 1️⃣  Exception : UMA 150 (HC) sur HTD
-    # ----------------------------------------------------------------------
-    mask_150_hc = (df["SITE"] == "HTD") & (df["UMA_HC_code"] == "150")
-    if mask_150_hc.any():
-        debug_rows = df.loc[mask_150_hc, ["TIM", "SITE", "UMA HC", "RUM codés mois"]]
-        print("\n-- UMA 150 HC sur HTD (lignes trouvées) --")
-        print(debug_rows)
+======== DEBUG SITE CCH ========
+[CCH] DMU=501 UMA=080 (HC) → base_m=46, base_c=678
+  ✔ Ajout : assigned_m=46.0, assigned_c=678.0
+[CCH] DMU=501 UMA=080S (HC) → base_m=60, base_c=649
+  ✔ Ajout : assigned_m=60.0, assigned_c=649.0
+[CCH] DMU=501 UMA=520 (HC) → base_m=57, base_c=620
+  ✔ Ajout : assigned_m=57.0, assigned_c=620.0
+[CCH] DMU=501 UMA=520S (HC) → base_m=24, base_c=256
+  ✔ Ajout : assigned_m=24.0, assigned_c=256.0
+[CCH] DMU=501 UMA=080J (HDJ) → base_m=161, base_c=1826
+  ✔ Ajout : assigned_m=161.0, assigned_c=1826.0
+[CCH] DMU=501 UMA=081J (HDJ) → base_m=109, base_c=999
+  ✔ Ajout : assigned_m=109.0, assigned_c=999.0
+[CCH] DMU=501 UMA=083J (HDJ) → base_m=226, base_c=2192
+  ✔ Ajout : assigned_m=226.0, assigned_c=2192.0
+[CCH] DMU=501 UMA=500J (HDJ) → base_m=133, base_c=1194
+  ✔ Ajout : assigned_m=66.5, assigned_c=597.0
+[CCH] DMU=501 UMA=520J (HDJ) → base_m=292, base_c=3406
+  ✔ Ajout : assigned_m=292.0, assigned_c=3406.0
+[CCH] DMU=501 UMA=112 (HC) → base_m=230, base_c=2865
+  ✔ Ajout : assigned_m=230.0, assigned_c=2865.0
+[CCH] DMU=501 UMA=112S (HC) → base_m=83, base_c=866
+  ✔ Ajout : assigned_m=83.0, assigned_c=866.0
+[CCH] DMU=501 UMA=115 (HC) → base_m=24, base_c=336
+  ✔ Ajout : assigned_m=24.0, assigned_c=336.0
+[CCH] DMU=501 UMA=112C (HDJ) → base_m=5, base_c=76
+  ✔ Ajout : assigned_m=5.0, assigned_c=76.0
+[CCH] DMU=501 UMA=114C (HDJ) → base_m=78, base_c=754
+  ✔ Ajout : assigned_m=78.0, assigned_c=754.0
+[CCH] DMU=502 UMA=020 (HC) → base_m=5, base_c=41
+  ✔ Ajout : assigned_m=5.0, assigned_c=41.0
+[CCH] DMU=502 UMA=021 (HC) → base_m=96, base_c=1162
+  ✔ Ajout : assigned_m=96.0, assigned_c=1162.0
+[CCH] DMU=502 UMA=020J (HDJ) → base_m=201, base_c=2408
+  ✔ Ajout : assigned_m=201.0, assigned_c=2408.0
+[CCH] DMU=503 UMA=103 (HC) → base_m=17, base_c=205
+  ✔ Ajout : assigned_m=8.5, assigned_c=102.5
+[CCH] DMU=503 UMA=104 (HC) → base_m=18, base_c=135
+  ✔ Ajout : assigned_m=9.0, assigned_c=67.5
+[CCH] DMU=503 UMA=103 (HC) → base_m=17, base_c=205
+  ✔ Ajout : assigned_m=8.5, assigned_c=102.5
+[CCH] DMU=503 UMA=104 (HC) → base_m=18, base_c=135
+  ✔ Ajout : assigned_m=9.0, assigned_c=67.5
+[CCH] DMU=503 UMA=260J (HDJ) → base_m=36, base_c=304
+  ✔ Ajout : assigned_m=36.0, assigned_c=304.0
+[CCH] DMU=503 UMA=500C (HDJ) → base_m=4, base_c=37
+  ✔ Ajout : assigned_m=4.0, assigned_c=37.0
+[CCH] DMU=503 UMA=501J (HDJ) → base_m=50, base_c=799
+  ✔ Ajout : assigned_m=25.0, assigned_c=399.5
+[CCH] DMU=505 UMA=037 (HC) → base_m=132, base_c=1437
+  ✔ Ajout : assigned_m=132.0, assigned_c=1437.0
+[CCH] DMU=505 UMA=037S (HC) → base_m=28, base_c=295
+  ✔ Ajout : assigned_m=28.0, assigned_c=295.0
+[CCH] DMU=505 UMA=393 (HC) → base_m=23, base_c=355
+  ✔ Ajout : assigned_m=23.0, assigned_c=355.0
+[CCH] DMU=505 UMA=037J (HDJ) → base_m=26, base_c=309
+  ✔ Ajout : assigned_m=26.0, assigned_c=309.0
+[CCH] DMU=504 UMA=340 (HC) → base_m=37, base_c=642
+  ✔ Ajout : assigned_m=18.5, assigned_c=321.0
+[CCH] DMU=504 UMA=341 (HC) → base_m=53, base_c=450
+  ✔ Ajout : assigned_m=26.5, assigned_c=225.0
+[CCH] DMU=504 UMA=540 (HC) → base_m=609, base_c=7446
+  ✔ Ajout : assigned_m=304.5, assigned_c=3723.0
+[CCH] DMU=504 UMA=543 (HC) → base_m=202, base_c=4096
+  ✔ Ajout : assigned_m=101.0, assigned_c=2048.0
+[CCH] DMU=517 UMA=071J (HDJ) → base_m=158, base_c=1722
+  ✔ Ajout : assigned_m=158.0, assigned_c=1722.0
+[CCH] DMU=517 UMA=073J (HDJ) → base_m=25, base_c=337
+  ✔ Ajout : assigned_m=25.0, assigned_c=337.0
+[CCH] DMU=504 UMA=340 (HC) → base_m=37, base_c=642
+  ✔ Ajout : assigned_m=18.5, assigned_c=321.0
+[CCH] DMU=504 UMA=341 (HC) → base_m=53, base_c=450
+  ✔ Ajout : assigned_m=26.5, assigned_c=225.0
+[CCH] DMU=504 UMA=540 (HC) → base_m=609, base_c=7446
+  ✔ Ajout : assigned_m=304.5, assigned_c=3723.0
+[CCH] DMU=504 UMA=543 (HC) → base_m=202, base_c=4096
+  ✔ Ajout : assigned_m=101.0, assigned_c=2048.0
+[CCH] DMU=504 UMA=384J (HDJ) → base_m=73, base_c=341
+  ✔ Ajout : assigned_m=73.0, assigned_c=341.0
+[CCH] DMU=507 UMA=022S (HC) → base_m=6, base_c=88
+  ✔ Ajout : assigned_m=6.0, assigned_c=88.0
+[CCH] DMU=507 UMA=022J (HDJ) → base_m=47, base_c=285
+  ✔ Ajout : assigned_m=47.0, assigned_c=285.0
+[CCH] DMU=507 UMA=150C (HDJ) → base_m=23, base_c=305
+  ✔ Ajout : assigned_m=23.0, assigned_c=305.0
+[CCH] DMU=507 UMA=150J (HDJ) → base_m=21, base_c=226
+  ✔ Ajout : assigned_m=10.5, assigned_c=113.0
+[CCH] DMU=507 UMA=320J (HDJ) → base_m=30, base_c=175
+  ✔ Ajout : assigned_m=30.0, assigned_c=175.0
+[CCH] DMU=515 UMA=270J (HDJ) → base_m=27, base_c=251
+  ✔ Ajout : assigned_m=27.0, assigned_c=251.0
+[CCH] DMU=515 UMA=271C (HDJ) → base_m=110, base_c=1075
+  ✔ Ajout : assigned_m=110.0, assigned_c=1075.0
+[CCH] DMU=515 UMA=410C (HDJ) → base_m=43, base_c=481
+  ✔ Ajout : assigned_m=43.0, assigned_c=481.0
+[CCH] DMU=515 UMA=450J (HDJ) → base_m=434, base_c=5031
+  ✔ Ajout : assigned_m=434.0, assigned_c=5031.0
+[CCH] DMU=515 UMA=670J (HDJ) → base_m=30, base_c=504
+  ✔ Ajout : assigned_m=30.0, assigned_c=504.0
+[CCH] DMU=505 UMA=060 (HC) → base_m=133, base_c=1660
+  ✔ Ajout : assigned_m=133.0, assigned_c=1660.0
+[CCH] DMU=505 UMA=060S (HC) → base_m=75, base_c=907
+  ✔ Ajout : assigned_m=75.0, assigned_c=907.0
+[CCH] DMU=505 UMA=060J (HDJ) → base_m=108, base_c=1157
+  ✔ Ajout : assigned_m=108.0, assigned_c=1157.0
+[CCH] DMU=505 UMA=061J (HDJ) → base_m=3, base_c=678
+  ✔ Ajout : assigned_m=3.0, assigned_c=678.0
+[CCH] DMU=505 UMA=062C (HDJ) → base_m=0, base_c=10
+[CCH] DMU=505 UMA=062J (HDJ) → base_m=3, base_c=720
+  ✔ Ajout : assigned_m=3.0, assigned_c=720.0
+[CCH] DMU=505 UMA=063J (HDJ) → base_m=32, base_c=395
+  ✔ Ajout : assigned_m=32.0, assigned_c=395.0
+[CCH] DMU=517 UMA=071 (HC) → base_m=36, base_c=613
+  ✔ Ajout : assigned_m=36.0, assigned_c=613.0
+[CCH] DMU=517 UMA=071S (HC) → base_m=77, base_c=843
+  ✔ Ajout : assigned_m=77.0, assigned_c=843.0
+[CCH] DMU=513 UMA=600 (HC) → base_m=5, base_c=150
+  ✔ Ajout : assigned_m=5.0, assigned_c=150.0
+[CCH] DMU=513 UMA=600J (HDJ) → base_m=136, base_c=1259
+  ✔ Ajout : assigned_m=136.0, assigned_c=1259.0
+[CCH] DMU=517 UMA=070 (HC) → base_m=113, base_c=1267
+  ✔ Ajout : assigned_m=113.0, assigned_c=1267.0
+[CCH] DMU=517 UMA=070J (HDJ) → base_m=184, base_c=1822
+  ✔ Ajout : assigned_m=184.0, assigned_c=1822.0
+[CCH] DMU=517 UMA=072J (HDJ) → base_m=13, base_c=141
+  ✔ Ajout : assigned_m=13.0, assigned_c=141.0
+[CCH] DMU=514 UMA=010 (HC) → base_m=88, base_c=1495
+  ✔ Ajout : assigned_m=44.0, assigned_c=747.5
+[CCH] DMU=514 UMA=010S (HC) → base_m=70, base_c=773
+  ✔ Ajout : assigned_m=70.0, assigned_c=773.0
+[CCH] DMU=514 UMA=010J (HDJ) → base_m=193, base_c=2357
+  ✔ Ajout : assigned_m=193.0, assigned_c=2357.0
+[CCH] DMU=515 UMA=011 (HC) → base_m=93, base_c=1166
+  ✔ Ajout : assigned_m=46.5, assigned_c=583.0
+[CCH] DMU=515 UMA=040S (HC) → base_m=142, base_c=1517
+  ✔ Ajout : assigned_m=71.0, assigned_c=758.5
+[CCH] DMU=515 UMA=040X (HC) → base_m=43, base_c=446
+  ✔ Ajout : assigned_m=43.0, assigned_c=446.0
+[CCH] DMU=515 UMA=011J (HDJ) → base_m=654, base_c=7459
+  ✔ Ajout : assigned_m=654.0, assigned_c=7459.0
+[CCH] DMU=515 UMA=040C (HDJ) → base_m=330, base_c=3641
+  ✔ Ajout : assigned_m=330.0, assigned_c=3641.0
+[CCH] DMU=515 UMA=040J (HDJ) → base_m=108, base_c=1199
+  ✔ Ajout : assigned_m=108.0, assigned_c=1199.0
+[CCH] DMU=515 UMA=041J (HDJ) → base_m=0, base_c=1
+[CCH] DMU=517 UMA=160 (HC) → base_m=48, base_c=540
+  ✔ Ajout : assigned_m=48.0, assigned_c=540.0
+[CCH] DMU=517 UMA=161J (HDJ) → base_m=207, base_c=2480
+  ✔ Ajout : assigned_m=207.0, assigned_c=2480.0
+[CCH] DMU=517 UMA=162C (HDJ) → base_m=97, base_c=851
+  ✔ Ajout : assigned_m=97.0, assigned_c=851.0
+[CCH] DMU=515 UMA=040 (HC) → base_m=27, base_c=498
+  ✔ Ajout : assigned_m=27.0, assigned_c=498.0
+[CCH] DMU=515 UMA=040S (HC) → base_m=142, base_c=1517
+  ✔ Ajout : assigned_m=71.0, assigned_c=758.5
+[CCH] DMU=515 UMA=041 (HC) → base_m=201, base_c=2366
+  ✔ Ajout : assigned_m=201.0, assigned_c=2366.0
+[CCH] DMU=515 UMA=270 (HC) → base_m=165, base_c=1720
+  ✔ Ajout : assigned_m=165.0, assigned_c=1720.0
+[CCH] DMU=515 UMA=270S (HC) → base_m=52, base_c=891
+  ✔ Ajout : assigned_m=52.0, assigned_c=891.0
+[CCH] DMU=515 UMA=450 (HC) → base_m=45, base_c=622
+  ✔ Ajout : assigned_m=45.0, assigned_c=622.0
+[CCH] DMU=515 UMA=451 (HC) → base_m=25, base_c=264
+  ✔ Ajout : assigned_m=25.0, assigned_c=264.0
+[CCH] DMU=515 UMA=670 (HC) → base_m=27, base_c=403
+  ✔ Ajout : assigned_m=27.0, assigned_c=403.0
+[CCH] DMU=516 UMA=090 (HC) → base_m=66, base_c=878
+  ✔ Ajout : assigned_m=66.0, assigned_c=878.0
+[CCH] DMU=516 UMA=091 (HC) → base_m=16, base_c=396
+  ✔ Ajout : assigned_m=16.0, assigned_c=396.0
+[CCH] DMU=516 UMA=092 (HC) → base_m=18, base_c=424
+  ✔ Ajout : assigned_m=18.0, assigned_c=424.0
+[CCH] DMU=516 UMA=140 (HC) → base_m=154, base_c=1869
+  ✔ Ajout : assigned_m=154.0, assigned_c=1869.0
+[CCH] DMU=516 UMA=140S (HC) → base_m=69, base_c=1059
+  ✔ Ajout : assigned_m=69.0, assigned_c=1059.0
+[CCH] DMU=516 UMA=090J (HDJ) → base_m=31, base_c=467
+  ✔ Ajout : assigned_m=31.0, assigned_c=467.0
+[CCH] DMU=516 UMA=140C (HDJ) → base_m=153, base_c=1557
+  ✔ Ajout : assigned_m=153.0, assigned_c=1557.0
+[CCH] DMU=516 UMA=140J (HDJ) → base_m=110, base_c=1341
+  ✔ Ajout : assigned_m=110.0, assigned_c=1341.0
+[CCH] DMU=516 UMA=141J (HDJ) → base_m=198, base_c=1945
+  ✔ Ajout : assigned_m=198.0, assigned_c=1945.0
+[CCH] DMU=516 UMA=142J (HDJ) → base_m=30, base_c=384
+  ✔ Ajout : assigned_m=30.0, assigned_c=384.0
+[CCH] DMU=516 UMA=143J (HDJ) → base_m=46, base_c=240
+  ✔ Ajout : assigned_m=46.0, assigned_c=240.0
+[CCH] DMU=516 UMA=146J (HDJ) → base_m=17, base_c=148
+  ✔ Ajout : assigned_m=17.0, assigned_c=148.0
+[CCH] DMU=516 UMA=130 (HC) → base_m=949, base_c=11449
+  ✔ Ajout : assigned_m=632.6666666666666, assigned_c=7632.666666666666
+[CCH] DMU=516 UMA=130 (HC) → base_m=949, base_c=11449
+  ✔ Ajout : assigned_m=316.3333333333333, assigned_c=3816.333333333333
+[CCH] DMU=516 UMA=591 (HC) → base_m=85, base_c=863
+  ✔ Ajout : assigned_m=85.0, assigned_c=863.0
+[CCH] DMU=516 UMA=130J (HDJ) → base_m=98, base_c=1245
+  ✔ Ajout : assigned_m=98.0, assigned_c=1245.0
+[CCH] DMU=516 UMA=143C (HDJ) → base_m=0, base_c=1
+[CCH] DMU=516 UMA=561C (HDJ) → base_m=7, base_c=62
+  ✔ Ajout : assigned_m=7.0, assigned_c=62.0
+[CCH] DMU=516 UMA=591C (HDJ) → base_m=654, base_c=6918
+  ✔ Ajout : assigned_m=654.0, assigned_c=6918.0
+[CCH] DMU=516 UMA=591J (HDJ) → base_m=118, base_c=239
+  ✔ Ajout : assigned_m=118.0, assigned_c=239.0
+==== Résumé CCH ====
+total_assigned_m = 10251.5
+total_assigned_c = 119003.0
+====================================
 
-        val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
-        val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
-        print(f"[150 HTD] Somme mois={val_mois}, cumul={val_cum}")
+====== DEBUG SPOOL BRC ======
+df_m: 7 lignes, somme = 622
+df_c: 6 lignes, somme = 7031
+=====================================
 
-        # Cliniciens → affectation sur la LIGNE Cliniciens + UMA 150 uniquement
-        mask_cliniciens_150 = mask_150_hc & (df["TIM"] == "Cliniciens")
-        df.loc[mask_cliniciens_150, "RUM codés mois"] = val_mois
-        df.loc[mask_cliniciens_150, "RUM codés cumulés"] = val_cum
+======== DEBUG SITE BRC ========
+[BRC] DMU=506 UMA=018 (HC) → base_m=30, base_c=518
+  ✔ Ajout : assigned_m=15.0, assigned_c=259.0
+[BRC] DMU=506 UMA=029 (HC) → base_m=44, base_c=750
+  ✔ Ajout : assigned_m=22.0, assigned_c=375.0
+[BRC] DMU=506 UMA=029J (HDJ) → base_m=335, base_c=3568
+  ✔ Ajout : assigned_m=167.5, assigned_c=1784.0
+[BRC] DMU=506 UMA=018 (HC) → base_m=30, base_c=518
+  ✔ Ajout : assigned_m=15.0, assigned_c=259.0
+[BRC] DMU=506 UMA=029 (HC) → base_m=44, base_c=750
+  ✔ Ajout : assigned_m=22.0, assigned_c=375.0
+[BRC] DMU=506 UMA=029J (HDJ) → base_m=335, base_c=3568
+  ✔ Ajout : assigned_m=167.5, assigned_c=1784.0
+==== Résumé BRC ====
+total_assigned_m = 409.0
+total_assigned_c = 4836.0
+====================================
 
-        # Autres TIM → relancés uniquement sur leur ligne 150
-        mask_other_tim_150 = mask_150_hc & (df["TIM"] != "Cliniciens")
-        df.loc[mask_other_tim_150, "RUM relancés mois"] = df.loc[mask_other_tim_150, "RUM codés mois"]
-        df.loc[mask_other_tim_150, "RUM relancés cumulés"] = df.loc[mask_other_tim_150, "RUM codés cumulés"]
+====== DEBUG SPOOL HTD ======
+df_m: 18 lignes, somme = 628
+df_c: 19 lignes, somme = 7524
+=====================================
 
-        # On efface les codés uniquement sur les lignes concernées
-        df.loc[mask_other_tim_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+======== DEBUG SITE HTD ========
+[HTD] DMU=504 UMA=010 (HC) → base_m=54, base_c=688
+  ✔ Ajout : assigned_m=27.0, assigned_c=344.0
+[HTD] DMU=504 UMA=011 (HC) → base_m=22, base_c=518
+  ✔ Ajout : assigned_m=11.0, assigned_c=259.0
+[HTD] DMU=504 UMA=013 (HC) → base_m=43, base_c=522
+  ✔ Ajout : assigned_m=21.5, assigned_c=261.0
+[HTD] DMU=505 UMA=152J (HDJ) → base_m=0, base_c=191
+[HTD] DMU=505 UMA=510J (HDJ) → base_m=26, base_c=107
+  ✔ Ajout : assigned_m=26.0, assigned_c=107.0
+[HTD] DMU=514 UMA=227J (HDJ) → base_m=8, base_c=72
+  ✔ Ajout : assigned_m=8.0, assigned_c=72.0
+[HTD] DMU=504 UMA=013 (HC) → base_m=43, base_c=522
+  ✔ Ajout : assigned_m=21.5, assigned_c=261.0
+[HTD] DMU=505 UMA=230J (HDJ) → base_m=55, base_c=733
+  ✔ Ajout : assigned_m=55.0, assigned_c=733.0
+[HTD] DMU=505 UMA=150 (HC) → base_m=74, base_c=768
+  ✔ Ajout : assigned_m=37.0, assigned_c=384.0
+[HTD] DMU=505 UMA=150 (HC) → base_m=74, base_c=768
+  ✔ Ajout : assigned_m=37.0, assigned_c=384.0
+[HTD] DMU=505 UMA=150J (HDJ) → base_m=9, base_c=106
+  ✔ Ajout : assigned_m=4.5, assigned_c=53.0
+[HTD] DMU=505 UMA=151J (HDJ) → base_m=90, base_c=1083
+  ✔ Ajout : assigned_m=90.0, assigned_c=1083.0
+[HTD] DMU=510 UMA=206J (HDJ) → base_m=1, base_c=29
+  ✔ Ajout : assigned_m=1.0, assigned_c=29.0
+[HTD] DMU=514 UMA=500J (HDJ) → base_m=32, base_c=343
+  ✔ Ajout : assigned_m=16.0, assigned_c=171.5
+[HTD] DMU=514 UMA=501J (HDJ) → base_m=9, base_c=107
+  ✔ Ajout : assigned_m=4.5, assigned_c=53.5
+[HTD] DMU=514 UMA=503J (HDJ) → base_m=2, base_c=23
+  ✔ Ajout : assigned_m=2.0, assigned_c=23.0
+[HTD] DMU=514 UMA=221J (HDJ) → base_m=115, base_c=1289
+  ✔ Ajout : assigned_m=115.0, assigned_c=1289.0
+[HTD] DMU=514 UMA=222J (HDJ) → base_m=57, base_c=606
+  ✔ Ajout : assigned_m=57.0, assigned_c=606.0
+==== Résumé HTD ====
+total_assigned_m = 534.0
+total_assigned_c = 6113.0
+====================================
 
-    # ----------------------------------------------------------------------
-    # 2️⃣  Exception : UMA 040X (HC) sur CCH
-    # ----------------------------------------------------------------------
-    mask_040x = (df["SITE"] == "CCH") & (df["UMA_HC_code"] == "040X")
-    if mask_040x.any():
-        print("\n-- UMA 040X HC sur CCH --")
-        print(df.loc[mask_040x, ["TIM", "SITE", "UMA HC", "RUM codés mois"]])
+====== DEBUG AVANT apply_uma_exceptions ======
+Total codés mois = 4710.5
+Total relancés mois = 6484.0
+==============================================
 
-        df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
-        df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
+======= DEBUG APPLY_UMA_EXCEPTIONS (corrigée) =======
+UMA HC (codes) : ['080' '080S' '520' '520S' '' '018' '029' '112' '112S' '115' '310' '020'
+ '021' '103' '104' '037' '037S' '393' '010' '011']
+UMA HDJ (codes): ['' '080J' '081J' '083J' '500J' '520J' '029J' '112C' '114C' '020J' '260J'
+ '500C' '501J' '037J' '152J' '510J' '227J' '071J' '073J' '230J']
 
-        df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+-- UMA 150 HC sur HTD (lignes trouvées) --
+                TIM SITE                 UMA HC  RUM codés mois
+71       Cliniciens  HTD  150 Centre du sommeil            37.0
+74  Olivier GARRIDO  HTD  150 Centre du sommeil            37.0
+[150 HTD] Somme mois=74.0, cumul=768.0
 
-    # ----------------------------------------------------------------------
-    # 3️⃣  Exceptions HDJ → bascule dans CODÉS
-    # ----------------------------------------------------------------------
-    HDJ_SPECIAL = ["561C", "591C", "591J"]
+-- UMA 040X HC sur CCH --
+                 TIM SITE                   UMA HC  RUM codés mois
+93  Géraldine DANIEL  CCH  040X HDJ CHIMIOS GASTRO            43.0
 
-    for code in HDJ_SPECIAL:
-        mask_hdj_special = (df["SITE"] == "CCH") & (df["UMA_HDJ_code"] == code)
+-- UMA 561C HDJ → bascule CODÉS --
+               TIM SITE                       UMA HDJ  RUM relancés mois
+126  Clara HEBRARD  CCH  561C UCA chir plastie et rec                7.0
 
-        if mask_hdj_special.any():
-            print(f"\n-- UMA {code} HDJ → bascule CODÉS --")
-            print(df.loc[mask_hdj_special, ["TIM", "SITE", "UMA HDJ", "RUM relancés mois"]])
+-- UMA 591C HDJ → bascule CODÉS --
+               TIM SITE                 UMA HDJ  RUM relancés mois
+127  Clara HEBRARD  CCH  591C Ophtalmologie HDJ              654.0
 
-            df.loc[mask_hdj_special, "RUM codés mois"] = df.loc[mask_hdj_special, "RUM relancés mois"]
-            df.loc[mask_hdj_special, "RUM codés cumulés"] = df.loc[mask_hdj_special, "RUM relancés cumulés"]
+-- UMA 591J HDJ → bascule CODÉS --
+               TIM SITE            UMA HDJ  RUM relancés mois
+128  Clara HEBRARD  CCH  591J HDJ BIRDSHOT              118.0
+======= FIN APPLY_UMA_EXCEPTIONS =======
 
-            df.loc[mask_hdj_special, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
-
-    print("======= FIN APPLY_UMA_EXCEPTIONS =======\n")
-    return df
+====== DEBUG APRÈS apply_uma_exceptions ======
+Total codés mois = 5446.5
+Total relancés mois = 5785.0
+==============================================
