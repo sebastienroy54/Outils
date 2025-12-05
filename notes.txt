@@ -1,37 +1,13 @@
-# Calcul RUM
-st.write("🔹 Calcul RUM par UMA...")
-# Pour chaque UMA dans tim_dict, récupérer sa base et appliquer pondération / type
-for tim, sites in tim_dict.items():
-    for site, dmus in sites.items():
-        for dmu, umas in dmus.items():
-            for uma in umas:
-                uma_code = uma["code"]
-                uma_type = uma["type"]
-                # base counts (0 si absent)
-                base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
-                base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
-                # poids personnalisé sinon 1 / nTIM
-                default_count = uma_to_tim_count.get(uma_code, 1)
-                weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count if default_count > 0 else 1.0)
-                assigned_m = base_m * weight
-                assigned_c = base_c * weight
-
-                # Ajouter aux lignes correspondantes dans df_patron
-                if uma_type == "HC":
-                    mask = (
-                        (df_patron["TIM"] == tim) &
-                        (df_patron["SITE"] == site) &
-                        (df_patron["DMU"] == dmu) &
-                        (df_patron["UMA HC"].str.startswith(uma_code))
-                    )
-                    df_patron.loc[mask, "RUM codés mois"] = assigned_m
-                    df_patron.loc[mask, "RUM codés cumulés"] = assigned_c
-                else:  # HDJ
-                    mask = (
-                        (df_patron["TIM"] == tim) &
-                        (df_patron["SITE"] == site) &
-                        (df_patron["DMU"] == dmu) &
-                        (df_patron["UMA HDJ"].str.startswith(uma_code))
-                    )
-                    df_patron.loc[mask, "RUM relancés mois"] = assigned_m
-                    df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
+KeyError: 'UMA_HC'
+Traceback:
+File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 504, in page_rum
+    output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 333, in write_copy_with_values_to_patron
+    df_sorted = df.sort_values(by=["TIM", "SITE", "DMU", "UMA_HC", "UMA_HDJ"]).reset_index(drop=True)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\frame.py", line 7194, in sort_values
+    keys = [self._get_label_or_level_values(x, axis=axis) for x in by]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\pandas\core\generic.py", line 1914, in _get_label_or_level_values
+    raise KeyError(key)
