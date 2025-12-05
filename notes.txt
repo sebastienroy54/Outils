@@ -1,38 +1,27 @@
-def apply_uma_exceptions(df_patron):
-    """
-    Gère les exceptions UMA spécifiques :
-    - UMA 150 HTD : codée par TIM 'Cliniciens', relance éventuelle par TIM habituel
-    - UMA 040X CCH : transférée des codés aux relancés
-    - UMA 561C, 591C, 591J CCH : codés par TIM, non cliniciens
-    """
-    # Créer colonnes vides si elles n'existent pas
-    for col in ["RUM_codes_mois", "RUM_codes_cum", "RUM_rel_mois", "RUM_rel_cum"]:
-        if col not in df_patron.columns:
-            df_patron[col] = None
+# Pour chaque UMA dans tim_dict, récupérer sa base et appliquer pondération / type
+for tim, sites in tim_dict.items():
+    for site, dmus in sites.items():
+        for dmu, umas in dmus.items():
+            for uma in umas:
+                uma_code = uma["code"]
+                uma_type = uma["type"]
+                # base counts (0 si absent)
+                base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
+                base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
+                # poids personnalisé sinon 1 / nTIM
+                default_count = uma_to_tim_count.get(uma_code, 1)
+                weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count if default_count > 0 else 1.0)
+                assigned_m = base_m * weight
+                assigned_c = base_c * weight
 
-    # --- UMA 150 HTD ---
-    mask_150 = (df_patron["UMA_code"] == "150") & (df_patron["SITE"] == "HTD") & (df_patron["UMA_type"] == "HC")
-    # Trouver TIM codant : Cliniciens
-    mask_cliniciens = mask_150 & (df_patron["TIM"] == "Cliniciens")
-    # Transférer le nombre de RUM codés (si présent dans df original)
-    for col in ["RUM_codes_mois", "RUM_codes_cum"]:
-        df_patron.loc[mask_cliniciens, col] = df_patron.loc[mask_150, col].values
-    # Laisser vide pour les autres TIM
-    mask_autres = mask_150 & (df_patron["TIM"] != "Cliniciens")
-    for col in ["RUM_codes_mois", "RUM_codes_cum"]:
-        df_patron.loc[mask_autres, col] = None
+                # Ajouter aux lignes correspondantes dans df_patron
+                mask = (df_patron["TIM"] == tim) & (df_patron["SITE"] == site) & (df_patron["DMU"] == dmu) & (df_patron["UMA_code"] == uma_code)
+                if uma_type == "HC":
+                    df_patron.loc[mask, "RUM_codes_mois"] = assigned_m
+                    df_patron.loc[mask, "RUM_codes_cumulés"] = assigned_c
+                else:  # HDJ
+                    df_patron.loc[mask, "RUM relancés mois"] = assigned_m
+                    df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
 
-    # --- UMA 040X CCH : transfert des codés aux relancés ---
-    mask_040X = (df_patron["UMA_code"].str.startswith("040X")) & (df_patron["SITE"] == "CCH")
-    for col_mois, col_rel_mois in [("RUM_codes_mois", "RUM_rel_mois"), ("RUM_codes_cum", "RUM_rel_cum")]:
-        df_patron.loc[mask_040X, col_rel_mois] = df_patron.loc[mask_040X, col_mois].values
-        df_patron.loc[mask_040X, col_mois] = None  # laisser vide
-
-    # --- UMA 561C, 591C, 591J CCH : codés par TIM, non cliniciens ---
-    for uma in ["561C", "591C", "591J"]:
-        mask = (df_patron["UMA_code"] == uma) & (df_patron["SITE"] == "CCH") & (df_patron["UMA_type"] == "HDJ")
-        # Transférer valeurs relancées vers codés
-        df_patron.loc[mask, ["RUM_codes_mois", "RUM_codes_cum"]] = df_patron.loc[mask, ["RUM_rel_mois", "RUM_rel_cum"]].values
-        df_patron.loc[mask, ["RUM_rel_mois", "RUM_rel_cum"]] = None
-
-    return df_patron
+# Appliquer les exceptions (transfert vers Cliniciens, etc.)
+df_patron = apply_uma_exceptions(df_patron)
