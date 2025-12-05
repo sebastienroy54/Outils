@@ -1,1 +1,11 @@
-TIM	SITE	UMA HC	RUM codés mois	RUM codés cumulés	UMA HDJ	DMU	RUM relancés mois	RUM relancés cumulés
+rows.append({
+    "TIM": tim,
+    "SITE": site,
+    "UMA HC": uma["libelle"] if uma["type"] == "HC" else "",
+    "RUM codés mois": 0.0 if uma["type"] == "HC" else None,
+    "RUM codés cumulés": 0.0 if uma["type"] == "HC" else None,
+    "UMA HDJ": uma["libelle"] if uma["type"] == "HDJ" else "",
+    "DMU": dmu,
+    "RUM relancés mois": 0.0 if uma["type"] == "HDJ" else None,
+    "RUM relancés cumulés": 0.0 if uma["type"] == "HDJ" else None,
+})
