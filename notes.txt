@@ -1,40 +1,150 @@
-# Calcul RUM
-st.write("🔹 Calcul RUM par UMA...")
-for tim, sites in tim_dict.items():
-    for site, dmus in sites.items():
-        for dmu, umas in dmus.items():
-            for uma in umas:
-                uma_code = uma["code"]
-                uma_type = uma["type"]
-                base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
-                base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
-                default_count = uma_to_tim_count.get(uma_code, 1)
-                weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count if default_count > 0 else 1.0)
-                assigned_m = base_m * weight
-                assigned_c = base_c * weight
-
-                # Logs pour debug
-                print(f"SITE={site}, DMU={dmu}, UMA={uma_code}, TYPE={uma_type}")
-                print(f"  base_m={base_m}, base_c={base_c}, default_count={default_count}, weight={weight}")
-                print(f"  assigned_m={assigned_m}, assigned_c={assigned_c}")
-
-                if uma_type == "HC":
-                    mask = (
-                        (df_patron["TIM"] == tim) &
-                        (df_patron["SITE"] == site) &
-                        (df_patron["DMU"] == dmu) &
-                        (df_patron["UMA_HC_code"] == uma_code)
-                    )
-                    df_patron.loc[mask, "RUM codés mois"] = assigned_m
-                    df_patron.loc[mask, "RUM codés cumulés"] = assigned_c
-                    print(f"  Updated df_patron rows (HC): {mask.sum()}")
-                else:  # HDJ
-                    mask = (
-                        (df_patron["TIM"] == tim) &
-                        (df_patron["SITE"] == site) &
-                        (df_patron["DMU"] == dmu) &
-                        (df_patron["UMA_HDJ_code"] == uma_code)
-                    )
-                    df_patron.loc[mask, "RUM relancés mois"] = assigned_m
-                    df_patron.loc[mask, "RUM relancés cumulés"] = assigned_c
-                    print(f"  Updated df_patron rows (HDJ): {mask.sum()}")
+SITE: CCH, total base_m=1108, base_c=11820
+ Exemples UMA : [('080', np.int64(46), np.int64(678)), ('080J', np.int64(161), np.int64(1826)), ('080S', np.int64(60), np.int64(649)), ('081J', np.int64(109), np.int64(999)), ('083J', np.int64(226), np.int64(2192))]
+SITE: BRC, total base_m=0, base_c=0
+ Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=420, base_c=4897
+ Exemples UMA : [('112', np.int64(230), np.int64(2865)), ('112C', np.int64(5), np.int64(76)), ('112S', np.int64(83), np.int64(866)), ('114C', np.int64(78), np.int64(754)), ('115', np.int64(24), np.int64(336))]
+SITE: BRC, total base_m=0, base_c=0
+ Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=337, base_c=3951
+ Exemples UMA : [('020', np.int64(5), np.int64(41)), ('020J', np.int64(201), np.int64(2408)), ('021', np.int64(96), np.int64(1162)), ('103', np.int64(17), np.int64(205)), ('104', np.int64(18), np.int64(135))]
+SITE: CCH, total base_m=334, base_c=3876
+ Exemples UMA : [('103', np.int64(17), np.int64(205)), ('104', np.int64(18), np.int64(135)), ('260J', np.int64(36), np.int64(304)), ('500C', np.int64(4), np.int64(37)), ('501J', np.int64(50), np.int64(799))]
+SITE: HTD, total base_m=181, base_c=2661
+ Exemples UMA : [('010', np.int64(88), np.int64(1495)), ('011', np.int64(93), np.int64(1166))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('013', np.int64(0), np.int64(0)), ('152J', np.int64(0), np.int64(0)), ('510J', np.int64(0), np.int64(0)), ('227J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=1084, base_c=14693
+ Exemples UMA : [('340', np.int64(37), np.int64(642)), ('341', np.int64(53), np.int64(450)), ('540', np.int64(609), np.int64(7446)), ('543', np.int64(202), np.int64(4096)), ('071J', np.int64(158), np.int64(1722))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('013', np.int64(0), np.int64(0)), ('230J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=901, base_c=12634
+ Exemples UMA : [('340', np.int64(37), np.int64(642)), ('341', np.int64(53), np.int64(450)), ('540', np.int64(609), np.int64(7446)), ('543', np.int64(202), np.int64(4096))]
+SITE: CCH, total base_m=844, base_c=8762
+ Exemples UMA : [('384J', np.int64(73), np.int64(341)), ('022J', np.int64(47), np.int64(285)), ('022S', np.int64(6), np.int64(88)), ('150C', np.int64(23), np.int64(305)), ('150J', np.int64(21), np.int64(226))]
+SITE: CCH, total base_m=354, base_c=5527
+ Exemples UMA : [('060', np.int64(133), np.int64(1660)), ('060J', np.int64(108), np.int64(1157)), ('060S', np.int64(75), np.int64(907)), ('061J', np.int64(3), np.int64(678)), ('062C', np.int64(0), np.int64(10))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('150', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=113, base_c=1456
+ Exemples UMA : [('071', np.int64(36), np.int64(613)), ('071S', np.int64(77), np.int64(843))]
+SITE: HTD, total base_m=204, base_c=2219
+ Exemples UMA : [('150', np.int64(0), np.int64(0)), ('150J', np.int64(21), np.int64(226)), ('151J', np.int64(0), np.int64(0)), ('206J', np.int64(0), np.int64(0)), ('500J', np.int64(133), np.int64(1194))]
+SITE: CCH, total base_m=451, base_c=4639
+ Exemples UMA : [('600', np.int64(5), np.int64(150)), ('600J', np.int64(136), np.int64(1259)), ('070', np.int64(113), np.int64(1267)), ('070J', np.int64(184), np.int64(1822)), ('072J', np.int64(13), np.int64(141))]
+SITE: CCH, total base_m=351, base_c=4625
+ Exemples UMA : [('010', np.int64(88), np.int64(1495)), ('010J', np.int64(193), np.int64(2357)), ('010S', np.int64(70), np.int64(773))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('221J', np.int64(0), np.int64(0)), ('222J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=1722, base_c=19300
+ Exemples UMA : [('011', np.int64(93), np.int64(1166)), ('011J', np.int64(654), np.int64(7459)), ('040C', np.int64(330), np.int64(3641)), ('040J', np.int64(108), np.int64(1199)), ('040S', np.int64(142), np.int64(1517))]
+SITE: CCH, total base_m=370, base_c=4381
+ Exemples UMA : [('040', np.int64(27), np.int64(498)), ('040S', np.int64(142), np.int64(1517)), ('041', np.int64(201), np.int64(2366))]
+SITE: CCH, total base_m=314, base_c=3900
+ Exemples UMA : [('270', np.int64(165), np.int64(1720)), ('270S', np.int64(52), np.int64(891)), ('450', np.int64(45), np.int64(622)), ('451', np.int64(25), np.int64(264)), ('670', np.int64(27), np.int64(403))]
+SITE: CCH, total base_m=908, base_c=10708
+ Exemples UMA : [('090', np.int64(66), np.int64(878)), ('090J', np.int64(31), np.int64(467)), ('091', np.int64(16), np.int64(396)), ('092', np.int64(18), np.int64(424)), ('140', np.int64(154), np.int64(1869))]
+SITE: CCH, total base_m=949, base_c=11449
+ Exemples UMA : [('130', np.int64(949), np.int64(11449))]
+SITE: CCH, total base_m=1911, base_c=20777
+ Exemples UMA : [('130', np.int64(949), np.int64(11449)), ('130J', np.int64(98), np.int64(1245)), ('143C', np.int64(0), np.int64(1)), ('561C', np.int64(7), np.int64(62)), ('591', np.int64(85), np.int64(863))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('080', np.int64(0), np.int64(0)), ('080J', np.int64(0), np.int64(0)), ('080S', np.int64(0), np.int64(0)), ('081J', np.int64(0), np.int64(0)), ('083J', np.int64(0), np.int64(0))]
+SITE: BRC, total base_m=409, base_c=4836
+ Exemples UMA : [('018', np.int64(30), np.int64(518)), ('029', np.int64(44), np.int64(750)), ('029J', np.int64(335), np.int64(3568))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('112', np.int64(0), np.int64(0)), ('112C', np.int64(0), np.int64(0)), ('112S', np.int64(0), np.int64(0)), ('114C', np.int64(0), np.int64(0)), ('115', np.int64(0), np.int64(0))]
+SITE: BRC, total base_m=409, base_c=4836
+ Exemples UMA : [('018', np.int64(30), np.int64(518)), ('029', np.int64(44), np.int64(750)), ('029J', np.int64(335), np.int64(3568))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('020', np.int64(0), np.int64(0)), ('020J', np.int64(0), np.int64(0)), ('021', np.int64(0), np.int64(0)), ('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0)), ('260J', np.int64(0), np.int64(0)), ('500C', np.int64(0), np.int64(0)), ('501J', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('010', np.int64(0), np.int64(0)), ('011', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('013', np.int64(0), np.int64(0)), ('152J', np.int64(0), np.int64(0)), ('510J', np.int64(0), np.int64(0)), ('227J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0)), ('071J', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('013', np.int64(0), np.int64(0)), ('230J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('384J', np.int64(0), np.int64(0)), ('022J', np.int64(0), np.int64(0)), ('022S', np.int64(0), np.int64(0)), ('150C', np.int64(0), np.int64(0)), ('150J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('060', np.int64(0), np.int64(0)), ('060J', np.int64(0), np.int64(0)), ('060S', np.int64(0), np.int64(0)), ('061J', np.int64(0), np.int64(0)), ('062C', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('150', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('071', np.int64(0), np.int64(0)), ('071S', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('150', np.int64(0), np.int64(0)), ('150J', np.int64(0), np.int64(0)), ('151J', np.int64(0), np.int64(0)), ('206J', np.int64(0), np.int64(0)), ('500J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('600', np.int64(0), np.int64(0)), ('600J', np.int64(0), np.int64(0)), ('070', np.int64(0), np.int64(0)), ('070J', np.int64(0), np.int64(0)), ('072J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('010', np.int64(0), np.int64(0)), ('010J', np.int64(0), np.int64(0)), ('010S', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=0, base_c=0
+ Exemples UMA : [('221J', np.int64(0), np.int64(0)), ('222J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('011', np.int64(0), np.int64(0)), ('011J', np.int64(0), np.int64(0)), ('040C', np.int64(0), np.int64(0)), ('040J', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('040', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0)), ('041', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('270', np.int64(0), np.int64(0)), ('270S', np.int64(0), np.int64(0)), ('450', np.int64(0), np.int64(0)), ('451', np.int64(0), np.int64(0)), ('670', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('090', np.int64(0), np.int64(0)), ('090J', np.int64(0), np.int64(0)), ('091', np.int64(0), np.int64(0)), ('092', np.int64(0), np.int64(0)), ('140', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('130', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('130', np.int64(0), np.int64(0)), ('130J', np.int64(0), np.int64(0)), ('143C', np.int64(0), np.int64(0)), ('561C', np.int64(0), np.int64(0)), ('591', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=32, base_c=343
+ Exemples UMA : [('080', np.int64(0), np.int64(0)), ('080J', np.int64(0), np.int64(0)), ('080S', np.int64(0), np.int64(0)), ('081J', np.int64(0), np.int64(0)), ('083J', np.int64(0), np.int64(0))]
+SITE: BRC, total base_m=0, base_c=0
+ Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('112', np.int64(0), np.int64(0)), ('112C', np.int64(0), np.int64(0)), ('112S', np.int64(0), np.int64(0)), ('114C', np.int64(0), np.int64(0)), ('115', np.int64(0), np.int64(0))]
+SITE: BRC, total base_m=0, base_c=0
+ Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('020', np.int64(0), np.int64(0)), ('020J', np.int64(0), np.int64(0)), ('021', np.int64(0), np.int64(0)), ('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=9, base_c=107
+ Exemples UMA : [('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0)), ('260J', np.int64(0), np.int64(0)), ('500C', np.int64(0), np.int64(0)), ('501J', np.int64(9), np.int64(107))]
+SITE: HTD, total base_m=76, base_c=1206
+ Exemples UMA : [('010', np.int64(54), np.int64(688)), ('011', np.int64(22), np.int64(518))]
+SITE: HTD, total base_m=77, base_c=892
+ Exemples UMA : [('013', np.int64(43), np.int64(522)), ('152J', np.int64(0), np.int64(191)), ('510J', np.int64(26), np.int64(107)), ('227J', np.int64(8), np.int64(72))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0)), ('071J', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=98, base_c=1255
+ Exemples UMA : [('013', np.int64(43), np.int64(522)), ('230J', np.int64(55), np.int64(733))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=9, base_c=106
+ Exemples UMA : [('384J', np.int64(0), np.int64(0)), ('022J', np.int64(0), np.int64(0)), ('022S', np.int64(0), np.int64(0)), ('150C', np.int64(0), np.int64(0)), ('150J', np.int64(9), np.int64(106))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('060', np.int64(0), np.int64(0)), ('060J', np.int64(0), np.int64(0)), ('060S', np.int64(0), np.int64(0)), ('061J', np.int64(0), np.int64(0)), ('062C', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=74, base_c=768
+ Exemples UMA : [('150', np.int64(74), np.int64(768))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('071', np.int64(0), np.int64(0)), ('071S', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=217, base_c=2459
+ Exemples UMA : [('150', np.int64(74), np.int64(768)), ('150J', np.int64(9), np.int64(106)), ('151J', np.int64(90), np.int64(1083)), ('206J', np.int64(1), np.int64(29)), ('500J', np.int64(32), np.int64(343))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('600', np.int64(0), np.int64(0)), ('600J', np.int64(0), np.int64(0)), ('070', np.int64(0), np.int64(0)), ('070J', np.int64(0), np.int64(0)), ('072J', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=54, base_c=688
+ Exemples UMA : [('010', np.int64(54), np.int64(688)), ('010J', np.int64(0), np.int64(0)), ('010S', np.int64(0), np.int64(0))]
+SITE: HTD, total base_m=172, base_c=1895
+ Exemples UMA : [('221J', np.int64(115), np.int64(1289)), ('222J', np.int64(57), np.int64(606))]
+SITE: CCH, total base_m=22, base_c=518
+ Exemples UMA : [('011', np.int64(22), np.int64(518)), ('011J', np.int64(0), np.int64(0)), ('040C', np.int64(0), np.int64(0)), ('040J', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('040', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0)), ('041', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('270', np.int64(0), np.int64(0)), ('270S', np.int64(0), np.int64(0)), ('450', np.int64(0), np.int64(0)), ('451', np.int64(0), np.int64(0)), ('670', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('090', np.int64(0), np.int64(0)), ('090J', np.int64(0), np.int64(0)), ('091', np.int64(0), np.int64(0)), ('092', np.int64(0), np.int64(0)), ('140', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('130', np.int64(0), np.int64(0))]
+SITE: CCH, total base_m=0, base_c=0
+ Exemples UMA : [('130', np.int64(0), np.int64(0)), ('130J', np.int64(0), np.int64(0)), ('143C', np.int64(0), np.int64(0)), ('561C', np.int64(0), np.int64(0)), ('591', np.int64(0), np.int64(0))]
