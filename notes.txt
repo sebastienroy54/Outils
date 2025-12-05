@@ -1,11 +1,1 @@
-TypeError: '<' not supported between instances of 'NoneType' and 'int'
-Traceback:
-File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 480, in page_rum
-    output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\Portail_outils\outils\RUM_TIM.py", line 330, in write_copy_with_values_to_patron
-    ws.cell(row=excel_row, column=col_rum_codes_mois).value = int(round(row["RUM_codes_mois"]))
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-File "C:\Users\4251352\AppData\Local\Programs\Python\Python312\Lib\site-packages\openpyxl\worksheet\worksheet.py", line 241, in cell
-    if row < 1 or column < 1:
-                  ^^^^^^^^^^
+TIM	SITE	UMA HC	RUM codés mois	RUM codés cumulés	UMA HDJ	DMU	RUM relancés mois	RUM relancés cumulés
