@@ -44,29 +44,22 @@ def write_copy_with_values_to_patron(df, patron_path):
         ws.cell(row=excel_row, column=col_map["SITE"]).value = row["SITE"]
         ws.cell(row=excel_row, column=col_map["DMU"]).value = row["DMU"]
 
-        # ---------------------------------------
-        #       ÉCRITURE DES UMA HC (codés)
-        # ---------------------------------------
+        # ➤ Écrire le libellé UMA HC ou UMA HDJ
         if row["UMA HC"]:
             ws.cell(row=excel_row, column=col_map["UMA HC"]).value = row["UMA HC"]
 
-            ws.cell(row=excel_row, column=col_map["RUM_codes_mois"]).value = (
-                int(row["RUM codés mois"]) if pd.notna(row["RUM codés mois"]) else None
-            )
-            ws.cell(row=excel_row, column=col_map["RUM_codes_cumulés"]).value = (
-                int(row["RUM codés cumulés"]) if pd.notna(row["RUM codés cumulés"]) else None
-            )
-
-        # ---------------------------------------
-        #        ÉCRITURE DES UMA HDJ
-        # ---------------------------------------
         if row["UMA HDJ"]:
             ws.cell(row=excel_row, column=col_map["UMA HDJ"]).value = row["UMA HDJ"]
 
-        # ---------------------------------------
-        #        ÉCRITURE DES RUM RELANCÉS
-        #   (⚠ toujours écrits, HC ou HDJ)
-        # ---------------------------------------
+        # ➤ Toujours écrire RUM CODÉS (HC ou HDJ spéciaux)
+        ws.cell(row=excel_row, column=col_map["RUM_codes_mois"]).value = (
+            int(row["RUM codés mois"]) if pd.notna(row["RUM codés mois"]) else None
+        )
+        ws.cell(row=excel_row, column=col_map["RUM_codes_cumulés"]).value = (
+            int(row["RUM codés cumulés"]) if pd.notna(row["RUM codés cumulés"]) else None
+        )
+
+        # ➤ Toujours écrire RUM RELANCÉS (HC ou HDJ)
         ws.cell(row=excel_row, column=col_map["RUM_rel_mois"]).value = (
             int(row["RUM relancés mois"]) if pd.notna(row["RUM relancés mois"]) else None
         )
@@ -74,12 +67,12 @@ def write_copy_with_values_to_patron(df, patron_path):
             int(row["RUM relancés cumulés"]) if pd.notna(row["RUM relancés cumulés"]) else None
         )
 
-    # --- Fusion des colonnes TIM / SITE / DMU ---
+    # --- Fusion colonnes TIM / SITE / DMU ---
     merge_vertical_conditionnel(ws, col_map["TIM"], df_sorted["TIM"], start)
     merge_vertical_conditionnel(ws, col_map["SITE"], df_sorted["SITE"], start, group_col=df_sorted["TIM"])
     merge_vertical_conditionnel(ws, col_map["DMU"], df_sorted["DMU"], start, group_col=df_sorted["TIM"])
 
-    # --- Bordures horizontales par TIM et séparation des sites ---
+    # --- Bordures horizontales / séparation TIM et sites ---
     draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_map["SITE"])
 
     # --- Bordure verticale sur toutes les cellules ---
@@ -105,7 +98,7 @@ def write_copy_with_values_to_patron(df, patron_path):
             new_font.bold = True
             cell.font = new_font
 
-    # --- Sauvegarde fichier ---
+    # --- Sauvegarde ---
     output = BytesIO()
     wb.save(output)
     output.seek(0)
