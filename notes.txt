@@ -1,142 +1,1008 @@
-def apply_uma_exceptions(df):
-    """
-    Exceptions UMA basées UNIQUEMENT sur les codes UMA.
-    """
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '270J HDJ UROLOGIE'
+  UMA_code = '270J'  (type=HDJ)
+  base_m dans CSV = 27
+  base_c dans CSV = 251
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    print("\n======= DEBUG APPLY_UMA_EXCEPTIONS =======")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '271C UCA Urologie HDJ'
+  UMA_code = '271C'  (type=HDJ)
+  base_m dans CSV = 110
+  base_c dans CSV = 1075
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    print("Codes UMA HC présents dans df_patron (20 max) :", df["UMA_HC_code"].unique()[:20])
-    print("Codes UMA HDJ présents dans df_patron (20 max) :", df["UMA_HDJ_code"].unique()[:20])
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '410C UCA Chirurgie digestive HDJ'
+  UMA_code = '410C'  (type=HDJ)
+  base_m dans CSV = 43
+  base_c dans CSV = 481
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    # ========== 1️⃣ 150 HC HTD ==========
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '450J Hématologie HDJ'
+  UMA_code = '450J'  (type=HDJ)
+  base_m dans CSV = 434
+  base_c dans CSV = 5031
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    print("\n-- Vérification des UMA 150 HC sur HTD --")
-    debug_150 = df[(df["SITE"]=="HTD") & (df["UMA_HC_code"]=="150")]
-    print(debug_150[["TIM","SITE","UMA HC","RUM codés mois"]].head(10))
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '670J Hépatologie médicale HDJ'
+  UMA_code = '670J'  (type=HDJ)
+  base_m dans CSV = 30
+  base_c dans CSV = 504
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    mask_150_hc = (df["SITE"] == "HTD") & (df["UMA_HC_code"] == "150")
-    mask_cliniciens = df["TIM"] == "Cliniciens"
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '060 Pneumologie'
+  UMA_code = '060'  (type=HC)
+  base_m dans CSV = 133
+  base_c dans CSV = 1660
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-    if mask_150_hc.any():
-        print("[EXC 150 HTD] Lignes trouvées :", mask_150_hc.sum())
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '060S Pneumologie HCS'
+  UMA_code = '060S'  (type=HC)
+  base_m dans CSV = 75
+  base_c dans CSV = 907
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-        val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
-        val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '060J Pneumologie HDJ'
+  UMA_code = '060J'  (type=HDJ)
+  base_m dans CSV = 108
+  base_c dans CSV = 1157
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-        print(f" Somme mois={val_mois}, cumul={val_cum}")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '061J Pneumologie diagnostic HDJ'
+  UMA_code = '061J'  (type=HDJ)
+  base_m dans CSV = 3
+  base_c dans CSV = 678
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-        # Cliniciens → codés
-        df.loc[mask_cliniciens, "RUM codés mois"] = val_mois
-        df.loc[mask_cliniciens, "RUM codés cumulés"] = val_cum
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '062C Pneumologie interventionnelle HDJ'
+  UMA_code = '062C'  (type=HDJ)
+  base_m dans CSV = 0
+  base_c dans CSV = 10
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-        # Autres TIM → relancés
-        other_tim = mask_150_hc & (~mask_cliniciens)
-        df.loc[other_tim, "RUM relancés mois"] = df.loc[other_tim, "RUM codés mois"]
-        df.loc[other_tim, "RUM relancés cumulés"] = df.loc[other_tim, "RUM codés cumulés"]
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '062J HDJ ONCOTHORAX'
+  UMA_code = '062J'  (type=HDJ)
+  base_m dans CSV = 3
+  base_c dans CSV = 720
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-        # Vider les codés chez eux
-        df.loc[other_tim, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=505
+  UMA libellé patron = '063J Suivi post-greffe HDJ'
+  UMA_code = '063J'  (type=HDJ)
+  base_m dans CSV = 32
+  base_c dans CSV = 395
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    # ========== 2️⃣ 040X HC CCH ==========
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '071 Diabétologie Cochin'
+  UMA_code = '071'  (type=HC)
+  base_m dans CSV = 36
+  base_c dans CSV = 613
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-    print("\n-- Vérification des UMA 040X HC sur CCH --")
-    debug_040x = df[(df["SITE"]=="CCH") & (df["UMA_HC_code"]=="040X")]
-    print(debug_040x[["TIM","SITE","UMA HC","RUM codés mois"]].head(10))
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '071S Diabétologie Cochin HCS'
+  UMA_code = '071S'  (type=HC)
+  base_m dans CSV = 77
+  base_c dans CSV = 843
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-    mask_040x = (df["SITE"] == "CCH") & (df["UMA_HC_code"] == "040X")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=513
+  UMA libellé patron = '600 Médecine interne - Maison des Adolescents'
+  UMA_code = '600'  (type=HC)
+  base_m dans CSV = 5
+  base_c dans CSV = 150
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-    if mask_040x.any():
-        print("[EXC 040X CCH] Lignes impactées :", mask_040x.sum())
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=513
+  UMA libellé patron = '600J Médecine interne ambulatoire - Maison des Adolescents HDJ'
+  UMA_code = '600J'  (type=HDJ)
+  base_m dans CSV = 136
+  base_c dans CSV = 1259
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-        df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
-        df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '070 Endocrinologie'
+  UMA_code = '070'  (type=HC)
+  base_m dans CSV = 113
+  base_c dans CSV = 1267
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-        df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '070J Endocrinologie HDJ'
+  UMA_code = '070J'  (type=HDJ)
+  base_m dans CSV = 184
+  base_c dans CSV = 1822
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-    # ========== 3️⃣ HDJ spéciaux → codés ==========
-    for code in ["561C", "591C", "591J"]:
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '072J Gynécologie - Endocrinologie HDJ'
+  UMA_code = '072J'  (type=HDJ)
+  base_m dans CSV = 13
+  base_c dans CSV = 141
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-        print(f"\n-- Vérification des UMA {code} HDJ sur CCH --")
-        debug_sp = df[(df["SITE"]=="CCH") & (df["UMA_HDJ_code"]==code)]
-        print(debug_sp[["TIM","SITE","UMA HDJ","RUM relancés mois"]].head(10))
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=514
+  UMA libellé patron = '010 Médecine interne'
+  UMA_code = '010'  (type=HC)
+  base_m dans CSV = 88
+  base_c dans CSV = 1495
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-        mask = (df["SITE"] == "CCH") & (df["UMA_HDJ_code"] == code)
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=514
+  UMA libellé patron = '010S Médecine interne HCS'
+  UMA_code = '010S'  (type=HC)
+  base_m dans CSV = 70
+  base_c dans CSV = 773
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-        if mask.any():
-            print(f"[EXC {code} CCH] Lignes impactées :", mask.sum())
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=514
+  UMA libellé patron = '010J Médecine interne HDJ'
+  UMA_code = '010J'  (type=HDJ)
+  base_m dans CSV = 193
+  base_c dans CSV = 2357
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-            df.loc[mask, "RUM codés mois"] = df.loc[mask, "RUM relancés mois"]
-            df.loc[mask, "RUM codés cumulés"] = df.loc[mask, "RUM relancés cumulés"]
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '011 Oncologie'
+  UMA_code = '011'  (type=HC)
+  base_m dans CSV = 93
+  base_c dans CSV = 1166
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-            df.loc[mask, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '040S Gastro-entérologie HCS'
+  UMA_code = '040S'  (type=HC)
+  base_m dans CSV = 142
+  base_c dans CSV = 1517
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-    print("======= FIN APPLY_UMA_EXCEPTIONS =======\n")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '040X HDJ CHIMIOS GASTRO'
+  UMA_code = '040X'  (type=HC)
+  base_m dans CSV = 43
+  base_c dans CSV = 446
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-    return df
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '011J Oncologie HDJ'
+  UMA_code = '011J'  (type=HDJ)
+  base_m dans CSV = 654
+  base_c dans CSV = 7459
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-for tim, sites in tims_for_site.items():
-    dmus = sites[site_label]
-    for dmu, umas in dmus.items():
-        for uma in umas:
-            uma_code = uma["code"]
-            uma_type = uma["type"]
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '040C Gastro-entérologie HDJ'
+  UMA_code = '040C'  (type=HDJ)
+  base_m dans CSV = 330
+  base_c dans CSV = 3641
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-            base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
-            base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '040J Biotherapie HDJ'
+  UMA_code = '040J'  (type=HDJ)
+  base_m dans CSV = 108
+  base_c dans CSV = 1199
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-            # -- DEBUG MATCHING --
-            print("\n===== DEBUG MATCH UMA =====")
-            print(f"SITE={site_label}, TIM=<hidden>, DMU={dmu}")
-            print(f"  UMA libellé patron = '{uma['libelle']}'")
-            print(f"  UMA_code = '{uma_code}'  (type={uma_type})")
-            print(f"  base_m dans CSV = {base_m}")
-            print(f"  base_c dans CSV = {base_c}")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '041J HDJ PREHAB CHIR DIG'
+  UMA_code = '041J'  (type=HDJ)
+  base_m dans CSV = 0
+  base_c dans CSV = 1
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-            if base_m == 0 and base_c == 0:
-                print("  ⚠ Aucune correspondance trouvée dans CSV")
-            else:
-                print("  ✔ Correspondance trouvée dans CSV")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '160 Dermatologie'
+  UMA_code = '160'  (type=HC)
+  base_m dans CSV = 48
+  base_c dans CSV = 540
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-            # Vérifier matching dans df_patron
-            mask_hc = (
-                (df_patron["TIM"] == tim) &
-                (df_patron["SITE"] == site_label) &
-                (df_patron["DMU"] == dmu) &
-                (df_patron["UMA_HC_code"] == uma_code)
-            )
-            mask_hdj = (
-                (df_patron["TIM"] == tim) &
-                (df_patron["SITE"] == site_label) &
-                (df_patron["DMU"] == dmu) &
-                (df_patron["UMA_HDJ_code"] == uma_code)
-            )
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '161J Dermatologie médicale (Tarnier) HDJ'
+  UMA_code = '161J'  (type=HDJ)
+  base_m dans CSV = 207
+  base_c dans CSV = 2480
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-            print(f"  Lignes matching UMA_HC_code = {mask_hc.sum()}")
-            print(f"  Lignes matching UMA_HDJ_code = {mask_hdj.sum()}")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=517
+  UMA libellé patron = '162C UCA Dermatologie HDJ'
+  UMA_code = '162C'  (type=HDJ)
+  base_m dans CSV = 97
+  base_c dans CSV = 851
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
 
-            if mask_hc.sum() == 0 and mask_hdj.sum() == 0:
-                print("  ❌ Aucun matching trouvé dans df_patron → PROBLÈME")
-            else:
-                print("  ✔ Matching trouvé dans df_patron")
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '040 Gastro-entérologie'
+  UMA_code = '040'  (type=HC)
+  base_m dans CSV = 27
+  base_c dans CSV = 498
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-            # Si pas de RUM, on arrête là
-            if base_m == 0 and base_c == 0:
-                continue
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '040S Gastro-entérologie HCS'
+  UMA_code = '040S'  (type=HC)
+  base_m dans CSV = 142
+  base_c dans CSV = 1517
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-            # Répartition TIM
-            default_count = uma_to_tim_count.get(uma_code, 1)
-            weight = UMA_WEIGHTS.get(
-                (uma_code, tim),
-                1.0 / default_count if default_count > 0 else 1.0
-            )
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '041 Chirurgie digestive et endocrinienne'
+  UMA_code = '041'  (type=HC)
+  base_m dans CSV = 201
+  base_c dans CSV = 2366
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-            assigned_m = base_m * weight
-            assigned_c = base_c * weight
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '270 Urologie'
+  UMA_code = '270'  (type=HC)
+  base_m dans CSV = 165
+  base_c dans CSV = 1720
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
 
-            # Affectation
-            if uma_type == "HC":
-                df_patron.loc[mask_hc, "RUM codés mois"] = assigned_m
-                df_patron.loc[mask_hc, "RUM codés cumulés"] = assigned_c
-            else:
-                df_patron.loc[mask_hdj, "RUM relancés mois"] = assigned_m
-                df_patron.loc[mask_hdj, "RUM relancés cumulés"] = assigned_c
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '270S Urologie HCS'
+  UMA_code = '270S'  (type=HC)
+  base_m dans CSV = 52
+  base_c dans CSV = 891
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '450 Hématologie'
+  UMA_code = '450'  (type=HC)
+  base_m dans CSV = 45
+  base_c dans CSV = 622
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '451 SI Hématologie'
+  UMA_code = '451'  (type=HC)
+  base_m dans CSV = 25
+  base_c dans CSV = 264
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=515
+  UMA libellé patron = '670 Hépatologie médicale'
+  UMA_code = '670'  (type=HC)
+  base_m dans CSV = 27
+  base_c dans CSV = 403
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '090 Néonatalogie Port-Royal'
+  UMA_code = '090'  (type=HC)
+  base_m dans CSV = 66
+  base_c dans CSV = 878
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '091 Réanimation néonatale - Port-Royal'
+  UMA_code = '091'  (type=HC)
+  base_m dans CSV = 16
+  base_c dans CSV = 396
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '092 SI Néonatalogie - Port-Royal'
+  UMA_code = '092'  (type=HC)
+  base_m dans CSV = 18
+  base_c dans CSV = 424
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '140 Gynécologie chirurgicale'
+  UMA_code = '140'  (type=HC)
+  base_m dans CSV = 154
+  base_c dans CSV = 1869
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '140S Gynécologie chirurgicale HCS'
+  UMA_code = '140S'  (type=HC)
+  base_m dans CSV = 69
+  base_c dans CSV = 1059
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '090J Néonatalogie - HDJ NN vulnérables'
+  UMA_code = '090J'  (type=HDJ)
+  base_m dans CSV = 31
+  base_c dans CSV = 467
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '140C UCA Gynécologie chirugicale HDJ'
+  UMA_code = '140C'  (type=HDJ)
+  base_m dans CSV = 153
+  base_c dans CSV = 1557
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '140J IVG A Port-Royal HDJ'
+  UMA_code = '140J'  (type=HDJ)
+  base_m dans CSV = 110
+  base_c dans CSV = 1341
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '141J Médecine de la reproduction HDJ'
+  UMA_code = '141J'  (type=HDJ)
+  base_m dans CSV = 198
+  base_c dans CSV = 1945
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '142J IVG B HDJ'
+  UMA_code = '142J'  (type=HDJ)
+  base_m dans CSV = 30
+  base_c dans CSV = 384
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '143J Gynécologie médicale HDJ'
+  UMA_code = '143J'  (type=HDJ)
+  base_m dans CSV = 46
+  base_c dans CSV = 240
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '146J HDJ AMP PF'
+  UMA_code = '146J'  (type=HDJ)
+  base_m dans CSV = 17
+  base_c dans CSV = 148
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '130 Obstétrique Port-Royal - Suite de couche'
+  UMA_code = '130'  (type=HC)
+  base_m dans CSV = 949
+  base_c dans CSV = 11449
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '130 Obstétrique Port-Royal - Suite de couche'
+  UMA_code = '130'  (type=HC)
+  base_m dans CSV = 949
+  base_c dans CSV = 11449
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '591 Ophtalmologie'
+  UMA_code = '591'  (type=HC)
+  base_m dans CSV = 85
+  base_c dans CSV = 863
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '130J Obstétrique Port-Royal HDJ'
+  UMA_code = '130J'  (type=HDJ)
+  base_m dans CSV = 98
+  base_c dans CSV = 1245
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '143C UCA Chirurgie réparatrice HDJ'
+  UMA_code = '143C'  (type=HDJ)
+  base_m dans CSV = 0
+  base_c dans CSV = 1
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '561C UCA chir plastie et rec'
+  UMA_code = '561C'  (type=HDJ)
+  base_m dans CSV = 7
+  base_c dans CSV = 62
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '591C Ophtalmologie HDJ'
+  UMA_code = '591C'  (type=HDJ)
+  base_m dans CSV = 654
+  base_c dans CSV = 6918
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=CCH, TIM=<hidden>, DMU=516
+  UMA libellé patron = '591J HDJ BIRDSHOT'
+  UMA_code = '591J'  (type=HDJ)
+  base_m dans CSV = 118
+  base_c dans CSV = 239
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+====== DEBUG AFFECTATION DF_PATRON POUR SITE CCH ======
+Total RUM codés mois (df_patron)   = 4481.5
+Total RUM codés cumulés (df_patron)= 56370.5
+Total RUM relancés mois (df_patron)   = 5770.0
+Total RUM relancés cumulés (df_patron)= 62644.5
+Total assigned_m calculé           = 0.0
+Total assigned_c calculé           = 0.0
+==============================================================
+
+====== DEBUG SPOOL POUR SITE BRC ======
+df_m (mois) : nb lignes = 7 , somme COUNT = 622
+df_c (cumul) : nb lignes = 6 , somme COUNT = 7031
+Quelques UMA mois : [{'UMA': '018', 'COUNT': 30}, {'UMA': '019M', 'COUNT': 7}, {'UMA': '029', 'COUNT': 44}, {'UMA': '029J', 'COUNT': 335}, {'UMA': '029K', 'COUNT': 168}, {'UMA': '029M', 'COUNT': 2}, {'UMA': 'nan', 'COUNT': 36}]
+Quelques UMA cumul : [{'UMA': '018', 'COUNT': 518}, {'UMA': '019M', 'COUNT': 461}, {'UMA': '029', 'COUNT': 750}, {'UMA': '029J', 'COUNT': 3568}, {'UMA': '029K', 'COUNT': 1605}, {'UMA': '029M', 'COUNT': 129}]
+===============================================
+
+===== DEBUG MATCH UMA =====
+SITE=BRC, TIM=<hidden>, DMU=506
+  UMA libellé patron = '018 Court-séjour gériatrique G1'
+  UMA_code = '018'  (type=HC)
+  base_m dans CSV = 30
+  base_c dans CSV = 518
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=BRC, TIM=<hidden>, DMU=506
+  UMA libellé patron = '029 Court-séjour gériatrique G2'
+  UMA_code = '029'  (type=HC)
+  base_m dans CSV = 44
+  base_c dans CSV = 750
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=BRC, TIM=<hidden>, DMU=506
+  UMA libellé patron = '029J Court-séjour gériatrique G2 HDJ'
+  UMA_code = '029J'  (type=HDJ)
+  base_m dans CSV = 335
+  base_c dans CSV = 3568
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=BRC, TIM=<hidden>, DMU=506
+  UMA libellé patron = '018 Court-séjour gériatrique G1'
+  UMA_code = '018'  (type=HC)
+  base_m dans CSV = 30
+  base_c dans CSV = 518
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=BRC, TIM=<hidden>, DMU=506
+  UMA libellé patron = '029 Court-séjour gériatrique G2'
+  UMA_code = '029'  (type=HC)
+  base_m dans CSV = 44
+  base_c dans CSV = 750
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=BRC, TIM=<hidden>, DMU=506
+  UMA libellé patron = '029J Court-séjour gériatrique G2 HDJ'
+  UMA_code = '029J'  (type=HDJ)
+  base_m dans CSV = 335
+  base_c dans CSV = 3568
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+====== DEBUG AFFECTATION DF_PATRON POUR SITE BRC ======
+Total RUM codés mois (df_patron)   = 74.0
+Total RUM codés cumulés (df_patron)= 1268.0
+Total RUM relancés mois (df_patron)   = 335.0
+Total RUM relancés cumulés (df_patron)= 3568.0
+Total assigned_m calculé           = 0.0
+Total assigned_c calculé           = 0.0
+==============================================================
+
+====== DEBUG SPOOL POUR SITE HTD ======
+df_m (mois) : nb lignes = 18 , somme COUNT = 628
+df_c (cumul) : nb lignes = 19 , somme COUNT = 7524
+Quelques UMA mois : [{'UMA': '010', 'COUNT': 54}, {'UMA': '011', 'COUNT': 22}, {'UMA': '013', 'COUNT': 43}, {'UMA': '150', 'COUNT': 74}, {'UMA': '150J', 'COUNT': 9}, {'UMA': '151J', 'COUNT': 90}, {'UMA': '204', 'COUNT': 17}, {'UMA': '205', 'COUNT': 1}, {'UMA': '206J', 'COUNT': 1}, {'UMA': '221J', 'COUNT': 115}]
+Quelques UMA cumul : [{'UMA': '010', 'COUNT': 688}, {'UMA': '011', 'COUNT': 518}, {'UMA': '013', 'COUNT': 522}, {'UMA': '150', 'COUNT': 768}, {'UMA': '150J', 'COUNT': 106}, {'UMA': '151J', 'COUNT': 1083}, {'UMA': '152J', 'COUNT': 191}, {'UMA': '203', 'COUNT': 1}, {'UMA': '204', 'COUNT': 336}, {'UMA': '205', 'COUNT': 2}]
+===============================================
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=504
+  UMA libellé patron = '010 Urgences médico-chirurgicales (UHTCD)'
+  UMA_code = '010'  (type=HC)
+  base_m dans CSV = 54
+  base_c dans CSV = 688
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=504
+  UMA libellé patron = '011 Unité MPA post UHCD'
+  UMA_code = '011'  (type=HC)
+  base_m dans CSV = 22
+  base_c dans CSV = 518
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=504
+  UMA libellé patron = '013 CUSCO - Urgences médico-judiciaires'
+  UMA_code = '013'  (type=HC)
+  base_m dans CSV = 43
+  base_c dans CSV = 522
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '152J HDJ PATHOLOGIES PROFESSIONNELLES ENV'
+  UMA_code = '152J'  (type=HDJ)
+  base_m dans CSV = 0
+  base_c dans CSV = 191
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '510J HDJ Dermato patho pro'
+  UMA_code = '510J'  (type=HDJ)
+  base_m dans CSV = 26
+  base_c dans CSV = 107
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=514
+  UMA libellé patron = '227J HDJ ESJ'
+  UMA_code = '227J'  (type=HDJ)
+  base_m dans CSV = 8
+  base_c dans CSV = 72
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=504
+  UMA libellé patron = '013 CUSCO - Urgences médico-judiciaires'
+  UMA_code = '013'  (type=HC)
+  base_m dans CSV = 43
+  base_c dans CSV = 522
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '230J Réhabilitation par le sport HDJ'
+  UMA_code = '230J'  (type=HDJ)
+  base_m dans CSV = 55
+  base_c dans CSV = 733
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '150 Centre du sommeil'
+  UMA_code = '150'  (type=HC)
+  base_m dans CSV = 74
+  base_c dans CSV = 768
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '150 Centre du sommeil'
+  UMA_code = '150'  (type=HC)
+  base_m dans CSV = 74
+  base_c dans CSV = 768
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 1
+  Lignes matching UMA_HDJ_code = 0
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '150J Centre du sommeil nuit HDJ'
+  UMA_code = '150J'  (type=HDJ)
+  base_m dans CSV = 9
+  base_c dans CSV = 106
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=505
+  UMA libellé patron = '151J Centre du sommeil jour HDJ'
+  UMA_code = '151J'  (type=HDJ)
+  base_m dans CSV = 90
+  base_c dans CSV = 1083
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=510
+  UMA libellé patron = '206J HDJ MAISON DES FEMMES'
+  UMA_code = '206J'  (type=HDJ)
+  base_m dans CSV = 1
+  base_c dans CSV = 29
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=514
+  UMA libellé patron = '500J HDJ CASPER EVAL'
+  UMA_code = '500J'  (type=HDJ)
+  base_m dans CSV = 32
+  base_c dans CSV = 343
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=514
+  UMA libellé patron = '501J HDJ CASPER REHAB MCO'
+  UMA_code = '501J'  (type=HDJ)
+  base_m dans CSV = 9
+  base_c dans CSV = 107
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=514
+  UMA libellé patron = '503J HDJ BILAN CASPER REH MCO'
+  UMA_code = '503J'  (type=HDJ)
+  base_m dans CSV = 2
+  base_c dans CSV = 23
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=514
+  UMA libellé patron = '221J HTA et PCV HDJ'
+  UMA_code = '221J'  (type=HDJ)
+  base_m dans CSV = 115
+  base_c dans CSV = 1289
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+===== DEBUG MATCH UMA =====
+SITE=HTD, TIM=<hidden>, DMU=514
+  UMA libellé patron = '222J Médecine spécialisée HDJ'
+  UMA_code = '222J'  (type=HDJ)
+  base_m dans CSV = 57
+  base_c dans CSV = 606
+  ✔ Correspondance trouvée dans CSV
+  Lignes matching UMA_HC_code = 0
+  Lignes matching UMA_HDJ_code = 1
+  ✔ Matching trouvé dans df_patron
+
+====== DEBUG AFFECTATION DF_PATRON POUR SITE HTD ======
+Total RUM codés mois (df_patron)   = 155.0
+Total RUM codés cumulés (df_patron)= 1893.0
+Total RUM relancés mois (df_patron)   = 379.0
+Total RUM relancés cumulés (df_patron)= 4411.0
+Total assigned_m calculé           = 0.0
+Total assigned_c calculé           = 0.0
+==============================================================
+
+====== DEBUG AVANT apply_uma_exceptions ======
+Total RUM codés mois global   = 4710.5
+Total RUM relancés mois global= 6484.0
+==============================================
+
+======= DEBUG APPLY_UMA_EXCEPTIONS =======
+Codes UMA HC présents dans df_patron (20 max) : ['080' '080S' '520' '520S' '' '018' '029' '112' '112S' '115' '310' '020'
+ '021' '103' '104' '037' '037S' '393' '010' '011']
+Codes UMA HDJ présents dans df_patron (20 max) : ['' '080J' '081J' '083J' '500J' '520J' '029J' '112C' '114C' '020J' '260J'
+ '500C' '501J' '037J' '152J' '510J' '227J' '071J' '073J' '230J']
+
+-- Vérification des UMA 150 HC sur HTD --
+                TIM SITE                 UMA HC  RUM codés mois
+71       Cliniciens  HTD  150 Centre du sommeil            37.0
+74  Olivier GARRIDO  HTD  150 Centre du sommeil            37.0
+[EXC 150 HTD] Lignes trouvées : 2
+ Somme mois=74.0, cumul=768.0
+
+-- Vérification des UMA 040X HC sur CCH --
+                 TIM SITE                   UMA HC  RUM codés mois
+93  Géraldine DANIEL  CCH  040X HDJ CHIMIOS GASTRO            43.0
+[EXC 040X CCH] Lignes impactées : 1
+
+-- Vérification des UMA 561C HDJ sur CCH --
+               TIM SITE                       UMA HDJ  RUM relancés mois
+126  Clara HEBRARD  CCH  561C UCA chir plastie et rec                7.0
+[EXC 561C CCH] Lignes impactées : 1
+
+-- Vérification des UMA 591C HDJ sur CCH --
+               TIM SITE                 UMA HDJ  RUM relancés mois
+127  Clara HEBRARD  CCH  591C Ophtalmologie HDJ              654.0
+[EXC 591C CCH] Lignes impactées : 1
+
+-- Vérification des UMA 591J HDJ sur CCH --
+               TIM SITE            UMA HDJ  RUM relancés mois
+128  Clara HEBRARD  CCH  591J HDJ BIRDSHOT              118.0
+[EXC 591J CCH] Lignes impactées : 1
+======= FIN APPLY_UMA_EXCEPTIONS =======
+
+====== DEBUG APRES apply_uma_exceptions ======
+Total RUM codés mois global   = 5481.5
+Total RUM relancés mois global= 5785.0
+==============================================
