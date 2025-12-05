@@ -1,150 +1,774 @@
-SITE: CCH, total base_m=1108, base_c=11820
- Exemples UMA : [('080', np.int64(46), np.int64(678)), ('080J', np.int64(161), np.int64(1826)), ('080S', np.int64(60), np.int64(649)), ('081J', np.int64(109), np.int64(999)), ('083J', np.int64(226), np.int64(2192))]
-SITE: BRC, total base_m=0, base_c=0
- Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=420, base_c=4897
- Exemples UMA : [('112', np.int64(230), np.int64(2865)), ('112C', np.int64(5), np.int64(76)), ('112S', np.int64(83), np.int64(866)), ('114C', np.int64(78), np.int64(754)), ('115', np.int64(24), np.int64(336))]
-SITE: BRC, total base_m=0, base_c=0
- Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=337, base_c=3951
- Exemples UMA : [('020', np.int64(5), np.int64(41)), ('020J', np.int64(201), np.int64(2408)), ('021', np.int64(96), np.int64(1162)), ('103', np.int64(17), np.int64(205)), ('104', np.int64(18), np.int64(135))]
-SITE: CCH, total base_m=334, base_c=3876
- Exemples UMA : [('103', np.int64(17), np.int64(205)), ('104', np.int64(18), np.int64(135)), ('260J', np.int64(36), np.int64(304)), ('500C', np.int64(4), np.int64(37)), ('501J', np.int64(50), np.int64(799))]
-SITE: HTD, total base_m=181, base_c=2661
- Exemples UMA : [('010', np.int64(88), np.int64(1495)), ('011', np.int64(93), np.int64(1166))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('013', np.int64(0), np.int64(0)), ('152J', np.int64(0), np.int64(0)), ('510J', np.int64(0), np.int64(0)), ('227J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=1084, base_c=14693
- Exemples UMA : [('340', np.int64(37), np.int64(642)), ('341', np.int64(53), np.int64(450)), ('540', np.int64(609), np.int64(7446)), ('543', np.int64(202), np.int64(4096)), ('071J', np.int64(158), np.int64(1722))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('013', np.int64(0), np.int64(0)), ('230J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=901, base_c=12634
- Exemples UMA : [('340', np.int64(37), np.int64(642)), ('341', np.int64(53), np.int64(450)), ('540', np.int64(609), np.int64(7446)), ('543', np.int64(202), np.int64(4096))]
-SITE: CCH, total base_m=844, base_c=8762
- Exemples UMA : [('384J', np.int64(73), np.int64(341)), ('022J', np.int64(47), np.int64(285)), ('022S', np.int64(6), np.int64(88)), ('150C', np.int64(23), np.int64(305)), ('150J', np.int64(21), np.int64(226))]
-SITE: CCH, total base_m=354, base_c=5527
- Exemples UMA : [('060', np.int64(133), np.int64(1660)), ('060J', np.int64(108), np.int64(1157)), ('060S', np.int64(75), np.int64(907)), ('061J', np.int64(3), np.int64(678)), ('062C', np.int64(0), np.int64(10))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('150', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=113, base_c=1456
- Exemples UMA : [('071', np.int64(36), np.int64(613)), ('071S', np.int64(77), np.int64(843))]
-SITE: HTD, total base_m=204, base_c=2219
- Exemples UMA : [('150', np.int64(0), np.int64(0)), ('150J', np.int64(21), np.int64(226)), ('151J', np.int64(0), np.int64(0)), ('206J', np.int64(0), np.int64(0)), ('500J', np.int64(133), np.int64(1194))]
-SITE: CCH, total base_m=451, base_c=4639
- Exemples UMA : [('600', np.int64(5), np.int64(150)), ('600J', np.int64(136), np.int64(1259)), ('070', np.int64(113), np.int64(1267)), ('070J', np.int64(184), np.int64(1822)), ('072J', np.int64(13), np.int64(141))]
-SITE: CCH, total base_m=351, base_c=4625
- Exemples UMA : [('010', np.int64(88), np.int64(1495)), ('010J', np.int64(193), np.int64(2357)), ('010S', np.int64(70), np.int64(773))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('221J', np.int64(0), np.int64(0)), ('222J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=1722, base_c=19300
- Exemples UMA : [('011', np.int64(93), np.int64(1166)), ('011J', np.int64(654), np.int64(7459)), ('040C', np.int64(330), np.int64(3641)), ('040J', np.int64(108), np.int64(1199)), ('040S', np.int64(142), np.int64(1517))]
-SITE: CCH, total base_m=370, base_c=4381
- Exemples UMA : [('040', np.int64(27), np.int64(498)), ('040S', np.int64(142), np.int64(1517)), ('041', np.int64(201), np.int64(2366))]
-SITE: CCH, total base_m=314, base_c=3900
- Exemples UMA : [('270', np.int64(165), np.int64(1720)), ('270S', np.int64(52), np.int64(891)), ('450', np.int64(45), np.int64(622)), ('451', np.int64(25), np.int64(264)), ('670', np.int64(27), np.int64(403))]
-SITE: CCH, total base_m=908, base_c=10708
- Exemples UMA : [('090', np.int64(66), np.int64(878)), ('090J', np.int64(31), np.int64(467)), ('091', np.int64(16), np.int64(396)), ('092', np.int64(18), np.int64(424)), ('140', np.int64(154), np.int64(1869))]
-SITE: CCH, total base_m=949, base_c=11449
- Exemples UMA : [('130', np.int64(949), np.int64(11449))]
-SITE: CCH, total base_m=1911, base_c=20777
- Exemples UMA : [('130', np.int64(949), np.int64(11449)), ('130J', np.int64(98), np.int64(1245)), ('143C', np.int64(0), np.int64(1)), ('561C', np.int64(7), np.int64(62)), ('591', np.int64(85), np.int64(863))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('080', np.int64(0), np.int64(0)), ('080J', np.int64(0), np.int64(0)), ('080S', np.int64(0), np.int64(0)), ('081J', np.int64(0), np.int64(0)), ('083J', np.int64(0), np.int64(0))]
-SITE: BRC, total base_m=409, base_c=4836
- Exemples UMA : [('018', np.int64(30), np.int64(518)), ('029', np.int64(44), np.int64(750)), ('029J', np.int64(335), np.int64(3568))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('112', np.int64(0), np.int64(0)), ('112C', np.int64(0), np.int64(0)), ('112S', np.int64(0), np.int64(0)), ('114C', np.int64(0), np.int64(0)), ('115', np.int64(0), np.int64(0))]
-SITE: BRC, total base_m=409, base_c=4836
- Exemples UMA : [('018', np.int64(30), np.int64(518)), ('029', np.int64(44), np.int64(750)), ('029J', np.int64(335), np.int64(3568))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('020', np.int64(0), np.int64(0)), ('020J', np.int64(0), np.int64(0)), ('021', np.int64(0), np.int64(0)), ('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0)), ('260J', np.int64(0), np.int64(0)), ('500C', np.int64(0), np.int64(0)), ('501J', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('010', np.int64(0), np.int64(0)), ('011', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('013', np.int64(0), np.int64(0)), ('152J', np.int64(0), np.int64(0)), ('510J', np.int64(0), np.int64(0)), ('227J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0)), ('071J', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('013', np.int64(0), np.int64(0)), ('230J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('384J', np.int64(0), np.int64(0)), ('022J', np.int64(0), np.int64(0)), ('022S', np.int64(0), np.int64(0)), ('150C', np.int64(0), np.int64(0)), ('150J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('060', np.int64(0), np.int64(0)), ('060J', np.int64(0), np.int64(0)), ('060S', np.int64(0), np.int64(0)), ('061J', np.int64(0), np.int64(0)), ('062C', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('150', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('071', np.int64(0), np.int64(0)), ('071S', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('150', np.int64(0), np.int64(0)), ('150J', np.int64(0), np.int64(0)), ('151J', np.int64(0), np.int64(0)), ('206J', np.int64(0), np.int64(0)), ('500J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('600', np.int64(0), np.int64(0)), ('600J', np.int64(0), np.int64(0)), ('070', np.int64(0), np.int64(0)), ('070J', np.int64(0), np.int64(0)), ('072J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('010', np.int64(0), np.int64(0)), ('010J', np.int64(0), np.int64(0)), ('010S', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=0, base_c=0
- Exemples UMA : [('221J', np.int64(0), np.int64(0)), ('222J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('011', np.int64(0), np.int64(0)), ('011J', np.int64(0), np.int64(0)), ('040C', np.int64(0), np.int64(0)), ('040J', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('040', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0)), ('041', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('270', np.int64(0), np.int64(0)), ('270S', np.int64(0), np.int64(0)), ('450', np.int64(0), np.int64(0)), ('451', np.int64(0), np.int64(0)), ('670', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('090', np.int64(0), np.int64(0)), ('090J', np.int64(0), np.int64(0)), ('091', np.int64(0), np.int64(0)), ('092', np.int64(0), np.int64(0)), ('140', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('130', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('130', np.int64(0), np.int64(0)), ('130J', np.int64(0), np.int64(0)), ('143C', np.int64(0), np.int64(0)), ('561C', np.int64(0), np.int64(0)), ('591', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=32, base_c=343
- Exemples UMA : [('080', np.int64(0), np.int64(0)), ('080J', np.int64(0), np.int64(0)), ('080S', np.int64(0), np.int64(0)), ('081J', np.int64(0), np.int64(0)), ('083J', np.int64(0), np.int64(0))]
-SITE: BRC, total base_m=0, base_c=0
- Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('112', np.int64(0), np.int64(0)), ('112C', np.int64(0), np.int64(0)), ('112S', np.int64(0), np.int64(0)), ('114C', np.int64(0), np.int64(0)), ('115', np.int64(0), np.int64(0))]
-SITE: BRC, total base_m=0, base_c=0
- Exemples UMA : [('018', np.int64(0), np.int64(0)), ('029', np.int64(0), np.int64(0)), ('029J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('020', np.int64(0), np.int64(0)), ('020J', np.int64(0), np.int64(0)), ('021', np.int64(0), np.int64(0)), ('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=9, base_c=107
- Exemples UMA : [('103', np.int64(0), np.int64(0)), ('104', np.int64(0), np.int64(0)), ('260J', np.int64(0), np.int64(0)), ('500C', np.int64(0), np.int64(0)), ('501J', np.int64(9), np.int64(107))]
-SITE: HTD, total base_m=76, base_c=1206
- Exemples UMA : [('010', np.int64(54), np.int64(688)), ('011', np.int64(22), np.int64(518))]
-SITE: HTD, total base_m=77, base_c=892
- Exemples UMA : [('013', np.int64(43), np.int64(522)), ('152J', np.int64(0), np.int64(191)), ('510J', np.int64(26), np.int64(107)), ('227J', np.int64(8), np.int64(72))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0)), ('071J', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=98, base_c=1255
- Exemples UMA : [('013', np.int64(43), np.int64(522)), ('230J', np.int64(55), np.int64(733))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('340', np.int64(0), np.int64(0)), ('341', np.int64(0), np.int64(0)), ('540', np.int64(0), np.int64(0)), ('543', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=9, base_c=106
- Exemples UMA : [('384J', np.int64(0), np.int64(0)), ('022J', np.int64(0), np.int64(0)), ('022S', np.int64(0), np.int64(0)), ('150C', np.int64(0), np.int64(0)), ('150J', np.int64(9), np.int64(106))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('060', np.int64(0), np.int64(0)), ('060J', np.int64(0), np.int64(0)), ('060S', np.int64(0), np.int64(0)), ('061J', np.int64(0), np.int64(0)), ('062C', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=74, base_c=768
- Exemples UMA : [('150', np.int64(74), np.int64(768))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('071', np.int64(0), np.int64(0)), ('071S', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=217, base_c=2459
- Exemples UMA : [('150', np.int64(74), np.int64(768)), ('150J', np.int64(9), np.int64(106)), ('151J', np.int64(90), np.int64(1083)), ('206J', np.int64(1), np.int64(29)), ('500J', np.int64(32), np.int64(343))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('600', np.int64(0), np.int64(0)), ('600J', np.int64(0), np.int64(0)), ('070', np.int64(0), np.int64(0)), ('070J', np.int64(0), np.int64(0)), ('072J', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=54, base_c=688
- Exemples UMA : [('010', np.int64(54), np.int64(688)), ('010J', np.int64(0), np.int64(0)), ('010S', np.int64(0), np.int64(0))]
-SITE: HTD, total base_m=172, base_c=1895
- Exemples UMA : [('221J', np.int64(115), np.int64(1289)), ('222J', np.int64(57), np.int64(606))]
-SITE: CCH, total base_m=22, base_c=518
- Exemples UMA : [('011', np.int64(22), np.int64(518)), ('011J', np.int64(0), np.int64(0)), ('040C', np.int64(0), np.int64(0)), ('040J', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('040', np.int64(0), np.int64(0)), ('040S', np.int64(0), np.int64(0)), ('041', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('270', np.int64(0), np.int64(0)), ('270S', np.int64(0), np.int64(0)), ('450', np.int64(0), np.int64(0)), ('451', np.int64(0), np.int64(0)), ('670', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('090', np.int64(0), np.int64(0)), ('090J', np.int64(0), np.int64(0)), ('091', np.int64(0), np.int64(0)), ('092', np.int64(0), np.int64(0)), ('140', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('130', np.int64(0), np.int64(0))]
-SITE: CCH, total base_m=0, base_c=0
- Exemples UMA : [('130', np.int64(0), np.int64(0)), ('130J', np.int64(0), np.int64(0)), ('143C', np.int64(0), np.int64(0)), ('561C', np.int64(0), np.int64(0)), ('591', np.int64(0), np.int64(0))]
+Avant filtre : SITE=CCH, UMA=080, base_m=46, base_c=678
+Après filtre : SITE=CCH, UMA=080, base_m=46, base_c=678
+Avant filtre : SITE=CCH, UMA=080J, base_m=161, base_c=1826
+Après filtre : SITE=CCH, UMA=080J, base_m=161, base_c=1826
+Avant filtre : SITE=CCH, UMA=080S, base_m=60, base_c=649
+Après filtre : SITE=CCH, UMA=080S, base_m=60, base_c=649
+Avant filtre : SITE=CCH, UMA=081J, base_m=109, base_c=999
+Après filtre : SITE=CCH, UMA=081J, base_m=109, base_c=999
+Avant filtre : SITE=CCH, UMA=083J, base_m=226, base_c=2192
+Après filtre : SITE=CCH, UMA=083J, base_m=226, base_c=2192
+Avant filtre : SITE=CCH, UMA=500J, base_m=133, base_c=1194
+Après filtre : SITE=CCH, UMA=500J, base_m=133, base_c=1194
+Avant filtre : SITE=CCH, UMA=520, base_m=57, base_c=620
+Après filtre : SITE=CCH, UMA=520, base_m=57, base_c=620
+Avant filtre : SITE=CCH, UMA=520J, base_m=292, base_c=3406
+Après filtre : SITE=CCH, UMA=520J, base_m=292, base_c=3406
+Avant filtre : SITE=CCH, UMA=520S, base_m=24, base_c=256
+Après filtre : SITE=CCH, UMA=520S, base_m=24, base_c=256
+Avant filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=112, base_m=230, base_c=2865
+Après filtre : SITE=CCH, UMA=112, base_m=230, base_c=2865
+Avant filtre : SITE=CCH, UMA=112C, base_m=5, base_c=76
+Après filtre : SITE=CCH, UMA=112C, base_m=5, base_c=76
+Avant filtre : SITE=CCH, UMA=112S, base_m=83, base_c=866
+Après filtre : SITE=CCH, UMA=112S, base_m=83, base_c=866
+Avant filtre : SITE=CCH, UMA=114C, base_m=78, base_c=754
+Après filtre : SITE=CCH, UMA=114C, base_m=78, base_c=754
+Avant filtre : SITE=CCH, UMA=115, base_m=24, base_c=336
+Après filtre : SITE=CCH, UMA=115, base_m=24, base_c=336
+Avant filtre : SITE=CCH, UMA=310, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=310, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=020, base_m=5, base_c=41
+Après filtre : SITE=CCH, UMA=020, base_m=5, base_c=41
+Avant filtre : SITE=CCH, UMA=020J, base_m=201, base_c=2408
+Après filtre : SITE=CCH, UMA=020J, base_m=201, base_c=2408
+Avant filtre : SITE=CCH, UMA=021, base_m=96, base_c=1162
+Après filtre : SITE=CCH, UMA=021, base_m=96, base_c=1162
+Avant filtre : SITE=CCH, UMA=103, base_m=17, base_c=205
+Après filtre : SITE=CCH, UMA=103, base_m=17, base_c=205
+Avant filtre : SITE=CCH, UMA=104, base_m=18, base_c=135
+Après filtre : SITE=CCH, UMA=104, base_m=18, base_c=135
+Avant filtre : SITE=CCH, UMA=103, base_m=17, base_c=205
+Après filtre : SITE=CCH, UMA=103, base_m=17, base_c=205
+Avant filtre : SITE=CCH, UMA=104, base_m=18, base_c=135
+Après filtre : SITE=CCH, UMA=104, base_m=18, base_c=135
+Avant filtre : SITE=CCH, UMA=260J, base_m=36, base_c=304
+Après filtre : SITE=CCH, UMA=260J, base_m=36, base_c=304
+Avant filtre : SITE=CCH, UMA=500C, base_m=4, base_c=37
+Après filtre : SITE=CCH, UMA=500C, base_m=4, base_c=37
+Avant filtre : SITE=CCH, UMA=501J, base_m=50, base_c=799
+Après filtre : SITE=CCH, UMA=501J, base_m=50, base_c=799
+Avant filtre : SITE=CCH, UMA=037, base_m=132, base_c=1437
+Après filtre : SITE=CCH, UMA=037, base_m=132, base_c=1437
+Avant filtre : SITE=CCH, UMA=037J, base_m=26, base_c=309
+Après filtre : SITE=CCH, UMA=037J, base_m=26, base_c=309
+Avant filtre : SITE=CCH, UMA=037S, base_m=28, base_c=295
+Après filtre : SITE=CCH, UMA=037S, base_m=28, base_c=295
+Avant filtre : SITE=CCH, UMA=393, base_m=23, base_c=355
+Après filtre : SITE=CCH, UMA=393, base_m=23, base_c=355
+Avant filtre : SITE=HTD, UMA=010, base_m=88, base_c=1495
+Après filtre : SITE=HTD, UMA=010, base_m=88, base_c=1495
+Avant filtre : SITE=HTD, UMA=011, base_m=93, base_c=1166
+Après filtre : SITE=HTD, UMA=011, base_m=93, base_c=1166
+Avant filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=152J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=152J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=510J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=510J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=227J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=227J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=340, base_m=37, base_c=642
+Après filtre : SITE=CCH, UMA=340, base_m=37, base_c=642
+Avant filtre : SITE=CCH, UMA=341, base_m=53, base_c=450
+Après filtre : SITE=CCH, UMA=341, base_m=53, base_c=450
+Avant filtre : SITE=CCH, UMA=540, base_m=609, base_c=7446
+Après filtre : SITE=CCH, UMA=540, base_m=609, base_c=7446
+Avant filtre : SITE=CCH, UMA=543, base_m=202, base_c=4096
+Après filtre : SITE=CCH, UMA=543, base_m=202, base_c=4096
+Avant filtre : SITE=CCH, UMA=071J, base_m=158, base_c=1722
+Après filtre : SITE=CCH, UMA=071J, base_m=158, base_c=1722
+Avant filtre : SITE=CCH, UMA=073J, base_m=25, base_c=337
+Après filtre : SITE=CCH, UMA=073J, base_m=25, base_c=337
+Avant filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=230J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=230J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=340, base_m=37, base_c=642
+Après filtre : SITE=CCH, UMA=340, base_m=37, base_c=642
+Avant filtre : SITE=CCH, UMA=341, base_m=53, base_c=450
+Après filtre : SITE=CCH, UMA=341, base_m=53, base_c=450
+Avant filtre : SITE=CCH, UMA=540, base_m=609, base_c=7446
+Après filtre : SITE=CCH, UMA=540, base_m=609, base_c=7446
+Avant filtre : SITE=CCH, UMA=543, base_m=202, base_c=4096
+Après filtre : SITE=CCH, UMA=543, base_m=202, base_c=4096
+Avant filtre : SITE=CCH, UMA=384J, base_m=73, base_c=341
+Après filtre : SITE=CCH, UMA=384J, base_m=73, base_c=341
+Avant filtre : SITE=CCH, UMA=022J, base_m=47, base_c=285
+Après filtre : SITE=CCH, UMA=022J, base_m=47, base_c=285
+Avant filtre : SITE=CCH, UMA=022S, base_m=6, base_c=88
+Après filtre : SITE=CCH, UMA=022S, base_m=6, base_c=88
+Avant filtre : SITE=CCH, UMA=150C, base_m=23, base_c=305
+Après filtre : SITE=CCH, UMA=150C, base_m=23, base_c=305
+Avant filtre : SITE=CCH, UMA=150J, base_m=21, base_c=226
+Après filtre : SITE=CCH, UMA=150J, base_m=21, base_c=226
+Avant filtre : SITE=CCH, UMA=320J, base_m=30, base_c=175
+Après filtre : SITE=CCH, UMA=320J, base_m=30, base_c=175
+Avant filtre : SITE=CCH, UMA=270J, base_m=27, base_c=251
+Après filtre : SITE=CCH, UMA=270J, base_m=27, base_c=251
+Avant filtre : SITE=CCH, UMA=271C, base_m=110, base_c=1075
+Après filtre : SITE=CCH, UMA=271C, base_m=110, base_c=1075
+Avant filtre : SITE=CCH, UMA=410C, base_m=43, base_c=481
+Après filtre : SITE=CCH, UMA=410C, base_m=43, base_c=481
+Avant filtre : SITE=CCH, UMA=450J, base_m=434, base_c=5031
+Après filtre : SITE=CCH, UMA=450J, base_m=434, base_c=5031
+Avant filtre : SITE=CCH, UMA=670J, base_m=30, base_c=504
+Après filtre : SITE=CCH, UMA=670J, base_m=30, base_c=504
+Avant filtre : SITE=CCH, UMA=060, base_m=133, base_c=1660
+Après filtre : SITE=CCH, UMA=060, base_m=133, base_c=1660
+Avant filtre : SITE=CCH, UMA=060J, base_m=108, base_c=1157
+Après filtre : SITE=CCH, UMA=060J, base_m=108, base_c=1157
+Avant filtre : SITE=CCH, UMA=060S, base_m=75, base_c=907
+Après filtre : SITE=CCH, UMA=060S, base_m=75, base_c=907
+Avant filtre : SITE=CCH, UMA=061J, base_m=3, base_c=678
+Après filtre : SITE=CCH, UMA=061J, base_m=3, base_c=678
+Avant filtre : SITE=CCH, UMA=062C, base_m=0, base_c=10
+Après filtre : SITE=CCH, UMA=062C, base_m=0, base_c=10
+Avant filtre : SITE=CCH, UMA=062J, base_m=3, base_c=720
+Après filtre : SITE=CCH, UMA=062J, base_m=3, base_c=720
+Avant filtre : SITE=CCH, UMA=063J, base_m=32, base_c=395
+Après filtre : SITE=CCH, UMA=063J, base_m=32, base_c=395
+Avant filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=071, base_m=36, base_c=613
+Après filtre : SITE=CCH, UMA=071, base_m=36, base_c=613
+Avant filtre : SITE=CCH, UMA=071S, base_m=77, base_c=843
+Après filtre : SITE=CCH, UMA=071S, base_m=77, base_c=843
+Avant filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=150J, base_m=21, base_c=226
+Après filtre : SITE=HTD, UMA=150J, base_m=21, base_c=226
+Avant filtre : SITE=HTD, UMA=151J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=151J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=206J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=206J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=500J, base_m=133, base_c=1194
+Après filtre : SITE=HTD, UMA=500J, base_m=133, base_c=1194
+Avant filtre : SITE=HTD, UMA=501J, base_m=50, base_c=799
+Après filtre : SITE=HTD, UMA=501J, base_m=50, base_c=799
+Avant filtre : SITE=HTD, UMA=503J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=503J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=600, base_m=5, base_c=150
+Après filtre : SITE=CCH, UMA=600, base_m=5, base_c=150
+Avant filtre : SITE=CCH, UMA=600J, base_m=136, base_c=1259
+Après filtre : SITE=CCH, UMA=600J, base_m=136, base_c=1259
+Avant filtre : SITE=CCH, UMA=070, base_m=113, base_c=1267
+Après filtre : SITE=CCH, UMA=070, base_m=113, base_c=1267
+Avant filtre : SITE=CCH, UMA=070J, base_m=184, base_c=1822
+Après filtre : SITE=CCH, UMA=070J, base_m=184, base_c=1822
+Avant filtre : SITE=CCH, UMA=072J, base_m=13, base_c=141
+Après filtre : SITE=CCH, UMA=072J, base_m=13, base_c=141
+Avant filtre : SITE=CCH, UMA=010, base_m=88, base_c=1495
+Après filtre : SITE=CCH, UMA=010, base_m=88, base_c=1495
+Avant filtre : SITE=CCH, UMA=010J, base_m=193, base_c=2357
+Après filtre : SITE=CCH, UMA=010J, base_m=193, base_c=2357
+Avant filtre : SITE=CCH, UMA=010S, base_m=70, base_c=773
+Après filtre : SITE=CCH, UMA=010S, base_m=70, base_c=773
+Avant filtre : SITE=HTD, UMA=221J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=221J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=222J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=222J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=011, base_m=93, base_c=1166
+Après filtre : SITE=CCH, UMA=011, base_m=93, base_c=1166
+Avant filtre : SITE=CCH, UMA=011J, base_m=654, base_c=7459
+Après filtre : SITE=CCH, UMA=011J, base_m=654, base_c=7459
+Avant filtre : SITE=CCH, UMA=040C, base_m=330, base_c=3641
+Après filtre : SITE=CCH, UMA=040C, base_m=330, base_c=3641
+Avant filtre : SITE=CCH, UMA=040J, base_m=108, base_c=1199
+Après filtre : SITE=CCH, UMA=040J, base_m=108, base_c=1199
+Avant filtre : SITE=CCH, UMA=040S, base_m=142, base_c=1517
+Après filtre : SITE=CCH, UMA=040S, base_m=142, base_c=1517
+Avant filtre : SITE=CCH, UMA=040X, base_m=43, base_c=446
+Après filtre : SITE=CCH, UMA=040X, base_m=43, base_c=446
+Avant filtre : SITE=CCH, UMA=041J, base_m=0, base_c=1
+Après filtre : SITE=CCH, UMA=041J, base_m=0, base_c=1
+Avant filtre : SITE=CCH, UMA=160, base_m=48, base_c=540
+Après filtre : SITE=CCH, UMA=160, base_m=48, base_c=540
+Avant filtre : SITE=CCH, UMA=161J, base_m=207, base_c=2480
+Après filtre : SITE=CCH, UMA=161J, base_m=207, base_c=2480
+Avant filtre : SITE=CCH, UMA=162C, base_m=97, base_c=851
+Après filtre : SITE=CCH, UMA=162C, base_m=97, base_c=851
+Avant filtre : SITE=CCH, UMA=040, base_m=27, base_c=498
+Après filtre : SITE=CCH, UMA=040, base_m=27, base_c=498
+Avant filtre : SITE=CCH, UMA=040S, base_m=142, base_c=1517
+Après filtre : SITE=CCH, UMA=040S, base_m=142, base_c=1517
+Avant filtre : SITE=CCH, UMA=041, base_m=201, base_c=2366
+Après filtre : SITE=CCH, UMA=041, base_m=201, base_c=2366
+Avant filtre : SITE=CCH, UMA=270, base_m=165, base_c=1720
+Après filtre : SITE=CCH, UMA=270, base_m=165, base_c=1720
+Avant filtre : SITE=CCH, UMA=270S, base_m=52, base_c=891
+Après filtre : SITE=CCH, UMA=270S, base_m=52, base_c=891
+Avant filtre : SITE=CCH, UMA=450, base_m=45, base_c=622
+Après filtre : SITE=CCH, UMA=450, base_m=45, base_c=622
+Avant filtre : SITE=CCH, UMA=451, base_m=25, base_c=264
+Après filtre : SITE=CCH, UMA=451, base_m=25, base_c=264
+Avant filtre : SITE=CCH, UMA=670, base_m=27, base_c=403
+Après filtre : SITE=CCH, UMA=670, base_m=27, base_c=403
+Avant filtre : SITE=CCH, UMA=090, base_m=66, base_c=878
+Après filtre : SITE=CCH, UMA=090, base_m=66, base_c=878
+Avant filtre : SITE=CCH, UMA=090J, base_m=31, base_c=467
+Après filtre : SITE=CCH, UMA=090J, base_m=31, base_c=467
+Avant filtre : SITE=CCH, UMA=091, base_m=16, base_c=396
+Après filtre : SITE=CCH, UMA=091, base_m=16, base_c=396
+Avant filtre : SITE=CCH, UMA=092, base_m=18, base_c=424
+Après filtre : SITE=CCH, UMA=092, base_m=18, base_c=424
+Avant filtre : SITE=CCH, UMA=140, base_m=154, base_c=1869
+Après filtre : SITE=CCH, UMA=140, base_m=154, base_c=1869
+Avant filtre : SITE=CCH, UMA=140C, base_m=153, base_c=1557
+Après filtre : SITE=CCH, UMA=140C, base_m=153, base_c=1557
+Avant filtre : SITE=CCH, UMA=140J, base_m=110, base_c=1341
+Après filtre : SITE=CCH, UMA=140J, base_m=110, base_c=1341
+Avant filtre : SITE=CCH, UMA=140S, base_m=69, base_c=1059
+Après filtre : SITE=CCH, UMA=140S, base_m=69, base_c=1059
+Avant filtre : SITE=CCH, UMA=141J, base_m=198, base_c=1945
+Après filtre : SITE=CCH, UMA=141J, base_m=198, base_c=1945
+Avant filtre : SITE=CCH, UMA=142J, base_m=30, base_c=384
+Après filtre : SITE=CCH, UMA=142J, base_m=30, base_c=384
+Avant filtre : SITE=CCH, UMA=143J, base_m=46, base_c=240
+Après filtre : SITE=CCH, UMA=143J, base_m=46, base_c=240
+Avant filtre : SITE=CCH, UMA=146J, base_m=17, base_c=148
+Après filtre : SITE=CCH, UMA=146J, base_m=17, base_c=148
+Avant filtre : SITE=CCH, UMA=130, base_m=949, base_c=11449
+Après filtre : SITE=CCH, UMA=130, base_m=949, base_c=11449
+Avant filtre : SITE=CCH, UMA=130, base_m=949, base_c=11449
+Après filtre : SITE=CCH, UMA=130, base_m=949, base_c=11449
+Avant filtre : SITE=CCH, UMA=130J, base_m=98, base_c=1245
+Après filtre : SITE=CCH, UMA=130J, base_m=98, base_c=1245
+Avant filtre : SITE=CCH, UMA=143C, base_m=0, base_c=1
+Après filtre : SITE=CCH, UMA=143C, base_m=0, base_c=1
+Avant filtre : SITE=CCH, UMA=561C, base_m=7, base_c=62
+Après filtre : SITE=CCH, UMA=561C, base_m=7, base_c=62
+Avant filtre : SITE=CCH, UMA=591, base_m=85, base_c=863
+Après filtre : SITE=CCH, UMA=591, base_m=85, base_c=863
+Avant filtre : SITE=CCH, UMA=591C, base_m=654, base_c=6918
+Après filtre : SITE=CCH, UMA=591C, base_m=654, base_c=6918
+Avant filtre : SITE=CCH, UMA=591J, base_m=118, base_c=239
+Après filtre : SITE=CCH, UMA=591J, base_m=118, base_c=239
+Avant filtre : SITE=CCH, UMA=080, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=080, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=080J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=080J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=080S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=080S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=081J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=081J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=083J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=083J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=500J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=500J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=520, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=520, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=520J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=520J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=520S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=520S, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=018, base_m=30, base_c=518
+Après filtre : SITE=BRC, UMA=018, base_m=30, base_c=518
+Avant filtre : SITE=BRC, UMA=029, base_m=44, base_c=750
+Après filtre : SITE=BRC, UMA=029, base_m=44, base_c=750
+Avant filtre : SITE=BRC, UMA=029J, base_m=335, base_c=3568
+Après filtre : SITE=BRC, UMA=029J, base_m=335, base_c=3568
+Avant filtre : SITE=CCH, UMA=112, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=112, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=112C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=112C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=112S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=112S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=114C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=114C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=115, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=115, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=310, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=310, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=018, base_m=30, base_c=518
+Après filtre : SITE=BRC, UMA=018, base_m=30, base_c=518
+Avant filtre : SITE=BRC, UMA=029, base_m=44, base_c=750
+Après filtre : SITE=BRC, UMA=029, base_m=44, base_c=750
+Avant filtre : SITE=BRC, UMA=029J, base_m=335, base_c=3568
+Après filtre : SITE=BRC, UMA=029J, base_m=335, base_c=3568
+Avant filtre : SITE=CCH, UMA=020, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=020, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=020J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=020J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=021, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=021, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=260J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=260J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=500C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=500C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=501J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=501J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=037, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=037, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=037J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=037J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=037S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=037S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=393, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=393, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=010, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=010, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=011, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=011, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=152J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=152J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=510J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=510J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=227J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=227J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=071J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=071J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=073J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=073J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=013, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=230J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=230J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=384J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=384J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=022J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=022J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=022S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=022S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=150C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=150C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=150J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=150J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=320J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=320J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=270J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=270J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=271C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=271C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=410C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=410C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=450J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=450J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=670J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=670J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=060, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=060, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=060J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=060J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=060S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=060S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=061J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=061J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=062C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=062C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=062J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=062J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=063J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=063J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=071, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=071, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=071S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=071S, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=150, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=150J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=150J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=151J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=151J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=206J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=206J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=500J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=500J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=501J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=501J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=503J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=503J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=600, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=600, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=600J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=600J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=070, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=070, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=070J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=070J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=072J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=072J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=010, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=010, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=010J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=010J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=010S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=010S, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=221J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=221J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=222J, base_m=0, base_c=0
+Après filtre : SITE=HTD, UMA=222J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=011, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=011, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=011J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=011J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040X, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040X, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=041J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=041J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=160, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=160, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=161J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=161J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=162C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=162C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=041, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=041, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=270, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=270, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=270S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=270S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=450, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=450, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=451, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=451, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=670, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=670, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=090, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=090, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=090J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=090J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=091, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=091, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=092, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=092, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=141J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=141J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=142J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=142J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=143J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=143J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=146J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=146J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=130J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=130J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=143C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=143C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=561C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=561C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=591, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=591, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=591C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=591C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=591J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=591J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=080, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=080, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=080J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=080J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=080S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=080S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=081J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=081J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=083J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=083J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=500J, base_m=32, base_c=343
+Après filtre : SITE=CCH, UMA=500J, base_m=32, base_c=343
+Avant filtre : SITE=CCH, UMA=520, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=520, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=520J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=520J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=520S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=520S, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=112, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=112, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=112C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=112C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=112S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=112S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=114C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=114C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=115, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=115, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=310, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=310, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=018, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029, base_m=0, base_c=0
+Avant filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Après filtre : SITE=BRC, UMA=029J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=020, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=020, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=020J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=020J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=021, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=021, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=103, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=104, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=260J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=260J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=500C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=500C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=501J, base_m=9, base_c=107
+Après filtre : SITE=CCH, UMA=501J, base_m=9, base_c=107
+Avant filtre : SITE=CCH, UMA=037, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=037, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=037J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=037J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=037S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=037S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=393, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=393, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=010, base_m=54, base_c=688
+Après filtre : SITE=HTD, UMA=010, base_m=54, base_c=688
+Avant filtre : SITE=HTD, UMA=011, base_m=22, base_c=518
+Après filtre : SITE=HTD, UMA=011, base_m=22, base_c=518
+Avant filtre : SITE=HTD, UMA=013, base_m=43, base_c=522
+Après filtre : SITE=HTD, UMA=013, base_m=43, base_c=522
+Avant filtre : SITE=HTD, UMA=152J, base_m=0, base_c=191
+Après filtre : SITE=HTD, UMA=152J, base_m=0, base_c=191
+Avant filtre : SITE=HTD, UMA=510J, base_m=26, base_c=107
+Après filtre : SITE=HTD, UMA=510J, base_m=26, base_c=107
+Avant filtre : SITE=HTD, UMA=227J, base_m=8, base_c=72
+Après filtre : SITE=HTD, UMA=227J, base_m=8, base_c=72
+Avant filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=071J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=071J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=073J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=073J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=013, base_m=43, base_c=522
+Après filtre : SITE=HTD, UMA=013, base_m=43, base_c=522
+Avant filtre : SITE=HTD, UMA=230J, base_m=55, base_c=733
+Après filtre : SITE=HTD, UMA=230J, base_m=55, base_c=733
+Avant filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=340, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=341, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=540, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=543, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=384J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=384J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=022J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=022J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=022S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=022S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=150C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=150C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=150J, base_m=9, base_c=106
+Après filtre : SITE=CCH, UMA=150J, base_m=9, base_c=106
+Avant filtre : SITE=CCH, UMA=320J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=320J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=270J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=270J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=271C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=271C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=410C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=410C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=450J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=450J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=670J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=670J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=060, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=060, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=060J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=060J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=060S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=060S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=061J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=061J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=062C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=062C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=062J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=062J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=063J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=063J, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=150, base_m=74, base_c=768
+Après filtre : SITE=HTD, UMA=150, base_m=74, base_c=768
+Avant filtre : SITE=CCH, UMA=071, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=071, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=071S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=071S, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=150, base_m=74, base_c=768
+Après filtre : SITE=HTD, UMA=150, base_m=74, base_c=768
+Avant filtre : SITE=HTD, UMA=150J, base_m=9, base_c=106
+Après filtre : SITE=HTD, UMA=150J, base_m=9, base_c=106
+Avant filtre : SITE=HTD, UMA=151J, base_m=90, base_c=1083
+Après filtre : SITE=HTD, UMA=151J, base_m=90, base_c=1083
+Avant filtre : SITE=HTD, UMA=206J, base_m=1, base_c=29
+Après filtre : SITE=HTD, UMA=206J, base_m=1, base_c=29
+Avant filtre : SITE=HTD, UMA=500J, base_m=32, base_c=343
+Après filtre : SITE=HTD, UMA=500J, base_m=32, base_c=343
+Avant filtre : SITE=HTD, UMA=501J, base_m=9, base_c=107
+Après filtre : SITE=HTD, UMA=501J, base_m=9, base_c=107
+Avant filtre : SITE=HTD, UMA=503J, base_m=2, base_c=23
+Après filtre : SITE=HTD, UMA=503J, base_m=2, base_c=23
+Avant filtre : SITE=CCH, UMA=600, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=600, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=600J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=600J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=070, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=070, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=070J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=070J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=072J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=072J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=010, base_m=54, base_c=688
+Après filtre : SITE=CCH, UMA=010, base_m=54, base_c=688
+Avant filtre : SITE=CCH, UMA=010J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=010J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=010S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=010S, base_m=0, base_c=0
+Avant filtre : SITE=HTD, UMA=221J, base_m=115, base_c=1289
+Après filtre : SITE=HTD, UMA=221J, base_m=115, base_c=1289
+Avant filtre : SITE=HTD, UMA=222J, base_m=57, base_c=606
+Après filtre : SITE=HTD, UMA=222J, base_m=57, base_c=606
+Avant filtre : SITE=CCH, UMA=011, base_m=22, base_c=518
+Après filtre : SITE=CCH, UMA=011, base_m=22, base_c=518
+Avant filtre : SITE=CCH, UMA=011J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=011J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040X, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040X, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=041J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=041J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=160, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=160, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=161J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=161J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=162C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=162C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=040S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=041, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=041, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=270, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=270, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=270S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=270S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=450, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=450, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=451, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=451, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=670, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=670, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=090, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=090, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=090J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=090J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=091, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=091, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=092, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=092, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=140S, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=140S, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=141J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=141J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=142J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=142J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=143J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=143J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=146J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=146J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=130, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=130J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=130J, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=143C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=143C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=561C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=561C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=591, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=591, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=591C, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=591C, base_m=0, base_c=0
+Avant filtre : SITE=CCH, UMA=591J, base_m=0, base_c=0
+Après filtre : SITE=CCH, UMA=591J, base_m=0, base_c=0
