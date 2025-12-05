@@ -1,1 +1,97 @@
-TIM	SITE	UMA HC	RUM codés mois	RUM codés cumulés	UMA HDJ	DMU	RUM relancés mois	RUM relancés cumulés
+def write_copy_with_values_to_patron(df, patron_path):
+    """
+    Écrit le dataframe dans le patron Excel et retourne un BytesIO pour téléchargement Streamlit
+    Respecte les accents et noms exacts des colonnes.
+    """
+    from io import BytesIO
+    from openpyxl import load_workbook
+    from openpyxl.styles import Border, Side, Alignment, Font
+
+    wb = load_workbook(filename=str(patron_path))
+    ws = wb.active
+
+    # repérer header_row
+    header_row = None
+    for r in range(1, 30):
+        values = [(ws.cell(row=r, column=c).value or "").strip() for c in range(1, ws.max_column + 1)]
+        if "TIM" in values and "SITE" in values:
+            header_row = r
+            break
+    if not header_row:
+        header_row = 1
+
+    # mapping des en-têtes exacts (avec accents)
+    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip(): c
+                   for c in range(1, ws.max_column + 1) if ws.cell(row=header_row, column=c).value}
+
+    # assignation colonnes avec accents exacts
+    col_tim = name_to_col.get("TIM")
+    col_site = name_to_col.get("SITE")
+    col_uma_hc = name_to_col.get("UMA HC")
+    col_rum_codes_mois = name_to_col.get("RUM codés mois")
+    col_rum_codes_cum = name_to_col.get("RUM codés cumulés")
+    col_uma_hdj = name_to_col.get("UMA HDJ")
+    col_dmu = name_to_col.get("DMU")
+    col_rum_rel_mois = name_to_col.get("RUM relancés mois")
+    col_rum_rel_cum = name_to_col.get("RUM relancés cumulés")
+
+    # check pour toutes les colonnes critiques
+    for col_name, col_val in [
+        ("TIM", col_tim),
+        ("SITE", col_site),
+        ("UMA HC", col_uma_hc),
+        ("RUM codés mois", col_rum_codes_mois),
+        ("RUM codés cumulés", col_rum_codes_cum),
+        ("UMA HDJ", col_uma_hdj),
+        ("DMU", col_dmu),
+        ("RUM relancés mois", col_rum_rel_mois),
+        ("RUM relancés cumulés", col_rum_rel_cum)
+    ]:
+        if col_val is None:
+            raise ValueError(f"Colonne '{col_name}' non trouvée dans le patron Excel ! Vérifiez l'en-tête exactement.")
+
+    start = header_row + 1
+
+    # trier le dataframe
+    df_sorted = df.sort_values(by=["TIM", "SITE", "DMU", "UMA_code"]).reset_index(drop=True)
+
+    # remplir les cellules
+    for idx, row in df_sorted.iterrows():
+        excel_row = start + idx
+        ws.cell(row=excel_row, column=col_tim).value = row["TIM"]
+        ws.cell(row=excel_row, column=col_site).value = row["SITE"]
+        if row["UMA_type"] == "HC":
+            ws.cell(row=excel_row, column=col_uma_hc).value = row["UMA_libelle"]
+            ws.cell(row=excel_row, column=col_rum_codes_mois).value = int(round(row["RUM_codes_mois"]))
+            ws.cell(row=excel_row, column=col_rum_codes_cum).value = int(round(row["RUM_codes_cum"]))
+        else:
+            ws.cell(row=excel_row, column=col_uma_hdj).value = row["UMA_libelle"]
+            ws.cell(row=excel_row, column=col_dmu).value = row["DMU"]
+            ws.cell(row=excel_row, column=col_rum_rel_mois).value = int(round(row["RUM_rel_mois"]))
+            ws.cell(row=excel_row, column=col_rum_rel_cum).value = int(round(row["RUM_rel_cum"]))
+
+    # Fusion TIM / SITE / DMU
+    merge_vertical_conditionnel(ws, col_tim, df_sorted["TIM"], start)
+    merge_vertical_conditionnel(ws, col_site, df_sorted["SITE"], start, group_col=df_sorted["TIM"])
+    merge_vertical_conditionnel(ws, col_dmu, df_sorted["DMU"], start, group_col=df_sorted["TIM"])
+
+    # Bordures
+    draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_site)
+
+    # Align center
+    for idx, row in df_sorted.iterrows():
+        excel_row = start + idx
+        for c in [col_tim, col_site, col_dmu]:
+            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
+
+    # TIM bold
+    tim_positions = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
+    for tim, (start_idx, _) in tim_positions.items():
+        excel_row = start + start_idx
+        ws.cell(row=excel_row, column=col_tim).font = Font(bold=True)
+
+    # exporter en mémoire
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
