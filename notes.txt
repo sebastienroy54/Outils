@@ -1,94 +1,63 @@
-========== BUILD_TIM_UMA_DICT ==========
-▶ Nombre de lignes patron TIM : 132
-▶ Colonnes reconnues : ['DMU', 'Site', 'UMA', 'Type', 'RUM du mois', 'RUM cumulés', 'TIM Référent', 'Relance']
-▶ TIM trouvés : 17
-=========================================
+def apply_uma_exceptions(df):
+    """
+    Exceptions UMA :
+    - 150 HTD : codés chez Cliniciens, relancés chez l’autre TIM
+    - 040X CCH : codés -> relancés
+    - 561C, 591C, 591J CCH : tout en codés (même si HDJ)
+    """
 
-====== DEBUG df_patron INITIAL ======
-Nombre de lignes : 129
-Colonnes : ['TIM', 'SITE', 'UMA HC', 'RUM codés mois', 'RUM codés cumulés', 'UMA HDJ', 'DMU', 'RUM relancés mois', 'RUM relancés cumulés']
-Sites présents dans df_patron : ['CCH' 'BRC' 'HTD']
-=====================================
-====== DEBUG UMA_to_TIM_count (quelques exemples) ======
-Code UMA 080 -> utilisé par 1 TIM
-Code UMA 080S -> utilisé par 1 TIM
-Code UMA 520 -> utilisé par 1 TIM
-Code UMA 520S -> utilisé par 1 TIM
-Code UMA 080J -> utilisé par 1 TIM
-Code UMA 081J -> utilisé par 1 TIM
-Code UMA 083J -> utilisé par 1 TIM
-Code UMA 500J -> utilisé par 2 TIM
-Code UMA 520J -> utilisé par 1 TIM
-Code UMA 018 -> utilisé par 2 TIM
-Code UMA 029 -> utilisé par 2 TIM
-Code UMA 029J -> utilisé par 2 TIM
-Code UMA 112 -> utilisé par 1 TIM
-Code UMA 112S -> utilisé par 1 TIM
-Code UMA 115 -> utilisé par 1 TIM
-========================================================
+    print("\n>>>> apply_uma_exceptions : début")
 
-====== DEBUG SPOOL POUR SITE CCH ======
-df_m (mois) : nb lignes = 99 , somme COUNT = 11029
-df_c (cumul) : nb lignes = 102 , somme COUNT = 126307
-Quelques UMA mois : [{'UMA': '010', 'COUNT': 88}, {'UMA': '010J', 'COUNT': 193}, {'UMA': '010S', 'COUNT': 70}, {'UMA': '011', 'COUNT': 93}, {'UMA': '011J', 'COUNT': 654}, {'UMA': '020', 'COUNT': 5}, {'UMA': '020J', 'COUNT': 201}, {'UMA': '021', 'COUNT': 96}, {'UMA': '022J', 'COUNT': 47}, {'UMA': '022S', 'COUNT': 6}]
-Quelques UMA cumul : [{'UMA': '010', 'COUNT': 1495}, {'UMA': '010J', 'COUNT': 2357}, {'UMA': '010S', 'COUNT': 773}, {'UMA': '011', 'COUNT': 1166}, {'UMA': '011J', 'COUNT': 7459}, {'UMA': '020', 'COUNT': 41}, {'UMA': '020J', 'COUNT': 2408}, {'UMA': '021', 'COUNT': 1162}, {'UMA': '022J', 'COUNT': 285}, {'UMA': '022S', 'COUNT': 88}]
-===============================================
+    # Helper : détecter l’UMA dans UMA HC OU UMA HDJ
+    def match_uma(df, code):
+        return (
+            df["UMA HC"].str.startswith(code, na=False)
+            | df["UMA HDJ"].str.startswith(code, na=False)
+        )
 
-====== DEBUG AFFECTATION DF_PATRON POUR SITE CCH ======
-Total RUM codés mois (df_patron)   = 4481.5
-Total RUM codés cumulés (df_patron)= 56370.5
-Total RUM relancés mois (df_patron)   = 5770.0
-Total RUM relancés cumulés (df_patron)= 62644.5
-Total assigned_m calculé           = 10251.5
-Total assigned_c calculé           = 119015.0
-==============================================================
+    # --- 150 HTD ---
+    mask_150 = match_uma(df, "150") & (df["SITE"] == "HTD")
+    mask_cliniciens = (df["TIM"] == "Cliniciens") & (df["SITE"] == "HTD")
 
-====== DEBUG SPOOL POUR SITE BRC ======
-df_m (mois) : nb lignes = 7 , somme COUNT = 622
-df_c (cumul) : nb lignes = 6 , somme COUNT = 7031
-Quelques UMA mois : [{'UMA': '018', 'COUNT': 30}, {'UMA': '019M', 'COUNT': 7}, {'UMA': '029', 'COUNT': 44}, {'UMA': '029J', 'COUNT': 335}, {'UMA': '029K', 'COUNT': 168}, {'UMA': '029M', 'COUNT': 2}, {'UMA': 'nan', 'COUNT': 36}]
-Quelques UMA cumul : [{'UMA': '018', 'COUNT': 518}, {'UMA': '019M', 'COUNT': 461}, {'UMA': '029', 'COUNT': 750}, {'UMA': '029J', 'COUNT': 3568}, {'UMA': '029K', 'COUNT': 1605}, {'UMA': '029M', 'COUNT': 129}]
-===============================================
+    if mask_150.any():
+        total_m = df.loc[mask_150, "RUM codés mois"].sum()
+        total_c = df.loc[mask_150, "RUM codés cumulés"].sum()
 
-====== DEBUG AFFECTATION DF_PATRON POUR SITE BRC ======
-Total RUM codés mois (df_patron)   = 74.0
-Total RUM codés cumulés (df_patron)= 1268.0
-Total RUM relancés mois (df_patron)   = 335.0
-Total RUM relancés cumulés (df_patron)= 3568.0
-Total assigned_m calculé           = 409.0
-Total assigned_c calculé           = 4836.0
-==============================================================
+        print(f"[EXC 150 HTD] Lignes 150 = {mask_150.sum()}  |  codés mois={total_m}")
 
-====== DEBUG SPOOL POUR SITE HTD ======
-df_m (mois) : nb lignes = 18 , somme COUNT = 628
-df_c (cumul) : nb lignes = 19 , somme COUNT = 7524
-Quelques UMA mois : [{'UMA': '010', 'COUNT': 54}, {'UMA': '011', 'COUNT': 22}, {'UMA': '013', 'COUNT': 43}, {'UMA': '150', 'COUNT': 74}, {'UMA': '150J', 'COUNT': 9}, {'UMA': '151J', 'COUNT': 90}, {'UMA': '204', 'COUNT': 17}, {'UMA': '205', 'COUNT': 1}, {'UMA': '206J', 'COUNT': 1}, {'UMA': '221J', 'COUNT': 115}]
-Quelques UMA cumul : [{'UMA': '010', 'COUNT': 688}, {'UMA': '011', 'COUNT': 518}, {'UMA': '013', 'COUNT': 522}, {'UMA': '150', 'COUNT': 768}, {'UMA': '150J', 'COUNT': 106}, {'UMA': '151J', 'COUNT': 1083}, {'UMA': '152J', 'COUNT': 191}, {'UMA': '203', 'COUNT': 1}, {'UMA': '204', 'COUNT': 336}, {'UMA': '205', 'COUNT': 2}]
-===============================================
+        # Cliniciens reçoivent le total en codés
+        df.loc[mask_cliniciens, ["RUM codés mois", "RUM codés cumulés"]] = [total_m, total_c]
 
-====== DEBUG AFFECTATION DF_PATRON POUR SITE HTD ======
-Total RUM codés mois (df_patron)   = 155.0
-Total RUM codés cumulés (df_patron)= 1893.0
-Total RUM relancés mois (df_patron)   = 379.0
-Total RUM relancés cumulés (df_patron)= 4411.0
-Total assigned_m calculé           = 534.0
-Total assigned_c calculé           = 6304.0
-==============================================================
+        # Autres TIM : les codés deviennent relancés
+        mask_autres = mask_150 & ~mask_cliniciens
+        df.loc[mask_autres, "RUM relancés mois"] = df.loc[mask_autres, "RUM codés mois"]
+        df.loc[mask_autres, "RUM relancés cumulés"] = df.loc[mask_autres, "RUM codés cumulés"]
+        df.loc[mask_autres, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
 
-====== DEBUG AVANT apply_uma_exceptions ======
-Total RUM codés mois global   = 4710.5
-Total RUM relancés mois global= 6484.0
-==============================================
+    # --- 040X CCH ---
+    mask_040X = match_uma(df, "040X") & (df["SITE"] == "CCH")
+    if mask_040X.any():
+        print(f"[EXC 040X CCH] Lignes impactées : {mask_040X.sum()}")
+        df.loc[mask_040X, "RUM relancés mois"] = df.loc[mask_040X, "RUM codés mois"]
+        df.loc[mask_040X, "RUM relancés cumulés"] = df.loc[mask_040X, "RUM codés cumulés"]
+        df.loc[mask_040X, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
 
->>>> apply_uma_exceptions : début
-[EXC 150 HTD] Somme codés mois=74.0, cumulés=768.0
-[EXC 040X CCH] Lignes impactées : 1
-[EXC 561C CCH] Lignes impactées : 1
-[EXC 591C CCH] Lignes impactées : 1
-[EXC 591J CCH] Lignes impactées : 1
-<<<< apply_uma_exceptions : fin
+    # --- 561C, 591C, 591J ---
+    for code in ["561C", "591C", "591J"]:
+        mask_code = match_uma(df, code) & (df["SITE"] == "CCH")
+        if mask_code.any():
+            print(f"[EXC {code} CCH] Lignes impactées : {mask_code.sum()}")
 
-====== DEBUG APRES apply_uma_exceptions ======
-Total RUM codés mois global   = 5446.5
-Total RUM relancés mois global= 5785.0
-==============================================
+            df.loc[mask_code, "RUM codés mois"] = (
+                df.loc[mask_code, "RUM codés mois"].fillna(0)
+                + df.loc[mask_code, "RUM relancés mois"].fillna(0)
+            )
+            df.loc[mask_code, "RUM codés cumulés"] = (
+                df.loc[mask_code, "RUM codés cumulés"].fillna(0)
+                + df.loc[mask_code, "RUM relancés cumulés"].fillna(0)
+            )
+
+            df.loc[mask_code, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
+
+    print("<<<< apply_uma_exceptions : fin\n")
+    return df
