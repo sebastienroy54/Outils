@@ -1,77 +1,29 @@
-def apply_uma_exceptions(df):
-    """
-    Exceptions UMA basées UNIQUEMENT sur les codes UMA,
-    MAIS appliquées uniquement aux lignes concernées (TIM + SITE + UMA),
-    et non à toutes les lignes d’un TIM.
-    """
-
-    print("\n======= DEBUG APPLY_UMA_EXCEPTIONS (corrigée) =======")
-
-    # Aperçu utile
-    print("UMA HC (codes) :", df["UMA_HC_code"].unique()[:20])
-    print("UMA HDJ (codes):", df["UMA_HDJ_code"].unique()[:20])
-
-    # ----------------------------------------------------------------------
-    # 1️⃣  Exception : UMA 150 (HC) sur HTD
-    # 🎯 Cliniciens reçoit le TOTAL 150/HTD en codés,
-    #    tous les autres TIM reçoivent ce même TOTAL en relancés.
-    # ----------------------------------------------------------------------
-    mask_150_hc = (df["SITE"] == "HTD") & (df["UMA_HC_code"] == "150")
-    if mask_150_hc.any():
-        debug_rows = df.loc[mask_150_hc, ["TIM", "SITE", "UMA HC", "RUM codés mois"]]
-        print("\n-- UMA 150 HC sur HTD (lignes trouvées) --")
-        print(debug_rows)
-
-        # TOTAL 150/HTD (en se basant sur les valeurs actuellement dans "codés")
-        val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
-        val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
-        print(f"[150 HTD] Somme mois={val_mois}, cumul={val_cum}")
-
-        # Cliniciens → reçoit tout le total en CODÉS
-        mask_cliniciens_150 = mask_150_hc & (df["TIM"] == "Cliniciens")
-        df.loc[mask_cliniciens_150, "RUM codés mois"] = val_mois
-        df.loc[mask_cliniciens_150, "RUM codés cumulés"] = val_cum
-
-        # Autres TIM → reçoivent le TOTAL en RELANCÉS (et plus leur valeur partagée)
-        mask_other_tim_150 = mask_150_hc & (df["TIM"] != "Cliniciens")
-        df.loc[mask_other_tim_150, "RUM relancés mois"] = val_mois
-        df.loc[mask_other_tim_150, "RUM relancés cumulés"] = val_cum
-
-        # On efface les codés uniquement sur les lignes des autres TIM
-        df.loc[mask_other_tim_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
-
-    # ----------------------------------------------------------------------
-    # 2️⃣  Exception : UMA 040X (HC) sur CCH
-    # 🎯 Tout passe de codés → relancés.
-    # ----------------------------------------------------------------------
-    mask_040x = (df["SITE"] == "CCH") & (df["UMA_HC_code"] == "040X")
-    if mask_040x.any():
-        print("\n-- UMA 040X HC sur CCH --")
-        print(df.loc[mask_040x, ["TIM", "SITE", "UMA HC", "RUM codés mois"]])
-
-        df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
-        df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
-
-        df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
-
-    # ----------------------------------------------------------------------
-    # 3️⃣  Exceptions HDJ → bascule dans CODÉS
-    # UMA HDJ spéciales : 561C, 591C, 591J sur CCH
-    # 🎯 relancés → codés, relancés vidés.
-    # ----------------------------------------------------------------------
-    HDJ_SPECIAL = ["561C", "591C", "591J"]
-
-    for code in HDJ_SPECIAL:
-        mask_hdj_special = (df["SITE"] == "CCH") & (df["UMA_HDJ_code"] == code)
-
-        if mask_hdj_special.any():
-            print(f"\n-- UMA {code} HDJ → bascule CODÉS --")
-            print(df.loc[mask_hdj_special, ["TIM", "SITE", "UMA HDJ", "RUM relancés mois"]])
-
-            df.loc[mask_hdj_special, "RUM codés mois"] = df.loc[mask_hdj_special, "RUM relancés mois"]
-            df.loc[mask_hdj_special, "RUM codés cumulés"] = df.loc[mask_hdj_special, "RUM relancés cumulés"]
-
-            df.loc[mask_hdj_special, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
-
-    print("======= FIN APPLY_UMA_EXCEPTIONS =======\n")
-    return df
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:/Users/4251352/Documents/mucoviscidose_test.csv
+SELECT DISTINCT SDO.KYNOIP AS IPP, SDO.NMMAL AS NOM, SDO.NMPMAL AS PRENOM, to_char(SDO.DANAIS, 'DD/MM/YYYY') AS DDN, EPI.KYNODA AS NDA,
+EPI.TYEPI AS TYPE, SUBURM_ISIS.CDURM_P AS URMP, EPI.D8EEUE, EPI.D8SOUE, EPI.CHPPMSI AS CHAMP
+FROM SDO, EPI, SUBURM_ISIS WHERE SDO.KYNODA = EPI.KYNODA AND EPI.UE = SUBURM_ISIS.UH
+AND EPI.D8SOUE >= to_date('01/04/2025','DD/MM/YYYY') AND EPI.D8SOUE < to_date('01/07/2025','DD/MM/YYYY')
+AND SDO.KYNOIP IN 
+(
+SELECT DISTINCT SDO.KYNOIP AS IPP
+FROM SDO, RSM, RUM, RSS, SUBURM_ISIS, EPI, DGN WHERE  RSM.KYRES = EPI.NORES AND EPI.UE = SUBURM_ISIS.UH 
+AND RSS.KYRSS = RUM.KYRSS AND RUM.NORES = RSM.KYRES AND RSM.KYRES = DGN.KYRES(+) AND SDO.KYNODA = RSM.NODA
+AND
+(
+RSM.CDDNC9 in ('E840','Z942','E841','Z943','E848','E849')
+OR RSM.CDRELIE in ('E840','Z942','E841','Z943','E848','E849')
+OR DGN.KYCDDG  in ('E840','Z942','E841','Z943','E848','E849')
+)
+AND SUBURM_ISIS.CDURM_P in ('393', '060', '060S', '060J', '061J', '062C', '063J', '300S', '062J')
+--AND RSS.D8FIN >= to_date('01/01/2023','DD/MM/YYYY')
+)
+;
+spool off;
