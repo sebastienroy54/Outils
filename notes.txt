@@ -1,30 +1,3 @@
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
-SET FEEDBACK OFF
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:/Users/4251352/Portail_outils/data/resultat.csv
-SELECT DISTINCT S.KYNOIP AS IPP,
-       S.DANAIS AS DATE_NAISSANCE,
-       E.KYNODA AS NDA,
-       E.CDURM_P AS UMA,
-       R.CDGHM AS GHM,
-       E.CHPPMSI AS PMSI,
-       TO_CHAR(E.D8EEUE, 'DD/MM/YYYY') AS DATE_ENTREE,
-       TO_CHAR(E.D8SOUE, 'DD/MM/YYYY') AS DATE_SORTIE
-FROM EPI E, SDO S, RSS R
-WHERE E.KYNODA = S.KYNODA
-  AND E.KYNODA = R.NODA(+)
-  AND E.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND E.D8EEUE <= TRUNC(SYSDATE)
-  AND E.CHPPMSI = "CS"
-ORDER BY S.KYNOIP;
-SPOOL OFF
-EXIT;
-
 import streamlit as st
 import pandas as pd
 import subprocess
@@ -68,7 +41,6 @@ def main():
             st.stop()
 
         with st.spinner("🔎 Analyse des séjours en cours..."):
-            #df = pd.read_csv(CSV_PATH, sep=';', skip_blank_lines=True, dtype=str)
             df = pd.read_csv(CSV_PATH, sep=';', skip_blank_lines=True, dtype=str, encoding='latin-1')
             df = df.dropna(how='all')
             df.columns = [col.strip().upper() for col in df.columns]
@@ -76,6 +48,8 @@ def main():
             expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
             if df.shape[1] >= len(expected_cols):
                 df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
+
+            df = df[~df["UMA"].isin(["540","543"])]
 
             df['IPP'] = df['IPP'].astype(str).str.strip()
             df['UMA'] = df['UMA'].astype(str).str.strip()
@@ -92,7 +66,7 @@ def main():
                 g = group.reset_index(drop=True)
                 n = len(g)
                 for i in range(n):
-                    nda1, uma1, de1, ds1 = g.loc[i, ['NDA', 'UMA', 'DATE_ENTREE', 'DATE_SORTIE']]
+                    nda1, uma1, ghm1, de1, ds1 = g.loc[i, ['NDA', 'UMA', 'GHM', 'DATE_ENTREE', 'DATE_SORTIE']]
                     j = i + 1
                     while j < n:
                         de2 = g.loc[j, 'DATE_ENTREE']
@@ -101,7 +75,7 @@ def main():
                             continue
                         if de2 > ds1 and de2 != ds1:
                             break
-                        nda2, uma2, ds2 = g.loc[j, ['NDA', 'UMA', 'DATE_SORTIE']]
+                        nda2, uma2, ghm2, ds2 = g.loc[j, ['NDA', 'UMA', 'GHM', 'DATE_SORTIE']]
                         if nda1 == nda2:
                             j += 1
                             continue
@@ -111,7 +85,7 @@ def main():
                             rel = "VRAI_DOUBLON"
                         elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
                             rel = "DOUBLON_0_NUIT"
-                        elif (uma1 != uma2) and ((ds1 == de2) or (ds2 == de1)):
+                        elif ( (uma1 != uma2) and ((ds1 == de2) or (ds2 == de1)) and (str(ghm1)[:5] == str(ghm2)[:5]) ):
                             rel = "CONTIGUS"
                         elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
                             rel = "CHEVAUCHEMENT"
@@ -122,10 +96,12 @@ def main():
                                 "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
                                 "NDA1": nda1,
                                 "UMA1": uma1,
+                                "GHM1": ghm1,
                                 "DATEE1": de1,
                                 "DATES1": ds1,
                                 "NDA2": nda2,
                                 "UMA2": uma2,
+                                "GHM2": ghm2,
                                 "DATEE2": de2,
                                 "DATES2": ds2,
                                 "TYPE_RELATION": rel
@@ -133,7 +109,7 @@ def main():
                         j += 1
 
             res = pd.DataFrame(rows).drop_duplicates()
-            cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "DATEE1", "DATES1", "NDA2", "UMA2", "DATEE2", "DATES2"]
+            cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "GHM1", "DATEE1", "DATES1", "NDA2", "UMA2", "GHM2", "DATEE2", "DATES2"]
 
             with pd.ExcelWriter(OUTPUT_PATH, engine='openpyxl') as writer:
                 for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
