@@ -1,204 +1,22 @@
-import streamlit as st
-import pandas as pd
-import subprocess
-import os
-from io import BytesIO
-from datetime import datetime
-
 def test_oracle_connection(user, password, tns_alias):
-    test_sql = "C:/Users/4251352/Portail_outils/data/test_connexion.sql"
+    test_sql = "C:/Users/4251352/Portail_outils/SQL/test_connexion.sql"
 
     cmd = f"sqlplus -S {user}/{password}@{tns_alias} @{test_sql}"
 
     try:
+        print("test")
         result = subprocess.run(
             cmd,
             shell=True,
+            stdout=subprocess.PIPE,
             capture_output=True,
             text=True,
             timeout=3
         )
-
+        print("test3")
         output = result.stdout.strip()
         return "1" in output
-    
+
     except Exception:
+        print("test2")
         return False
-
-def main():
-    SQL_PATH = "C:/Users/4251352/Portail_outils/SQL/contigus.sql"
-    CSV_PATH = "C:/Users/4251352/Portail_outils/data/resultat.csv"
-    OUTPUT_PATH = "C:/Users/4251352/Portail_outils/data/doublons.xlsx"
-
-    st.set_page_config(page_title="Analyse des Séjours Contigus & Doublons", layout="centered")
-
-    st.title("Détection des Doublons, Contigus et Chevauchements")
-    st.markdown("Cet outil exécute la requête SQL, analyse les séjours et génère un fichier Excel structuré.")
-
-
-    with st.form("connexion"):
-        st.subheader("Connexion Oracle")
-        user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
-        password = st.text_input("🔑 Mot de passe :", type="password")
-        execute_sql = st.checkbox("Exécuter la requête SQL avant analyse", value=False)
-        submitted = st.form_submit_button("🚀 Lancer le traitement")
-
-    if submitted:
-        if not user or not password:
-            st.error("Veuillez renseigner vos identifiants Oracle.")
-            st.stop()
-
-        if execute_sql:
-            tns_alias = "SIP1CCH.WORLD"
-            with st.spinner("🔐 Test de connexion Oracle..."):
-                is_ok = test_oracle_connection(user, password, tns_alias)
-            if not is_ok:
-                st.error("Connexion Oracle échouée : Identifiants incorrects.")
-                st.stop()
-            with st.spinner("🧠 Exécution de la requête SQL, veuillez patienter..."):
-                try:
-                    cmd = f'sqlplus {user}/{password}@{tns_alias} @{SQL_PATH}'
-                    subprocess.run(cmd, shell=True)
-                except Exception as e:
-                    st.error(f"Erreur lor de l'exécution SQL : {e}")
-                    return
-            st.success("✅ Requête SQL terminée et fichier CSV généré.")
-            st.divider()
-
-        if not os.path.exists(CSV_PATH):
-            st.error(f"Le fichier {CSV_PATH} n'existe pas. Veuillez exécuter la requête SQL.")
-            st.stop()
-
-        with st.spinner("🔎 Analyse des séjours en cours..."):
-            try:
-                df = pd.read_csv(CSV_PATH, sep=';', skip_blank_lines=True, dtype=str, encoding='latin-1')
-            except Exception as e:
-                st.error(f"Erreur lecture CSV : {e}")
-                return
-            
-            try:
-                df = df.dropna(how='all')
-                df.columns = [col.strip().upper() for col in df.columns]
-
-                expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
-                if df.shape[1] >= len(expected_cols):
-                    df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
-
-                df['IPP'] = df['IPP'].astype(str).str.strip()
-                df['UMA'] = df['UMA'].fillna("").astype(str).str.strip()
-                df['NDA'] = df['NDA'].astype(str).str.strip()
-                df['GHM'] = df["GHM"].fillna("").astype(str).str.strip()
-                df['DATE_ENTREE'] = pd.to_datetime(df['DATE_ENTREE'], dayfirst=True, errors='coerce')
-                df['DATE_SORTIE'] = pd.to_datetime(df['DATE_SORTIE'], dayfirst=True, errors='coerce')
-
-                df = df[~df["UMA"].isin(["540","543"])]
-
-                df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
-                df = df.sort_values(['IPP', 'DATE_ENTREE', 'DATE_SORTIE']).reset_index(drop=True)
-            except Exception as e:
-                st.error(f"Erreur nettoyage données : {e}")
-                return
-
-            rows = []
-            try:
-                for ipp, group in df.groupby('IPP', sort=False):
-                    g = group.reset_index(drop=True)
-                    n = len(g)
-                    for i in range(n):
-                        nda1, uma1, ghm1, de1, ds1 = g.loc[i, ['NDA', 'UMA', 'GHM', 'DATE_ENTREE', 'DATE_SORTIE']]
-                        j = i + 1
-                        while j < n:
-                            de2 = g.loc[j, 'DATE_ENTREE']
-                            if pd.isna(de2):
-                                j += 1
-                                continue
-                            if de2 > ds1 and de2 != ds1:
-                                break
-                            nda2, uma2, ghm2, ds2 = g.loc[j, ['NDA', 'UMA', 'GHM', 'DATE_SORTIE']]
-                            if nda1 == nda2:
-                                j += 1
-                                continue
-
-                            rel = None
-                            if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                                rel = "VRAI_DOUBLON"
-                            elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                                rel = "DOUBLON_0_NUIT"
-                            else:
-                                root1 = ghm1.strip()
-                                root2 = ghm2.strip()
-                                valid_ghm = (
-                                    root1 not in ("", "NAN", "None", "NONE") and
-                                    root2 not in ("", "NAN", "None", "NONE") and
-                                    len(root1) >= 5 and len(root2) >= 5
-                                )
-                                if ( (uma1 != uma2) and ((ds1 == de2) or (ds2 == de1)) and valid_ghm and root1[:5] == root2[:5] ):
-                                    rel = "CONTIGUS"
-                                elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
-                                    rel = "CHEVAUCHEMENT"
-
-                            if rel:
-                                rows.append({
-                                    "IPP": ipp,
-                                    "DATE_NAISSANCE": g.loc[i, 'DATE_NAISSANCE'],
-
-                                    "NDA1": nda1,
-                                    "UMA1": uma1,
-                                    "GHM1": ghm1,
-                                    "DATEE1": de1,
-                                    "DATES1": ds1,
-
-                                    "NDA2": nda2,
-                                    "UMA2": uma2,
-                                    "GHM2": ghm2,
-                                    "DATEE2": de2,
-                                    "DATES2": ds2,
-                                    "TYPE_RELATION": rel
-                                })
-                            j += 1
-            except Exception as e:
-                st.error(f"Erreur détection relations : {e}")
-                return
-
-            try:
-                res = pd.DataFrame(rows).drop_duplicates()
-
-                with pd.ExcelWriter(OUTPUT_PATH, engine='openpyxl') as writer:
-                    for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
-                        subset = res[res["TYPE_RELATION"] == groupe].copy()
-
-                        if groupe == "CONTIGUS":
-                            cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "GHM1", "DATEE1", "DATES1", "NDA2", "UMA2", "GHM2", "DATEE2", "DATES2"]
-                            subset = subset.drop(columns=["TYPE_RELATION"], errors="ignore")
-                        else:
-                            cols = ["IPP", "DATE_NAISSANCE", "NDA1", "UMA1", "DATEE1", "DATES1", "NDA2", "UMA2", "DATEE2", "DATES2"]
-                            subset = subset.drop(columns=["GHM1","GHM2","TYPE_RELATION"], errors="ignore")
-                            
-                        if subset.empty:
-                            df_to_write = pd.DataFrame([{col: "N/A" for col in cols}])
-                        else:
-                            df_to_write = subset.copy()
-                            for c in ["DATEE1", "DATES1", "DATEE2", "DATES2"]:
-                                df_to_write[c] = pd.to_datetime(df_to_write[c], errors='coerce').dt.strftime("%d/%m/%Y")
-
-                        df_to_write.to_excel(writer, sheet_name=groupe, index=False)
-
-                        worksheet = writer.sheets[groupe]
-                        for i, col in enumerate(df_to_write.columns):
-                            max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
-                            worksheet.column_dimensions[
-                                worksheet.cell(row=1, column=i + 1).column_letter
-                            ].width = max_len
-            except Exception as e:
-                st.error(f"Erreur écriture Excel : {e}")
-                return
-
-        st.success("✅ Analyse terminée avec succès !")
-
-        with open(OUTPUT_PATH, "rb") as f:
-            st.download_button(
-                label="📥 Télécharger le fichier Excel",
-                data=f,
-                file_name=f"doublons_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
