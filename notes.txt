@@ -8,12 +8,8 @@ Traceback (most recent call last):
   File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 170, in merge
     op = _MergeOperation(
          ^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 794, in __init__
-    ) = self._get_merge_keys()
-        ^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 1298, in _get_merge_keys
-    right_keys.append(right._get_label_or_level_values(rk))
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\generic.py", line 1914, in _get_label_or_level_values
-    raise KeyError(key)
-KeyError: 'GHS'
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 807, in __init__
+    self._maybe_coerce_merge_keys()
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 1509, in _maybe_coerce_merge_keys
+    raise ValueError(msg)
+ValueError: You are trying to merge on object and int64 columns for key 'GHS séjour'. If you wish to proceed you should use pd.concat
