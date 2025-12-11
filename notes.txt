@@ -1,15 +1,203 @@
-Traceback (most recent call last):
-  File "c:\Users\4251352\projets\extraction_nobileau.py", line 107, in <module>
-    df = df.merge(
-         ^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\frame.py", line 10859, in merge
-    return merge(
-           ^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 170, in merge
-    op = _MergeOperation(
-         ^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 807, in __init__
-    self._maybe_coerce_merge_keys()
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\reshape\merge.py", line 1509, in _maybe_coerce_merge_keys
-    raise ValueError(msg)
-ValueError: You are trying to merge on object and int64 columns for key 'GHS séjour'. If you wish to proceed you should use pd.concat
+import pandas as pd
+from datetime import datetime
+
+# ------------------------------------------------------
+# 1. CHARGEMENT DES FICHIERS
+# ------------------------------------------------------
+
+rss_file = "EX832212.xlsx"                 # fichier RSS converti en .xlsx
+tarif_file = "tarif_arrete_2025_2.xlsx"    # fichier de tarifs ATIH
+
+df = pd.read_excel(rss_file)
+# header=3 : les vrais intitulés de colonnes sont en ligne 4 du fichier tarifs
+tarifs = pd.read_excel(tarif_file, header=3)
+
+# ------------------------------------------------------
+# 2. EXTRACTION DES COLONNES RSS
+# ------------------------------------------------------
+
+colonnes_source = [
+    "NIP", "NDA", "Nom", "Prenom", "UH", "URMP", "Date naiss", "Sexe", "Age",
+    "Date entree resume", "Mode ent", "Date sortie resume", "Mode sor",
+    "GHM", "GHS", "Duree sejour", "Nb URM", "Indic Rsm princ",
+    "Diag Princ SS", "Diag Relie",
+    "CIM SIGN 1", "CIM SIGN 2", "CIM SIGN 3", "CIM SIGN 4",
+    "CCAM 1", "CCAM 2", "CCAM 3"
+]
+
+df = df[colonnes_source]
+
+# ------------------------------------------------------
+# 3. NORMALISATION DATE DE NAISSANCE ET CALCUL AGE
+# ------------------------------------------------------
+
+# Nettoyage des valeurs du type ="dd/mm/yyyy"
+df["Date naiss"] = (
+    df["Date naiss"]
+    .astype(str)
+    .str.replace('="', '', regex=False)
+    .str.replace('"', '', regex=False)
+)
+
+df["Date naiss"] = pd.to_datetime(df["Date naiss"], format="%d/%m/%Y", errors="coerce")
+
+def calcul_age(date_naiss):
+    if pd.isna(date_naiss):
+        return None
+    today = datetime.today()
+    return (
+        today.year - date_naiss.year -
+        ((today.month, today.day) < (date_naiss.month, date_naiss.day))
+    )
+
+df["Age"] = df["Date naiss"].apply(calcul_age)
+df = df.drop(columns=["Date naiss"])
+
+# ------------------------------------------------------
+# 4. RENOMMAGE DES COLONNES POUR FORMAT FINAL
+# ------------------------------------------------------
+
+mapping = {
+    "Date entree resume": "Date entree",
+    "Mode ent": "Mode ent provenance",
+    "Date sortie resume": "Date sortie",
+    "Mode sor": "Mode sortie Destination",
+    "Duree sejour": "Durée de séjour",
+    "GHM": "GHM séjour",
+    "GHS": "GHS séjour",
+    "Diag Princ SS": "Diag principal",
+    "CIM SIGN 1": "DAS 1",
+    "CIM SIGN 2": "DAS 2",
+    "CIM SIGN 3": "DAS 3",
+    "CIM SIGN 4": "DAS 4"
+}
+
+df = df.rename(columns=mapping)
+
+# ------------------------------------------------------
+# 5. NORMALISATION DURÉE DE SÉJOUR → ENTIER + FILTRE >= 3
+# ------------------------------------------------------
+
+df["Durée de séjour"] = pd.to_numeric(df["Durée de séjour"], errors="coerce")
+df["Durée de séjour"] = df["Durée de séjour"].fillna(0).astype(int)
+
+df = df[df["Durée de séjour"] >= 3].copy()
+
+# ------------------------------------------------------
+# 6. COLONNES VIDES POUR LE DIM / CLINICIENS
+# ------------------------------------------------------
+
+colonnes_vides = [
+    "CA Séjour (+EX et forfait)",
+    "GHM Apres", "GHS Après", "CA Séjour apres", "Delta avant-apres",
+    "Commentaire DIM", "Commentaire Clinicien"
+]
+
+for col in colonnes_vides:
+    df[col] = None
+
+# ------------------------------------------------------
+# 7. NORMALISATION GHS POUR LE MERGE
+# ------------------------------------------------------
+
+# GHS séjour dans le RSS : enlever =" et le .0 éventuel
+df["GHS séjour"] = (
+    df["GHS séjour"]
+    .astype(str)
+    .str.replace('="', '', regex=False)
+    .str.replace('"', '', regex=False)
+    .str.replace(r"\.0$", "", regex=True)   # enlève le .0 en fin de chaîne
+    .str.strip()
+)
+
+# Colonne GHS dans le fichier tarifs : forcer en string propre
+tarifs["GHS"] = (
+    tarifs["GHS"]
+    .astype(str)
+    .str.replace(r"\.0$", "", regex=True)
+    .str.strip()
+)
+
+# ------------------------------------------------------
+# 8. MERGE RSS + TARIFS ATIH
+# ------------------------------------------------------
+
+df = df.merge(
+    tarifs,
+    left_on="GHS séjour",
+    right_on="GHS",
+    how="left"
+)
+
+# ------------------------------------------------------
+# 9. RENOMMAGE DES COLONNES TARIFAIRES (selon les noms du fichier ATIH)
+# ------------------------------------------------------
+
+# On part du principe que les colonnes contiennent ces mots-clés :
+#  - "Borne"  -> borne basse / borne haute
+#  - "TARIF"  -> tarif centre
+#  - "EXB"    -> tarif EXB
+#  - "EXH"    -> tarif EXH
+
+df = df.rename(columns={
+    df.columns[df.columns.str.contains("Borne", case=False)][0]: "Borne basse",
+    df.columns[df.columns.str.contains("Borne", case=False)][1]: "Borne haute",
+    df.columns[df.columns.str.contains("TARIF", case=False)][0]: "Tarif centre",
+    df.columns[df.columns.str.contains("EXB", case=False)][0]: "EXB",
+    df.columns[df.columns.str.contains("EXH", case=False)][0]: "EXH",
+})
+
+# ------------------------------------------------------
+# 10. CALCUL CA SELON FORMULE EXB/EXH
+# ------------------------------------------------------
+
+def calcul_ca(duree, bb, bh, tarif_centre, exb, exh):
+    if pd.isna(duree) or pd.isna(bb) or pd.isna(bh) or pd.isna(tarif_centre):
+        return None
+
+    # Durée < borne basse
+    if duree < bb:
+        return tarif_centre - (bb - duree) * exb
+
+    # Durée > borne haute
+    if duree > bh:
+        return tarif_centre + (duree - bh) * exh
+
+    # Durée entre bornes → tarif centre
+    return tarif_centre
+
+df["CA Séjour (+EX et forfait)"] = df.apply(
+    lambda row: calcul_ca(
+        row["Durée de séjour"],
+        row["Borne basse"],
+        row["Borne haute"],
+        row["Tarif centre"],
+        row["EXB"],
+        row["EXH"]
+    ),
+    axis=1
+)
+
+# ------------------------------------------------------
+# 11. SUPPRESSION DES COLONNES TARIFS/TECHNIQUES INUTILES
+# ------------------------------------------------------
+
+colonnes_a_supprimer = [
+    "GHS",            # clé de merge côté tarifs
+    "Borne basse",
+    "Borne haute",
+    "Tarif centre",
+    "EXB",
+    "EXH",
+    "Libelle",        # si écrit sans accent
+    "Libellé"         # au cas où avec accent
+]
+
+df = df.drop(columns=colonnes_a_supprimer, errors="ignore")
+
+# ------------------------------------------------------
+# 12. EXPORT FINAL
+# ------------------------------------------------------
+
+df.to_excel("EX832212_final.xlsx", index=False)
+print("✔ Fichier généré : EX832212_final.xlsx")
