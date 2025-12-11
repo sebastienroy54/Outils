@@ -1,13 +1,10 @@
-NIP	NDA	Nom	Prenom	UH	URMP	Sexe	Age	Date entree	Mode ent provenance	Date sortie	Mode sortie Destination	GHM séjour	GHS séjour	Durée de séjour	Nb URM	Indic Rsm princ	Diag principal	Diag Relie	DAS 1	DAS 2	DAS 3	DAS 4	CCAM 1	CCAM 2	CCAM 3	CA Séjour	GHM Apres	GHS Après	CA Séjour apres	Delta avant-apres	Commentaire DIM	Commentaire Clinicien	EXB	"TARIF EXB
-(en euros) 
-"	EXH
-
-
-GHS	GHM	LIBELLE	"Bornes basses
-"	"Bornes hautes
-"	" TARIF
-(en euros) "	 FORFAIT EXB 	" TARIF EXB
-(en euros) 
- "	" TARIF EXH
-(en euros) 
- "
+---- Colonnes ATIH détectées ----
+'GHS'
+'GHM'
+'LIBELLE'
+'Bornes basses\n'
+'Bornes hautes\n'
+'TARIF\n(en euros)'
+'FORFAIT EXB'
+'TARIF EXB\n(en euros) \n'
+'TARIF EXH\n(en euros) \n'
