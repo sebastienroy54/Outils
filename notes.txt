@@ -1,24 +1,166 @@
-Traceback (most recent call last):
-  File "c:\Users\4251352\projets\extraction_nobileau.py", line 41, in <module>
-    df["Age"] = df["Date naiss"].apply(calcul_age)
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\series.py", line 4943, in apply
-    ).apply()
-      ^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\apply.py", line 1422, in apply
-    return self.apply_standard()
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\apply.py", line 1502, in apply_standard
-    mapped = obj._map_values(
-             ^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\base.py", line 925, in _map_values
-    return algorithms.map_array(arr, mapper, na_action=na_action, convert=convert)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\algorithms.py", line 1743, in map_array
-    return lib.map_infer(values, mapper, convert=convert)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "pandas/_libs/lib.pyx", line 2999, in pandas._libs.lib.map_infer
-  File "c:\Users\4251352\projets\extraction_nobileau.py", line 37, in calcul_age
-    return today.year - date_naiss.year - (
-                        ^^^^^^^^^^^^^^^
-AttributeError: 'str' object has no attribute 'year'
+import pandas as pd
+from datetime import datetime
+from tqdm import tqdm
+
+tqdm.pandas()
+
+# ------------------------------------------------------
+# 1. CHARGEMENT DES FICHIERS
+# ------------------------------------------------------
+
+rss_file = "EX832212.xlsx"                 # ton fichier RSS converti en .xlsx
+tarif_file = "tarif_arrete_2025_2.xlsx"    # tarifs ATIH 2025
+
+df = pd.read_excel(rss_file)
+tarifs = pd.read_excel(tarif_file)
+
+# ------------------------------------------------------
+# 2. EXTRACTION DES COLONNES RSS
+# ------------------------------------------------------
+
+colonnes_source = [
+    "NIP", "NDA", "Nom", "Prenom", "UH", "URMP", "Date naiss", "Sexe", "Age",
+    "Date entree resume", "Mode ent", "Date sortie resume", "Mode sor",
+    "GHM", "GHS", "Duree sejour", "Nb URM", "Indic Rsm princ",
+    "Diag Princ SS", "Diag Relie",
+    "CIM SIGN 1", "CIM SIGN 2", "CIM SIGN 3", "CIM SIGN 4",
+    "CCAM 1", "CCAM 2", "CCAM 3"
+]
+
+df = df[colonnes_source]
+
+# ------------------------------------------------------
+# 3. NORMALISATION DATE DE NAISSANCE ET CALCUL AGE
+# ------------------------------------------------------
+
+df["Date naiss"] = (
+    df["Date naiss"]
+    .astype(str)
+    .str.replace('="', '', regex=False)
+    .str.replace('"', '', regex=False)
+)
+
+df["Date naiss"] = pd.to_datetime(df["Date naiss"], format="%d/%m/%Y", errors="coerce")
+
+def calcul_age(date_naiss):
+    if pd.isna(date_naiss):
+        return None
+    today = datetime.today()
+    return (
+        today.year - date_naiss.year -
+        ((today.month, today.day) < (date_naiss.month, date_naiss.day))
+    )
+
+df["Age"] = df["Date naiss"].progress_apply(calcul_age)
+df = df.drop(columns=["Date naiss"])
+
+# ------------------------------------------------------
+# 4. RENOMMAGE DES COLONNES POUR FORMAT FINAL
+# ------------------------------------------------------
+
+mapping = {
+    "Date entree resume": "Date entree",
+    "Mode ent": "Mode ent provenance",
+    "Date sortie resume": "Date sortie",
+    "Mode sor": "Mode sortie Destination",
+    "Duree sejour": "Durée de séjour",
+    "GHM": "GHM séjour",
+    "GHS": "GHS séjour",
+    "Diag Princ SS": "Diag principal",
+    "CIM SIGN 1": "DAS 1",
+    "CIM SIGN 2": "DAS 2",
+    "CIM SIGN 3": "DAS 3",
+    "CIM SIGN 4": "DAS 4"
+}
+
+df = df.rename(columns=mapping)
+
+# ------------------------------------------------------
+# 5. NORMALISATION DURÉE DE SÉJOUR → ENTIER
+# ------------------------------------------------------
+
+df["Durée de séjour"] = pd.to_numeric(df["Durée de séjour"], errors="coerce")
+df["Durée de séjour"] = df["Durée de séjour"].fillna(0).astype(int)
+
+# ------------------------------------------------------
+# 6. FILTRE : garder uniquement durée >= 3
+# ------------------------------------------------------
+
+df = df[df["Durée de séjour"] >= 3].copy()
+
+# ------------------------------------------------------
+# 7. COLONNES VIDES POUR LE DIM / CLINICIENS
+# ------------------------------------------------------
+
+colonnes_vides = [
+    "CA Séjour (+EX et forfait)",
+    "GHM Apres", "GHS Après", "CA Séjour apres", "Delta avant-apres",
+    "Commentaire DIM", "Commentaire Clinicien"
+]
+
+for col in colonnes_vides:
+    df[col] = None
+
+# ------------------------------------------------------
+# 8. MERGE RSS + TARIFS ATIH
+# ------------------------------------------------------
+
+df = df.merge(
+    tarifs,
+    left_on="GHS séjour",
+    right_on="GHS",
+    how="left"
+)
+
+# Renommer les colonnes tarifaires automatiquement
+df = df.rename(columns={
+    df.columns[df.columns.str.contains("Borne", case=False)][0]: "Borne basse",
+    df.columns[df.columns.str.contains("Borne", case=False)][1]: "Borne haute",
+    df.columns[df.columns.str.contains("TARIF", case=False)][0]: "Tarif centre",
+    df.columns[df.columns.str.contains("EXB", case=False)][0]: "EXB",
+    df.columns[df.columns.str.contains("EXH", case=False)][0]: "EXH",
+})
+
+# ------------------------------------------------------
+# 9. CALCUL CA SELON FORMULE EXB/EXH (avec tqdm)
+# ------------------------------------------------------
+
+def calcul_ca(duree, bb, bh, tarif_centre, exb, exh):
+    if pd.isna(duree) or pd.isna(bb) or pd.isna(bh):
+        return None
+
+    # Durée < borne basse
+    if duree < bb:
+        return tarif_centre - (bb - duree) * exb
+
+    # Durée > borne haute
+    if duree > bh:
+        return tarif_centre + (duree - bh) * exh
+
+    # Sinon tarif standard
+    return tarif_centre
+
+df["CA Séjour (+EX et forfait)"] = df.progress_apply(
+    lambda row: calcul_ca(
+        row["Durée de séjour"],
+        row["Borne basse"],
+        row["Borne haute"],
+        row["Tarif centre"],
+        row["EXB"],
+        row["EXH"]
+    ),
+    axis=1
+)
+
+# ------------------------------------------------------
+# 10. SUPPRESSION DES COLONNES TARIFS INTERMÉDIAIRES
+# ------------------------------------------------------
+
+df = df.drop(columns=["GHS", "Borne basse", "Borne haute", "Tarif centre", "EXB", "EXH"], errors="ignore")
+
+# ------------------------------------------------------
+# 11. EXPORT FINAL
+# ------------------------------------------------------
+
+df.to_excel("EX832212_final.xlsx", index=False)
+print("\n✔ Fichier généré : EX832212_final.xlsx\n")
