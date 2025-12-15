@@ -3,3 +3,16 @@ Traceback:
 
 File "/app/app.py", line 2, in <module>
     from outils import decoupage_excel, dashboard_rum, croisement_RAA, doublons_app, tableau_comparaison_valo, croisement_BHRe, RUM_TIM
+
+
+        rows.append(
+        f'<tr>'
+        f'<td class="group-border-right">{unit_nom}</td>'
+        f'<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td class="group-border-right">{pct_rum2}%</td>'
+        f'<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td class="group-border-right">{pct_journees2}</td>'
+        f'<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>'
+        f'<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td class="group-border-right">{pct_journees1}</td>'
+        f'<td>{'+' if evol_rum > 0 else ''}{evol_rum}%</td>'
+        f'<td>{'+' if evol_journees > 0 else ''}{evol_journees}%</td>'
+        f'</tr>'
+        )
