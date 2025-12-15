@@ -3,31 +3,74 @@ import subprocess
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+from pathlib import Path
 
+# =========================================================
+# PATHS PORTABLES (MODIF)
+# =========================================================
+
+BASE_DIR = Path(__file__).resolve().parents[1]   # Portail_outils
+SQL_DIR = BASE_DIR / "SQL"
+DATA_DIR = BASE_DIR / "data"
+OUTILS_DIR = BASE_DIR / "outils"
+
+SQL_FILE = SQL_DIR / "Requete_RUM.sql"
+CSV_FILE = DATA_DIR / "dashboard.csv"
+CSS_FILE = OUTILS_DIR / "styles_dashboard_rum.css"
+
+# =========================================================
 # Chargement du fichier CSS
+# =========================================================
+
 def load_css(file_path):
-    with open(file_path) as f:
+    with open(file_path, encoding="utf-8") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
+# =========================================================
 # Exécution de la requête SQL
+# =========================================================
+
 def run_sqlplus(user, password, tns_alias, sql_file):
-    cmd = f'sqlplus -S {user}/{password}@{tns_alias} @{sql_file}'
+    cmd = [
+        "sqlplus",
+        "-S",
+        f"{user}/{password}@{tns_alias}",
+        f"@{sql_file}"
+    ]
     result = subprocess.run(
         cmd,
-        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
     )
     if result.returncode != 0:
-        st.error("Erreur SQL*Plus : " + result.stderr)
+        st.error("Erreur SQL*Plus")
+        st.code(result.stderr or result.stdout)
 
+# =========================================================
 # Chargement et nettoyage des données
+# =========================================================
+
 def load_data(csv_file):
-    cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL", "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
+    cols = [
+        "UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
+        "NB_JOURNEES", "NB_JOURNEES_SUPPL",
+        "%_RUM_SUPPL", "%_JOURNEES_SUPPL"
+    ]
 
-    df = pd.read_csv(csv_file, sep=";", engine='python', names=cols, header=None, encoding="cp1252")
+    df = pd.read_csv(
+        csv_file,
+        sep=";",
+        engine="python",
+        names=cols,
+        header=None,
+        encoding="cp1252"
+    )
+
     df = df.dropna(subset=["UNIT"])
-
     df["ANNEE"] = df["ANNEE"].astype(int)
     df["UNIT"] = df["UNIT"].astype(str).str.strip()
+
     numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
@@ -35,46 +78,17 @@ def load_data(csv_file):
     df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
     df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
 
-    df = df.sort_values("UNIT").reset_index(drop=True)
+    return df.sort_values("UNIT").reset_index(drop=True)
 
-    return df
+# =========================================================
+# Tableau HTML
+# =========================================================
 
-# def load_data(csv_file):
-#     cols = ["UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
-#             "NB_JOURNEES", "NB_JOURNEES_SUPPL",
-#             "%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-
-#     df = pd.read_csv(csv_file, sep=";", engine="python", names=cols, header=None, encoding="cp1252", dtype=str)
-
-#     df = df.dropna(how="all")
-
-#     df["UNIT"] = df["UNIT"].astype(str).str.strip()
-#     df = df[df["UNIT"].notna() & (df["UNIT"] != "")]
-
-#     df["ANNEE"] = pd.to_numeric(df["ANNEE"].str.extract(r'(\d{4})', expand=False), errors="coerce")
-#     df = df[df["ANNEE"].notna()].copy()
-#     df["ANNEE"] = df["ANNEE"].astype(int)
-
-#     int_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
-#     for c in int_cols:
-#         if c in df.columns:
-#             df[c] = pd.to_numeric(df[c].str.replace(",", ".").str.strip(), errors="coerce").fillna(0).astype(int)
-
-#     pct_cols = ["%_RUM_SUPPL", "%_JOURNEES_SUPPL"]
-#     for c in pct_cols:
-#         if c in df.columns:
-#             df[c] = pd.to_numeric(df[c].astype(str).str.replace(",", ".").str.replace("%","").str.strip(),
-#                                   errors="coerce").fillna(0.0).astype(float)
-
-#     df = df.sort_values(["UNIT", "ANNEE"]).reset_index(drop=True)
-#     return df
-
-# Fonction pour afficher le tableau de données
 def afficher_tableau(df, annee1, annee2):
 
     mois_actuel = datetime.now().month
-    mois_précédent = 12 if mois_actuel == 1 else mois_actuel - 1
-    suffixe_mois = f"M{mois_précédent:02d}"
+    mois_precedent = 12 if mois_actuel == 1 else mois_actuel - 1
+    suffixe_mois = f"M{mois_precedent:02d}"
 
     um_names = {
         "103": "Réa CHIR",
@@ -89,144 +103,81 @@ def afficher_tableau(df, annee1, annee2):
 
     st.markdown("""
     <style>
-    .block-container {
-                max-width : 95% !important;
-    }
-    .table-grouped {                
-                width : 100% !important;
-                margin-left: auto;
-                margin-right: auto;
-    }
+    .block-container { max-width: 95% !important; }
+    .table-grouped { width: 100% !important; }
     </style>
     """, unsafe_allow_html=True)
 
     df["UNIT_NOM"] = df["UNIT"].map(um_names).fillna(df["UNIT"])
 
-    units = sorted(df['UNIT'].unique())
     rows = []
 
-    for unit in units:
-        d1 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee1)]
-        d2 = df[(df['UNIT'] == unit) & (df['ANNEE'] == annee2)]
+    for unit in sorted(df["UNIT"].unique()):
+        d1 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee1)]
+        d2 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee2)]
 
         d1 = d1.iloc[0] if not d1.empty else None
         d2 = d2.iloc[0] if not d2.empty else None
 
-        nb_rum1 = d1['NB_RUM'] if d1 is not None else 0
-        nb_rum_sup1 = d1['NB_RUM_SUPPL'] if d1 is not None else 0
-        pct_rum1 = d1['%_RUM_SUPPL'] if d1 is not None else 0
-        nb_journees1 = d1['NB_JOURNEES'] if d1 is not None else 0
-        nb_journees_sup1 = d1['NB_JOURNEES_SUPPL'] if d1 is not None else 0
-        pct_journees1 = d1['%_JOURNEES_SUPPL'] if d1 is not None else 0
+        nb_rum1 = d1["NB_RUM"] if d1 is not None else 0
+        nb_rum_sup1 = d1["NB_RUM_SUPPL"] if d1 is not None else 0
+        pct_rum1 = d1["%_RUM_SUPPL"] if d1 is not None else 0
+        nb_journees1 = d1["NB_JOURNEES"] if d1 is not None else 0
+        nb_journees_sup1 = d1["NB_JOURNEES_SUPPL"] if d1 is not None else 0
+        pct_journees1 = d1["%_JOURNEES_SUPPL"] if d1 is not None else 0
 
-        nb_rum2 = d2['NB_RUM'] if d2 is not None else 0
-        nb_rum_sup2 = d2['NB_RUM_SUPPL'] if d2 is not None else 0
-        pct_rum2 = d2['%_RUM_SUPPL'] if d2 is not None else 0
-        nb_journees2 = d2['NB_JOURNEES'] if d2 is not None else 0
-        nb_journees_sup2 = d2['NB_JOURNEES_SUPPL'] if d2 is not None else 0
-        pct_journees2 = d2['%_JOURNEES_SUPPL'] if d2 is not None else 0
+        nb_rum2 = d2["NB_RUM"] if d2 is not None else 0
+        nb_rum_sup2 = d2["NB_RUM_SUPPL"] if d2 is not None else 0
+        pct_rum2 = d2["%_RUM_SUPPL"] if d2 is not None else 0
+        nb_journees2 = d2["NB_JOURNEES"] if d2 is not None else 0
+        nb_journees_sup2 = d2["NB_JOURNEES_SUPPL"] if d2 is not None else 0
+        pct_journees2 = d2["%_JOURNEES_SUPPL"] if d2 is not None else 0
 
-        evol_rum = round(nb_rum_sup1 / nb_rum_sup2, 1)
-        evol_journees = round(nb_journees_sup1 / nb_journees_sup2, 1)
-        # evol_rum = round(pct_rum2 - pct_rum1, 1)
-        # evol_journees = round(pct_journees2 - pct_journees1, 1)
+        evol_rum = round(nb_rum_sup1 / nb_rum_sup2, 1) if nb_rum_sup2 else 0
+        evol_journees = round(nb_journees_sup1 / nb_journees_sup2, 1) if nb_journees_sup2 else 0
 
         unit_nom = f"UM {unit} - {d1['UNIT_NOM'] if d1 is not None else (d2['UNIT_NOM'] if d2 is not None else unit)}"
 
         rows.append(
-        f'<tr>'
-        f'<td class="group-border-right">{unit_nom}</td>'
-        f'<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td class="group-border-right">{pct_rum2}%</td>'
-        f'<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td class="group-border-right">{pct_journees2}</td>'
-        f'<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td class="group-border-right">{pct_rum1}%</td>'
-        f'<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td class="group-border-right">{pct_journees1}</td>'
-        f'<td>{"+" if evol_rum > 0 else ""}{evol_rum}%</td>'
-        f'<td>{"+" if evol_journees > 0 else ""}{evol_journees}%</td>'
-        f'</tr>'
+            f"<tr>"
+            f"<td>{unit_nom}</td>"
+            f"<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td>{pct_rum2}%</td>"
+            f"<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td>{pct_journees2}%</td>"
+            f"<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td>{pct_rum1}%</td>"
+            f"<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td>{pct_journees1}%</td>"
+            f"<td>{'+' if evol_rum > 0 else ''}{evol_rum}%</td>"
+            f"<td>{'+' if evol_journees > 0 else ''}{evol_journees}%</td>"
+            f"</tr>"
         )
 
-    tableau_html = f"""
+    st.markdown(f"""
     <h2>Évolution {annee1} vs {annee2} - {suffixe_mois}</h2>
-    <table class="table-grouped">
-        <thead>
-        <tr>
-          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
-          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
-          <th colspan="3" class="group-border-right th-jours">{annee2} Journées</th>
-          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
-          <th colspan="3" class="group-border-right th-jours">{annee1} Journées</th>
-          <th colspan="2" class="th-evol">Évolution</th>
-        </tr>
-        <tr>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
-          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
-        </tr>
-      </thead>
-      <tbody>
-        {''.join(rows)}
-      </tbody>
-    </table>
-    """
-    st.markdown(tableau_html, unsafe_allow_html=True)
+    <table class="table-grouped"><tbody>{''.join(rows)}</tbody></table>
+    """, unsafe_allow_html=True)
 
-# Fonction d'affichage du graphique
-def afficher_graphique(df, annee1, annee2):
-    fig = go.Figure()
-    df1 = df[df['ANNEE'] == annee1]
-    df2 = df[df['ANNEE'] == annee2]
+# =========================================================
+# MAIN
+# =========================================================
 
-    fig.add_trace(go.Bar(x=df1['UNIT'], y=df1['%_RUM_SUPPL'], name=f"% RUM {annee1}"))
-    fig.add_trace(go.Bar(x=df2['UNIT'], y=df2['%_RUM_SUPPL'], name=f"% RUM {annee2}"))
-    fig.add_trace(go.Bar(x=df1['UNIT'], y=df1['%_JOURNEES_SUPPL'], name=f"% Journées {annee1}"))
-    fig.add_trace(go.Bar(x=df2['UNIT'], y=df2['%_JOURNEES_SUPPL'], name=f"% Journées {annee2}"))
-
-    fig.update_layout(
-        bargap=0.2,
-        bargroupgap=0.05,
-        title="Évolution % RUM et % Journées par unité",
-        barmode="group",
-        xaxis_title="Unité médicale",
-        yaxis_title="%",
-        height=500,
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# Fonction principale
 def main():
     st.title("Dashboard d'évolution des RUMs")
 
     annee1 = 2024
     annee2 = 2025
 
-    sql_file = r"C:\Users\4251352\Portail_outils\SQL\Requete_RUM.sql"
-    csv_file = r"C:\Users\4251352\Portail_outils\data\dashboard.csv"
-    css_file = r"C:\Users\4251352\Portail_outils\outils\styles_dashboard_rum.css"
+    load_css(CSS_FILE)
 
-    load_css(css_file)
-
-    #user = st.text_input("Nom d'utilisateur")
-    #password = st.text_input("Mot de passe", type="password")
     user = "consult"
     password = "consult"
     tns_alias = st.text_input("TNS alias", value="SIP1CCH.WORLD")
 
     if st.button("Actualiser le tableau"):
+        try:
+            run_sqlplus(user, password, tns_alias, SQL_FILE)
+            df = load_data(CSV_FILE)
+            afficher_tableau(df, annee1, annee2)
+        except Exception as e:
+            st.error(f"Erreur lors de l'exécution : {e}")
 
-        if not user or not password:
-            st.error("Merci de renseigner le nom d'utilisateur et le mot de passe")
-
-        else:
-            try:
-                run_sqlplus(user, password, tns_alias, sql_file)
-                # with open(csv_file, "r", encoding="cp1252") as f:
-                #     contenu = f.read()
-                # st.text_area("Contenu brut du csv :", contenu[:2000], height=300)
-                df = load_data(csv_file)
-                afficher_tableau(df, annee1, annee2)
-                #afficher_graphique(df, annee1, annee2)
-
-            except Exception as e:
-                st.error(f"Erreur lors de l'exécution : {e}")
+if __name__ == "__main__":
+    main()
