@@ -1,51 +1,70 @@
-# Oracle 10.2 impose une glibc ancienne
-FROM debian:9-slim
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
 
-# --------------------------------------------------
-# Dépendances système
-# --------------------------------------------------
-RUN apt-get update && apt-get install -y \
-    libaio1 \
-    unzip \
-    python3 \
-    python3-pip \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-# --------------------------------------------------
-# Oracle Instant Client 10.2 + SQL*Plus
-# --------------------------------------------------
-WORKDIR /opt/oracle
-
-# ZIP présents dans Portail_outils
-COPY basic-10.2.0.5.0-linux-x64.zip .
-COPY sqlplus-10.2.0.5.0-linux-x64.zip .
-
-RUN unzip basic-10.2.0.5.0-linux-x64.zip && \
-    unzip sqlplus-10.2.0.5.0-linux-x64.zip && \
-    rm -f *.zip && \
-    ln -sf instantclient_10_2/libclntsh.so.10.1 instantclient_10_2/libclntsh.so && \
-    ln -sf instantclient_10_2/libocci.so.10.1 instantclient_10_2/libocci.so
-
-# --------------------------------------------------
-# Variables Oracle (dans le conteneur uniquement)
-# --------------------------------------------------
-ENV ORACLE_HOME=/opt/oracle/instantclient_10_2
-ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_10_2
-ENV PATH=/opt/oracle/instantclient_10_2:$PATH
-
-# --------------------------------------------------
-# Application Python
-# --------------------------------------------------
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-# --------------------------------------------------
-# Streamlit
-# --------------------------------------------------
-EXPOSE 8501
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0"]
+Sending build context to Docker daemon  46.64MB
+Step 1/15 : FROM debian:9-slim
+9-slim: Pulling from library/debian
+bff3e048017e: Pulling fs layer
+bff3e048017e: Verifying Checksum
+bff3e048017e: Download complete
+bff3e048017e: Pull complete
+Digest: sha256:abaa313c7e1dfe16069a1a42fa254014780f165d4fd084844602edbe29915e70
+Status: Downloaded newer image for debian:9-slim
+ ---> 0e23ec2ce5e6
+Step 2/15 : RUN apt-get update && apt-get install -y     libaio1     unzip     python3     python3-pip     ca-certificates     && rm -rf /var/lib/apt/lists/*
+ ---> Running in 65c8c10d693f
+Ign:1 http://deb.debian.org/debian stretch InRelease
+Ign:2 http://security.debian.org/debian-security stretch/updates InRelease
+Ign:3 http://deb.debian.org/debian stretch-updates InRelease
+Ign:4 http://security.debian.org/debian-security stretch/updates Release
+Ign:5 http://deb.debian.org/debian stretch Release
+Ign:6 http://security.debian.org/debian-security stretch/updates/main all Packages
+Ign:7 http://deb.debian.org/debian stretch-updates Release
+Ign:8 http://security.debian.org/debian-security stretch/updates/main amd64 Packages
+Ign:9 http://deb.debian.org/debian stretch/main amd64 Packages
+Ign:6 http://security.debian.org/debian-security stretch/updates/main all Packages
+Ign:10 http://deb.debian.org/debian stretch/main all Packages
+Ign:8 http://security.debian.org/debian-security stretch/updates/main amd64 Packages
+Ign:11 http://deb.debian.org/debian stretch-updates/main amd64 Packages
+Ign:6 http://security.debian.org/debian-security stretch/updates/main all Packages
+Ign:12 http://deb.debian.org/debian stretch-updates/main all Packages
+Ign:8 http://security.debian.org/debian-security stretch/updates/main amd64 Packages
+Ign:6 http://security.debian.org/debian-security stretch/updates/main all Packages
+Ign:9 http://deb.debian.org/debian stretch/main amd64 Packages
+Ign:10 http://deb.debian.org/debian stretch/main all Packages
+Ign:8 http://security.debian.org/debian-security stretch/updates/main amd64 Packages
+Ign:11 http://deb.debian.org/debian stretch-updates/main amd64 Packages
+Ign:6 http://security.debian.org/debian-security stretch/updates/main all Packages
+Ign:12 http://deb.debian.org/debian stretch-updates/main all Packages
+Ign:8 http://security.debian.org/debian-security stretch/updates/main amd64 Packages
+Ign:9 http://deb.debian.org/debian stretch/main amd64 Packages
+Ign:6 http://security.debian.org/debian-security stretch/updates/main all Packages
+Ign:10 http://deb.debian.org/debian stretch/main all Packages
+Err:8 http://security.debian.org/debian-security stretch/updates/main amd64 Packages
+  404  Not Found [IP: 151.101.130.132 80]
+Ign:11 http://deb.debian.org/debian stretch-updates/main amd64 Packages
+Ign:12 http://deb.debian.org/debian stretch-updates/main all Packages
+Ign:9 http://deb.debian.org/debian stretch/main amd64 Packages
+Ign:10 http://deb.debian.org/debian stretch/main all Packages
+Ign:11 http://deb.debian.org/debian stretch-updates/main amd64 Packages
+Ign:12 http://deb.debian.org/debian stretch-updates/main all Packages
+Ign:9 http://deb.debian.org/debian stretch/main amd64 Packages
+Ign:10 http://deb.debian.org/debian stretch/main all Packages
+Ign:11 http://deb.debian.org/debian stretch-updates/main amd64 Packages
+Ign:12 http://deb.debian.org/debian stretch-updates/main all Packages
+Err:9 http://deb.debian.org/debian stretch/main amd64 Packages
+  404  Not Found
+Ign:10 http://deb.debian.org/debian stretch/main all Packages
+Err:11 http://deb.debian.org/debian stretch-updates/main amd64 Packages
+  404  Not Found
+Ign:12 http://deb.debian.org/debian stretch-updates/main all Packages
+Reading package lists...
+W: The repository 'http://security.debian.org/debian-security stretch/updates Release' does not have a Release file.
+W: The repository 'http://deb.debian.org/debian stretch Release' does not have a Release file.
+W: The repository 'http://deb.debian.org/debian stretch-updates Release' does not have a Release file.
+E: Failed to fetch http://security.debian.org/debian-security/dists/stretch/updates/main/binary-amd64/Packages  404  Not Found [IP: 151.101.130.132 80]
+E: Failed to fetch http://deb.debian.org/debian/dists/stretch/main/binary-amd64/Packages  404  Not Found
+E: Failed to fetch http://deb.debian.org/debian/dists/stretch-updates/main/binary-amd64/Packages  404  Not Found
+E: Some index files failed to download. They have been ignored, or old ones used instead.
+The command '/bin/sh -c apt-get update && apt-get install -y     libaio1     unzip     python3     python3-pip     ca-certificates     && rm -rf /var/lib/apt/lists/*' returned a non-zero code: 100
