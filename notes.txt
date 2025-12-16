@@ -1,5 +1,6 @@
-# Debian 9 est EOL → utiliser les archives
-RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
-    sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
-    sed -i '/stretch-updates/d' /etc/apt/sources.list && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
+Collecting enum-compat (from streamlit->-r requirements.txt (line 4))
+  Downloading https://files.pythonhosted.org/packages/55/ae/467bc4509246283bb59746e21a1a2f5a8aecbef56b1fa6eaca78cd438c8b/enum_compat-0.0.3-py3-none-any.whl
+Collecting watchdog (from streamlit->-r requirements.txt (line 4))
+  Downloading https://files.pythonhosted.org/packages/f3/6e/14f228ece54c289af148f9f588d9e591fa8294e36193c1904682affb2751/watchdog-1.0.0.tar.gz (97kB)
+watchdog requires Python '>=3.6' but the running Python is 3.5.3
+The command '/bin/sh -c pip3 install --no-cache-dir -r requirements.txt' returned a non-zero code: 1
