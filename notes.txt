@@ -1,6 +1,84 @@
-Collecting enum-compat (from streamlit->-r requirements.txt (line 4))
-  Downloading https://files.pythonhosted.org/packages/55/ae/467bc4509246283bb59746e21a1a2f5a8aecbef56b1fa6eaca78cd438c8b/enum_compat-0.0.3-py3-none-any.whl
-Collecting watchdog (from streamlit->-r requirements.txt (line 4))
-  Downloading https://files.pythonhosted.org/packages/f3/6e/14f228ece54c289af148f9f588d9e591fa8294e36193c1904682affb2751/watchdog-1.0.0.tar.gz (97kB)
-watchdog requires Python '>=3.6' but the running Python is 3.5.3
-The command '/bin/sh -c pip3 install --no-cache-dir -r requirements.txt' returned a non-zero code: 1
+# --------------------------------------------------
+# Base compatible Oracle 10.2
+# --------------------------------------------------
+FROM debian:9-slim
+
+# --------------------------------------------------
+# Debian 9 EOL → utiliser les archives
+# --------------------------------------------------
+RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i '/stretch-updates/d' /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
+
+# --------------------------------------------------
+# Dépendances système + outils build Python
+# --------------------------------------------------
+RUN apt-get update && apt-get install -y \
+    libaio1 \
+    unzip \
+    ca-certificates \
+    build-essential \
+    wget \
+    libssl-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libgdbm-dev \
+    libdb5.3-dev \
+    libbz2-dev \
+    libexpat1-dev \
+    liblzma-dev \
+    tk-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# --------------------------------------------------
+# Installation Python 3.7
+# --------------------------------------------------
+WORKDIR /usr/src
+
+RUN wget https://www.python.org/ftp/python/3.7.17/Python-3.7.17.tgz && \
+    tar xzf Python-3.7.17.tgz && \
+    cd Python-3.7.17 && \
+    ./configure --enable-optimizations && \
+    make -j$(nproc) && \
+    make altinstall
+
+RUN python3.7 -m ensurepip && \
+    python3.7 -m pip install --upgrade pip
+
+# --------------------------------------------------
+# Oracle Instant Client 10.2 + SQL*Plus
+# --------------------------------------------------
+WORKDIR /opt/oracle
+
+COPY basic-10.2.0.5.0-linux-x64.zip .
+COPY sqlplus-10.2.0.5.0-linux-x64.zip .
+
+RUN unzip basic-10.2.0.5.0-linux-x64.zip && \
+    unzip sqlplus-10.2.0.5.0-linux-x64.zip && \
+    rm -f *.zip && \
+    ln -sf instantclient_10_2/libclntsh.so.10.1 instantclient_10_2/libclntsh.so && \
+    ln -sf instantclient_10_2/libocci.so.10.1 instantclient_10_2/libocci.so
+
+ENV ORACLE_HOME=/opt/oracle/instantclient_10_2
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_10_2
+ENV PATH=/opt/oracle/instantclient_10_2:$PATH
+
+# --------------------------------------------------
+# Application Python
+# --------------------------------------------------
+WORKDIR /app
+
+COPY requirements.txt .
+RUN python3.7 -m pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# --------------------------------------------------
+# Streamlit
+# --------------------------------------------------
+EXPOSE 8501
+CMD ["python3.7", "-m", "streamlit", "run", "app.py", "--server.address=0.0.0.0"]
