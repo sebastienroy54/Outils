@@ -5,7 +5,7 @@ FROM
     RSM R
 WHERE
     M.NORES = R.KYRES
-    AND R.CDURM_P = '520S'
+    AND R.CDURM_P = '520'
     AND R.CDDNC9 IN (
         'M545',
         'M5450',
