@@ -1,13 +1,22 @@
 SELECT
-    COUNT(DISTINCT R.NOIP) AS NB_IPP
+    COUNT(DISTINCT H.NOIP) AS NB_IPP
 FROM
-    RSM R,
-    DGN D
+    EPI E,
+    HJO H,
+    RSM R
 WHERE
-    D.KYRES(+) = R.KYRES
-    AND R.CDURM_P = '520J'
+    E.NOHJO = H.NOHJO
+    AND R.KYRES = E.NORES
+
+    -- UMA HDJ : à prendre sur l'épisode
+    AND E.CDURM_P = '520J'
+
+    -- Année 2024 (date de séance)
+    AND H.DAEXEC >= TO_DATE('01/01/2024','DD/MM/YYYY')
+    AND H.DAEXEC <  TO_DATE('01/01/2025','DD/MM/YYYY')
+
+    -- DP commence par M545 (gère M545..., M54.5..., espaces)
     AND (
-        R.CDDNC9  LIKE 'M545%'
-    )
-    AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
-    AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY');
+         TRIM(R.CDDNC9) LIKE 'M545%'
+      OR REPLACE(TRIM(R.CDDNC9),'.','') LIKE 'M545%'
+    );
