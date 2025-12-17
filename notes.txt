@@ -1,3 +1,25 @@
-SELECT COUNT(*) AS NB_LIGNES_AVEC_POINT
-FROM RSM
-WHERE CDDNC9 LIKE 'M54.%';
+SELECT
+    COUNT(DISTINCT H.NOIP) AS NB_IPP
+FROM
+    HJO H,
+    EPI E,
+    RSM R
+WHERE
+    -- lien séance → épisode
+    H.NOHJO = E.NOHJO
+    -- lien épisode → séjour
+    AND E.NORES = R.KYRES
+    -- UMA HDJ
+    AND E.CDURM_P = '520J'
+    -- DP uniquement (comme PMSIPilot)
+    AND R.CDDNC9 IN (
+        'M545',
+        'M5450',
+        'M5456',
+        'M5457',
+        'M5458',
+        'M5459'
+    )
+    -- année 2024 (séances exécutées)
+    AND H.DAEXEC >= TO_DATE('01/01/2024','DD/MM/YYYY')
+    AND H.DAEXEC <  TO_DATE('01/01/2025','DD/MM/YYYY');
