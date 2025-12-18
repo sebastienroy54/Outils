@@ -1,37 +1,19 @@
-import os
+import smtplib
+from email.message import EmailMessage
 from pathlib import Path
-from oracle_runner import run_sqlplus
-from txt_to_excel import txt_to_excel
-from code_decoupage import decouper_excel
-from mailer import send_mail
+import os
 
-BASE = Path("/app")
-OUTPUT = BASE / "output"
+def send_mail(subject, body, attachments):
+    msg = EmailMessage()
+    msg["From"] = os.environ["MAIL_FROM"]
+    msg["To"] = os.environ["MAIL_TO"]
+    msg["Subject"] = subject
+    msg.set_content(body)
 
-CONFIGS = {
-    "CCH": ("ORACLE_CCH_DSN", "MONO_UHCD_CCH.sql", "MONO_UHCD_CCH.txt"),
-    "HTD": ("ORACLE_HTD_DSN", "MONO_UHCD_HTD.sql", "MONO_UHCD_HTD.txt")
-}
+    for f in attachments:
+        data = Path(f).read_bytes()
+        msg.add_attachment(data, maintype="application",
+                           subtype="octet-stream", filename=Path(f).name)
 
-generated_files = []
-
-for site, (dsn_env, sql, txt) in CONFIGS.items():
-    site_dir = OUTPUT / site
-    run_sqlplus(BASE/"sql"/sql, site_dir,
-                os.environ["ORACLE_USER"],
-                os.environ["ORACLE_PASSWORD"],
-                os.environ[dsn_env])
-
-    xlsx = site_dir / f"{site}.xlsx"
-    final = site_dir / f"{site}_FINAL.xlsx"
-
-    txt_to_excel(site_dir/txt, xlsx)
-    decouper_excel(xlsx, final)
-
-    generated_files.append(final)
-
-send_mail(
-    subject="MONO UHCD – Rapport hebdomadaire",
-    body="Veuillez trouver les fichiers en pièce jointe.",
-    attachments=generated_files
-)
+    with smtplib.SMTP(os.environ["MAIL_HOST"], int(os.environ["MAIL_PORT"])) as s:
+        s.send_message(msg)
