@@ -1,39 +1,27 @@
-import pandas as pd
+import smtplib
+from email.message import EmailMessage
+from pathlib import Path
 
-def decouper_excel(input_file, output_file,
-                   date_cols=("DEBUT_EPI", "FIN_EPI")):
-    df = pd.read_excel(input_file)
+def send_mail(mail_from, recipients, subject, body, attachments=None):
+    if attachments is None:
+        attachments = []
 
-    for col in date_cols:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
+    msg = EmailMessage()
+    msg["From"] = mail_from
+    msg["To"] = ", ".join(recipients)
+    msg["Subject"] = subject
+    msg["Reply-To"] = mail_from
 
-    today = pd.Timestamp.today().normalize()
-    week_start = today - pd.Timedelta(days=7)
-    month_start = today.replace(day=1)
-    next_month = month_start + pd.offsets.MonthBegin(1)
-    year_start = pd.Timestamp(today.year, 1, 1)
+    msg.set_content(body)
 
-    def mask(a, b):
-        return (
-            df["DEBUT_EPI"].between(a, b)
-            | df["FIN_EPI"].between(a, b)
+    for f in attachments:
+        p = Path(f)
+        msg.add_attachment(
+            p.read_bytes(),
+            maintype="application",
+            subtype="octet-stream",
+            filename=p.name
         )
 
-    semaine = df[mask(week_start, today)]
-    mois = df[mask(month_start, next_month)]
-    annee = df[mask(year_start, month_start)]
-
-    if "IPP" in df.columns:
-        mois = mois[~mois["IPP"].isin(semaine["IPP"])]
-        annee = annee[~annee["IPP"].isin(semaine["IPP"]) & ~annee["IPP"].isin(mois["IPP"])]
-
-    for d in (semaine, mois, annee):
-        for col in date_cols:
-            if col in d.columns:
-                d[col] = d[col].dt.strftime("%d/%m/%Y")
-
-    with pd.ExcelWriter(output_file, engine="openpyxl") as w:
-        semaine.to_excel(w, "SEMAINE_CCH", index=False)
-        mois.to_excel(w, "MOIS_CCH", index=False)
-        annee.to_excel(w, "ANNEE_CCH", index=False)
+    with smtplib.SMTP("smtp.aphp.fr", 25) as smtp:
+        smtp.send_message(msg)
