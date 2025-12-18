@@ -1,19 +1,32 @@
+import re
+from pathlib import Path
+from openpyxl import Workbook
 
-PS C:\WINDOWS\system32> curl http://localhost:8501
-curl : Impossible de se connecter au serveur distant
-Au caractère Ligne:1 : 1
-+ curl http://localhost:8501
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : InvalidOperation : (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], WebEx
-   ception
-    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+def txt_to_excel(txt_file: Path, xlsx_file: Path):
+    with txt_file.open(encoding="cp1252") as f:
+        lines = [l.rstrip("\n") for l in f if l.strip()]
 
-PS C:\WINDOWS\system32> telnet localhost 8501
-telnet : Le terme «telnet» n'est pas reconnu comme nom d'applet de commande, fonction, fichier de script ou programme
-exécutable. Vérifiez l'orthographe du nom, ou si un chemin d'accès existe, vérifiez que le chemin d'accès est correct
-et réessayez.
-Au caractère Ligne:1 : 1
-+ telnet localhost 8501
-+ ~~~~~~
-    + CategoryInfo          : ObjectNotFound: (telnet:String) [], CommandNotFoundException
-    + FullyQualifiedErrorId : CommandNotFoundException
+    header_idx = next(i for i,l in enumerate(lines) if re.match(r"^-{2,}", l.strip()))
+    dash_line = lines[header_idx]
+
+    columns, in_dash, start = [], False, 0
+    for i, c in enumerate(dash_line + " "):
+        if not in_dash and c == "-":
+            in_dash, start = True, i
+        elif in_dash and c != "-":
+            in_dash = False
+            columns.append((start, i))
+
+    headers = [lines[header_idx-1][s:e].strip() for s,e in columns]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(headers)
+
+    for line in lines[header_idx+1:]:
+        if "sélectionnée" in line.lower():
+            continue
+        ws.append([line[s:e].strip() for s,e in columns])
+
+    wb.save(xlsx_file)
+
