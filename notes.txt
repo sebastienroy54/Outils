@@ -1,38 +1,64 @@
-# Python 3.7 (compatible Oracle 10g)
-FROM python:3.7-buster
+FROM debian:9-slim
 
-# Dépendances système requises par Oracle Instant Client
+RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i '/stretch-updates/d' /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
+
 RUN apt-get update && apt-get install -y \
     libaio1 \
     unzip \
+    ca-certificates \
+    build-essential \
+    wget \
+    libssl-dev \
+    libffi-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libgdbm-dev \
+    libdb5.3-dev \
+    libbz2-dev \
+    libexpat1-dev \
+    liblzma-dev \
+    tk-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Oracle Instant Client 10.2
+WORKDIR /usr/src
+
+RUN wget https://www.python.org/ftp/python/3.7.17/Python-3.7.17.tgz && \
+    tar xzf Python-3.7.17.tgz && \
+    cd Python-3.7.17 && \
+    ./configure --enable-optimizations && \
+    make -j$(nproc) && \
+    make altinstall
+
+RUN python3.7 -m ensurepip && \
+    python3.7 -m pip install --upgrade pip
+
 WORKDIR /opt/oracle
 
-# Copier les ZIP fournis (pas de téléchargement)
 COPY basic-10.2.0.5.0-linux-x64.zip .
 COPY sqlplus-10.2.0.5.0-linux-x64.zip .
 
-RUN unzip basic-10.2.0.5.0-linux-x64.zip \
- && unzip sqlplus-10.2.0.5.0-linux-x64.zip \
- && rm *.zip
+RUN unzip basic-10.2.0.5.0-linux-x64.zip && \
+    unzip sqlplus-10.2.0.5.0-linux-x64.zip && \
+    rm -f *.zip && \
+    ln -sf instantclient_10_2/libclntsh.so.10.1 instantclient_10_2/libclntsh.so && \
+    ln -sf instantclient_10_2/libocci.so.10.1 instantclient_10_2/libocci.so
 
-# Variables Oracle
 ENV ORACLE_HOME=/opt/oracle/instantclient_10_2
-ENV LD_LIBRARY_PATH=$ORACLE_HOME
-ENV PATH=$ORACLE_HOME:$PATH
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_10_2
+ENV PATH=/opt/oracle/instantclient_10_2:$PATH
 
-# App
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python3.7 -m pip install --no-cache-dir -r requirements.txt
 
-COPY app /app
-COPY sql /app/sql
+COPY . .
 
-# Dossier output
-RUN mkdir -p /app/output
-
-CMD ["python", "/app/main.py"]
+EXPOSE 8501
+CMD ["python3.7", "-m", "streamlit", "run", "app.py", "--server.address=0.0.0.0"]
