@@ -1,20 +1,4 @@
 docker run --rm \
   -v /home/github:/github \
   monouhcd-image \
-  python3.7 - << 'EOF'
-import yaml
-from pprint import pprint
-from pathlib import Path
-
-p = Path("/github/stream/storage/query/dsn/simpa_cch.yml")
-cfg = yaml.safe_load(p.read_text())
-
-print("\n=== CLÉS NIVEAU RACINE ===")
-pprint(cfg.keys())
-
-print("\n=== CLÉS doctrine ===")
-pprint(cfg.get("doctrine", {}).keys())
-
-print("\n=== CONTENU dbal ===")
-pprint(cfg.get("doctrine", {}).get("dbal"))
-EOF
+  python3.7 -c "import yaml; from pathlib import Path; from pprint import pprint; p=Path('/github/stream/storage/query/dsn/simpa_cch.yml'); cfg=yaml.safe_load(p.read_text()); print('ROOT:', cfg.keys()); print('DOCTRINE:', cfg.get('doctrine', {}).keys()); print('DBAL:', cfg.get('doctrine', {}).get('dbal'))"
