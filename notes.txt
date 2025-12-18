@@ -1,30 +1,76 @@
-from mailer import send_mail
 import os
+from pathlib import Path
 
-# fichiers générés auparavant
-cch_file = "/app/output/CCH/CCH_FINAL.xlsx"
-htd_file = "/app/output/HTD/HTD_FINAL.xlsx"
+from oracle_runner import run_sqlplus
+from txt_to_excel import txt_to_excel
+from code_decoupage import decouper_excel
+from mailer import send_mail
 
-# --- Mail CCH ---
-send_mail(
-    subject="MONO UHCD – Rapport CCH",
-    body=(
-        "Bonjour,\n\n"
-        "Veuillez trouver en pièce jointe le rapport MONO UHCD – CCH.\n"
-        "Découpage : semaine / mois / année."
-    ),
-    recipients=os.environ["MAIL_TO_CCH"],
-    attachments=[cch_file]
-)
+# --- Répertoires ---
+BASE_DIR = Path(__file__).resolve().parent
+SQL_DIR = BASE_DIR / "sql"
+OUTPUT_DIR = BASE_DIR / "output"
 
-# --- Mail HTD ---
-send_mail(
-    subject="MONO UHCD – Rapport HTD",
-    body=(
-        "Bonjour,\n\n"
-        "Veuillez trouver en pièce jointe le rapport MONO UHCD – HTD.\n"
-        "Découpage : semaine / mois / année."
-    ),
-    recipients=os.environ["MAIL_TO_HTD"],
-    attachments=[htd_file]
-)
+# --- Config par site ---
+SITES = {
+    "CCH": {
+        "dsn_env": "ORACLE_CCH_DSN",
+        "sql_file": "MONO_UHCD_CCH.sql",
+        "mail_to_env": "MAIL_TO_CCH"
+    },
+    "HTD": {
+        "dsn_env": "ORACLE_HTD_DSN",
+        "sql_file": "MONO_UHCD_HTD.sql",
+        "mail_to_env": "MAIL_TO_HTD"
+    }
+}
+
+# --- Credentials Oracle ---
+ORACLE_USER = os.environ["ORACLE_USER"]
+ORACLE_PASSWORD = os.environ["ORACLE_PASSWORD"]
+
+generated_files = {}
+
+for site, cfg in SITES.items():
+    print(f"▶ Traitement {site}")
+
+    site_dir = OUTPUT_DIR / site
+    site_dir.mkdir(parents=True, exist_ok=True)
+
+    # 1️⃣ Exécution SQL*Plus
+    run_sqlplus(
+        sql_file=SQL_DIR / cfg["sql_file"],
+        output_dir=site_dir,
+        user=ORACLE_USER,
+        password=ORACLE_PASSWORD,
+        dsn=os.environ[cfg["dsn_env"]]
+    )
+
+    # 2️⃣ TXT → Excel
+    txt_file = site_dir / f"MONO_UHCD_{site}.txt"
+    excel_raw = site_dir / f"MONO_UHCD_{site}_RAW.xlsx"
+    excel_final = site_dir / f"MONO_UHCD_{site}.xlsx"
+
+    txt_to_excel(txt_file, excel_raw)
+
+    # 3️⃣ Découpage semaine / mois / année
+    decouper_excel(excel_raw, excel_final)
+
+    generated_files[site] = excel_final
+
+# 4️⃣ Envoi des mails (séparés)
+for site, cfg in SITES.items():
+    send_mail(
+        subject=f"MONO UHCD – Rapport {site}",
+        body=(
+            f"Bonjour,\n\n"
+            f"Veuillez trouver en pièce jointe le rapport MONO UHCD – {site}.\n"
+            f"Découpage : semaine / mois / année.\n\n"
+            f"---\n"
+            f"Mail généré automatiquement, merci de ne pas répondre."
+        ),
+        recipients=os.environ[cfg["mail_to_env"]],
+        attachments=[generated_files[site]]
+    )
+
+print("✅ Traitement complet terminé")
