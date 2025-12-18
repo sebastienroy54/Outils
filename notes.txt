@@ -1,4 +1,3 @@
-docker run --rm \
-  -v /home/github:/github \
-  monouhcd-image \
-  python3.7 -c "import yaml; from pathlib import Path; from pprint import pprint; p=Path('/github/stream/storage/query/dsn/simpa_cch.yml'); cfg=yaml.safe_load(p.read_text()); print('ROOT:', cfg.keys()); print('DOCTRINE:', cfg.get('doctrine', {}).keys()); print('DBAL:', cfg.get('doctrine', {}).get('dbal'))"
+ROOT: dict_keys(['doctrine'])
+DOCTRINE: dict_keys(['dbal'])
+DBAL: {'driver': 'oci8', 'dbname': 'SIP1CCH', 'host': 'o-simpa-b1.cch.aphp.fr', 'port': '10805', 'user': 'xxx', 'password': 'xxx', 'charset': 'AL32UTF8'}
