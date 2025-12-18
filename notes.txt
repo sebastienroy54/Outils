@@ -1,10 +1,12 @@
 FROM debian:9-slim
 
+# --- Fix Debian 9 (EOL)
 RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
     sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
     sed -i '/stretch-updates/d' /etc/apt/sources.list && \
     echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
 
+# --- Dépendances système + build Python
 RUN apt-get update && apt-get install -y \
     libaio1 \
     unzip \
@@ -26,6 +28,7 @@ RUN apt-get update && apt-get install -y \
     tk-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# --- Build Python 3.7.17
 WORKDIR /usr/src
 
 RUN wget https://www.python.org/ftp/python/3.7.17/Python-3.7.17.tgz && \
@@ -38,6 +41,7 @@ RUN wget https://www.python.org/ftp/python/3.7.17/Python-3.7.17.tgz && \
 RUN python3.7 -m ensurepip && \
     python3.7 -m pip install --upgrade pip
 
+# --- Oracle Instant Client 10.2
 WORKDIR /opt/oracle
 
 COPY basic-10.2.0.5.0-linux-x64.zip .
@@ -53,12 +57,17 @@ ENV ORACLE_HOME=/opt/oracle/instantclient_10_2
 ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_10_2
 ENV PATH=/opt/oracle/instantclient_10_2:$PATH
 
+# --- Application
 WORKDIR /app
 
 COPY requirements.txt .
 RUN python3.7 -m pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Code + SQL
+COPY app /app
+COPY sql /app/sql
 
-EXPOSE 8501
-CMD ["python3.7", "-m", "streamlit", "run", "app.py", "--server.address=0.0.0.0"]
+RUN mkdir -p /app/output
+
+# --- Lancement (cron / manuel)
+CMD ["python3.7", "/app/main.py"]
