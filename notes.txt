@@ -1,27 +1,38 @@
-import smtplib
-from email.message import EmailMessage
-from pathlib import Path
+# Python 3.7 (compatible Oracle 10g)
+FROM python:3.7-buster
 
-def send_mail(mail_from, recipients, subject, body, attachments=None):
-    if attachments is None:
-        attachments = []
+# Dépendances système requises par Oracle Instant Client
+RUN apt-get update && apt-get install -y \
+    libaio1 \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
 
-    msg = EmailMessage()
-    msg["From"] = mail_from
-    msg["To"] = ", ".join(recipients)
-    msg["Subject"] = subject
-    msg["Reply-To"] = mail_from
+# Oracle Instant Client 10.2
+WORKDIR /opt/oracle
 
-    msg.set_content(body)
+# Copier les ZIP fournis (pas de téléchargement)
+COPY basic-10.2.0.5.0-linux-x64.zip .
+COPY sqlplus-10.2.0.5.0-linux-x64.zip .
 
-    for f in attachments:
-        p = Path(f)
-        msg.add_attachment(
-            p.read_bytes(),
-            maintype="application",
-            subtype="octet-stream",
-            filename=p.name
-        )
+RUN unzip basic-10.2.0.5.0-linux-x64.zip \
+ && unzip sqlplus-10.2.0.5.0-linux-x64.zip \
+ && rm *.zip
 
-    with smtplib.SMTP("smtp.aphp.fr", 25) as smtp:
-        smtp.send_message(msg)
+# Variables Oracle
+ENV ORACLE_HOME=/opt/oracle/instantclient_10_2
+ENV LD_LIBRARY_PATH=$ORACLE_HOME
+ENV PATH=$ORACLE_HOME:$PATH
+
+# App
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app /app
+COPY sql /app/sql
+
+# Dossier output
+RUN mkdir -p /app/output
+
+CMD ["python", "/app/main.py"]
