@@ -1,89 +1,18 @@
-import os
-import json
-from pathlib import Path
+### EXH JULIA ###
+00 08 * * *  /home/crontab/julia_exh.sh >> /var/log/exh.log 2>1
+#40 06 * * *  /home/crontab/julia_exhghu.sh >> /var/log/exh.log 2>1
+#35 06 * * 1  /home/crontab/julia_exh_ssr.sh >> /var/log/exh.log 2>1
+#30 08 * * *  /home/crontab/julia_exh-daily.sh >> /var/log/exh.log 2>1
 
-from oracle_runner import run_sqlplus
-from txt_to_excel import txt_to_excel
-from code_decoupage import decouper_excel
-from mailer import send_mail
+### REJETS JULIA ###
+#50 06 * * *  /home/crontab/julia_rejets_simpa.sh >> /var/log/exh.log 2>1
 
-# --- Répertoires Docker ---
-APP_DIR = Path("/app")
-CONFIG_DIR = Path("/config")
+### MONORUM UHCD > 0j ### Execution le Lundi Matin
+#00 08 * * 1 /home/crontab/julia_monorum_uhcd.sh
 
-SQL_DIR = APP_DIR / "sql"
-OUTPUT_DIR = APP_DIR / "output"
+### EOH ISO ### Execution le premier jour du mois
+#00 05 01 * * /home/crontab/julia_eoh.sh
 
-MAIL_CONFIG_FILE = CONFIG_DIR / "mail_config.json"
+### DBAI ### Execution le premier jour du mois (trimestriel)
+#00 07 01 * * /home/crontab/julia_dbai.sh
 
-# --- Vérifications ---
-if not MAIL_CONFIG_FILE.exists():
-    raise FileNotFoundError(f"Config mail introuvable : {MAIL_CONFIG_FILE}")
-
-with MAIL_CONFIG_FILE.open(encoding="utf-8") as f:
-    mail_config = json.load(f)
-
-ORACLE_USER = os.environ["ORACLE_USER"]
-ORACLE_PASSWORD = os.environ["ORACLE_PASSWORD"]
-
-SITES = {
-    "CCH": {
-        "dsn_env": "ORACLE_CCH_DSN",
-        "sql_file": "MONO_UHCD_CCH.sql"
-    },
-    "HTD": {
-        "dsn_env": "ORACLE_HTD_DSN",
-        "sql_file": "MONO_UHCD_HTD.sql"
-    }
-}
-
-generated_files = {}
-
-for site, cfg in SITES.items():
-    print(f"▶ Traitement {site}")
-
-    site_dir = OUTPUT_DIR / site
-    site_dir.mkdir(parents=True, exist_ok=True)
-
-    # 1️⃣ SQL*Plus
-    run_sqlplus(
-        sql_file=SQL_DIR / cfg["sql_file"],
-        output_dir=site_dir,
-        user=ORACLE_USER,
-        password=ORACLE_PASSWORD,
-        dsn=os.environ[cfg["dsn_env"]]
-    )
-
-    txt_file = site_dir / f"MONO_UHCD_{site}.txt"
-    excel_final = site_dir / f"MONO_UHCD_{site}.xlsx"
-
-    # 2️⃣ TXT → Excel final (pas de RAW conservé)
-    txt_to_excel(txt_file, excel_final)
-
-    # 3️⃣ Découpage
-    decouper_excel(excel_final, excel_final)
-
-    # Nettoyage
-    if txt_file.exists():
-        txt_file.unlink()
-
-    generated_files[site] = excel_final
-
-# 4️⃣ Envoi des mails (séparés)
-for site, file in generated_files.items():
-    recipients = ",".join(mail_config[site]["to"])
-
-    send_mail(
-        subject=f"MONO UHCD – Rapport {site}",
-        body=(
-            "Bonjour,\n\n"
-            f"Veuillez trouver en pièce jointe le rapport MONO UHCD – {site}.\n\n"
-            "---\n"
-            "Mail généré automatiquement.\n"
-            "Merci de ne pas répondre."
-        ),
-        recipients=recipients,
-        attachments=[file]
-    )
-
-print("✅ MONO UHCD – traitement terminé")
