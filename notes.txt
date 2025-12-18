@@ -1,2 +1,19 @@
-vitrygtr@Pro:~$ curl http://localhost:8501
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no"/><link rel="shortcut icon" href="./favicon.png"/><title>Streamlit</title><script>window.prerenderReady=!1</script><script defer="defer" src="./static/js/main.4e910df2.js"></script><link href="./static/css/main.f4a8738f.css" rel="stylesheet"></head><body><noscript>You need to enable JavaScript to run this app.</noscript><div id="root"></div></body></html>vitrygtr@Pro:~$ 
+
+PS C:\WINDOWS\system32> curl http://localhost:8501
+curl : Impossible de se connecter au serveur distant
+Au caractère Ligne:1 : 1
++ curl http://localhost:8501
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation : (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], WebEx
+   ception
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+
+PS C:\WINDOWS\system32> telnet localhost 8501
+telnet : Le terme «telnet» n'est pas reconnu comme nom d'applet de commande, fonction, fichier de script ou programme
+exécutable. Vérifiez l'orthographe du nom, ou si un chemin d'accès existe, vérifiez que le chemin d'accès est correct
+et réessayez.
+Au caractère Ligne:1 : 1
++ telnet localhost 8501
++ ~~~~~~
+    + CategoryInfo          : ObjectNotFound: (telnet:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
