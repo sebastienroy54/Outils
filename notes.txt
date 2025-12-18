@@ -1,32 +1,32 @@
-import re
-from pathlib import Path
-from openpyxl import Workbook
+import pandas as pd
 
-def txt_to_excel(txt_file: Path, xlsx_file: Path):
-    with txt_file.open(encoding="cp1252") as f:
-        lines = [l.rstrip("\n") for l in f if l.strip()]
+def decouper_excel(input_file, output_file):
+    df = pd.read_excel(input_file)
+    for c in ["DEBUT_EPI","FIN_EPI"]:
+        df[c] = pd.to_datetime(df[c], dayfirst=True, errors="coerce")
 
-    header_idx = next(i for i,l in enumerate(lines) if re.match(r"^-{2,}", l.strip()))
-    dash_line = lines[header_idx]
+    today = pd.Timestamp.today().normalize()
+    week_start = today - pd.Timedelta(days=7)
+    month_start = today.replace(day=1)
+    next_month = month_start + pd.offsets.MonthBegin(1)
+    year_start = pd.Timestamp(today.year, 1, 1)
 
-    columns, in_dash, start = [], False, 0
-    for i, c in enumerate(dash_line + " "):
-        if not in_dash and c == "-":
-            in_dash, start = True, i
-        elif in_dash and c != "-":
-            in_dash = False
-            columns.append((start, i))
+    def mask(a,b):
+        return ((df["DEBUT_EPI"].between(a,b)) | (df["FIN_EPI"].between(a,b)))
 
-    headers = [lines[header_idx-1][s:e].strip() for s,e in columns]
+    semaine = df[mask(week_start,today)]
+    mois = df[mask(month_start,next_month)]
+    annee = df[mask(year_start,month_start)]
 
-    wb = Workbook()
-    ws = wb.active
-    ws.append(headers)
+    if "IPP" in df.columns:
+        mois = mois[~mois["IPP"].isin(semaine["IPP"])]
+        annee = annee[~annee["IPP"].isin(semaine["IPP"]) & ~annee["IPP"].isin(mois["IPP"])]
 
-    for line in lines[header_idx+1:]:
-        if "sélectionnée" in line.lower():
-            continue
-        ws.append([line[s:e].strip() for s,e in columns])
+    for d in (semaine, mois, annee):
+        for c in ["DEBUT_EPI","FIN_EPI"]:
+            d[c] = d[c].dt.strftime("%d/%m/%Y")
 
-    wb.save(xlsx_file)
-
+    with pd.ExcelWriter(output_file, engine="openpyxl") as w:
+        semaine.to_excel(w,"SEMAINE_CCH",index=False)
+        mois.to_excel(w,"MOIS_CCH",index=False)
+        annee.to_excel(w,"ANNEE_CCH",index=False)
