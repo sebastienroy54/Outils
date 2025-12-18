@@ -1,9 +1,12 @@
 import smtplib
 from email.message import EmailMessage
-from pathlib import Path
 import os
+from pathlib import Path
 
-def send_mail(subject, body, attachments):
+def send_mail(subject, body, attachments=None):
+    if attachments is None:
+        attachments = []
+
     msg = EmailMessage()
     msg["From"] = os.environ["MAIL_FROM"]
     msg["To"] = os.environ["MAIL_TO"]
@@ -11,9 +14,13 @@ def send_mail(subject, body, attachments):
     msg.set_content(body)
 
     for f in attachments:
-        data = Path(f).read_bytes()
-        msg.add_attachment(data, maintype="application",
-                           subtype="octet-stream", filename=Path(f).name)
+        path = Path(f)
+        msg.add_attachment(
+            path.read_bytes(),
+            maintype="application",
+            subtype="octet-stream",
+            filename=path.name
+        )
 
     with smtplib.SMTP(os.environ["MAIL_HOST"], int(os.environ["MAIL_PORT"])) as s:
         s.send_message(msg)
