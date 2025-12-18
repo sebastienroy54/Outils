@@ -1,26 +1,30 @@
-import smtplib
-from email.message import EmailMessage
+from mailer import send_mail
 import os
-from pathlib import Path
 
-def send_mail(subject, body, attachments=None):
-    if attachments is None:
-        attachments = []
+# fichiers générés auparavant
+cch_file = "/app/output/CCH/CCH_FINAL.xlsx"
+htd_file = "/app/output/HTD/HTD_FINAL.xlsx"
 
-    msg = EmailMessage()
-    msg["From"] = os.environ["MAIL_FROM"]
-    msg["To"] = os.environ["MAIL_TO"]
-    msg["Subject"] = subject
-    msg.set_content(body)
+# --- Mail CCH ---
+send_mail(
+    subject="MONO UHCD – Rapport CCH",
+    body=(
+        "Bonjour,\n\n"
+        "Veuillez trouver en pièce jointe le rapport MONO UHCD – CCH.\n"
+        "Découpage : semaine / mois / année."
+    ),
+    recipients=os.environ["MAIL_TO_CCH"],
+    attachments=[cch_file]
+)
 
-    for f in attachments:
-        path = Path(f)
-        msg.add_attachment(
-            path.read_bytes(),
-            maintype="application",
-            subtype="octet-stream",
-            filename=path.name
-        )
-
-    with smtplib.SMTP(os.environ["MAIL_HOST"], int(os.environ["MAIL_PORT"])) as s:
-        s.send_message(msg)
+# --- Mail HTD ---
+send_mail(
+    subject="MONO UHCD – Rapport HTD",
+    body=(
+        "Bonjour,\n\n"
+        "Veuillez trouver en pièce jointe le rapport MONO UHCD – HTD.\n"
+        "Découpage : semaine / mois / année."
+    ),
+    recipients=os.environ["MAIL_TO_HTD"],
+    attachments=[htd_file]
+)
