@@ -1,12 +1,39 @@
-import subprocess
-from pathlib import Path
+import pandas as pd
 
-def run_sqlplus(sql_file: Path, output_dir: Path,
-                host: str, port: int, user: str, password: str):
+def decouper_excel(input_file, output_file,
+                   date_cols=("DEBUT_EPI", "FIN_EPI")):
+    df = pd.read_excel(input_file)
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
 
-    connect = f"{user}/{password}@{host}:{port}"
-    cmd = f"sqlplus -S {connect} @{sql_file}"
+    today = pd.Timestamp.today().normalize()
+    week_start = today - pd.Timedelta(days=7)
+    month_start = today.replace(day=1)
+    next_month = month_start + pd.offsets.MonthBegin(1)
+    year_start = pd.Timestamp(today.year, 1, 1)
 
-    subprocess.run(cmd, shell=True, check=True)
+    def mask(a, b):
+        return (
+            df["DEBUT_EPI"].between(a, b)
+            | df["FIN_EPI"].between(a, b)
+        )
+
+    semaine = df[mask(week_start, today)]
+    mois = df[mask(month_start, next_month)]
+    annee = df[mask(year_start, month_start)]
+
+    if "IPP" in df.columns:
+        mois = mois[~mois["IPP"].isin(semaine["IPP"])]
+        annee = annee[~annee["IPP"].isin(semaine["IPP"]) & ~annee["IPP"].isin(mois["IPP"])]
+
+    for d in (semaine, mois, annee):
+        for col in date_cols:
+            if col in d.columns:
+                d[col] = d[col].dt.strftime("%d/%m/%Y")
+
+    with pd.ExcelWriter(output_file, engine="openpyxl") as w:
+        semaine.to_excel(w, "SEMAINE_CCH", index=False)
+        mois.to_excel(w, "MOIS_CCH", index=False)
+        annee.to_excel(w, "ANNEE_CCH", index=False)
