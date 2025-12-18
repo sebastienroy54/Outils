@@ -287,3 +287,14 @@ def main():
                 file_name=f"doublons_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
+
+StreamlitAPIException: set_page_config() can only be called once per app page, and must be called as the first Streamlit command in your script.
+
+For more information refer to the docs.
+Traceback:
+
+File "/app/app.py", line 15, in <module>
+    doublons_app.main()
+File "/app/outils/doublons_app.py", line 42, in main
+    layout="centered"
