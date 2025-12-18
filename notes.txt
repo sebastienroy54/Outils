@@ -1,32 +1,37 @@
-import pandas as pd
+import os
+from pathlib import Path
+from oracle_runner import run_sqlplus
+from txt_to_excel import txt_to_excel
+from code_decoupage import decouper_excel
+from mailer import send_mail
 
-def decouper_excel(input_file, output_file):
-    df = pd.read_excel(input_file)
-    for c in ["DEBUT_EPI","FIN_EPI"]:
-        df[c] = pd.to_datetime(df[c], dayfirst=True, errors="coerce")
+BASE = Path("/app")
+OUTPUT = BASE / "output"
 
-    today = pd.Timestamp.today().normalize()
-    week_start = today - pd.Timedelta(days=7)
-    month_start = today.replace(day=1)
-    next_month = month_start + pd.offsets.MonthBegin(1)
-    year_start = pd.Timestamp(today.year, 1, 1)
+CONFIGS = {
+    "CCH": ("ORACLE_CCH_DSN", "MONO_UHCD_CCH.sql", "MONO_UHCD_CCH.txt"),
+    "HTD": ("ORACLE_HTD_DSN", "MONO_UHCD_HTD.sql", "MONO_UHCD_HTD.txt")
+}
 
-    def mask(a,b):
-        return ((df["DEBUT_EPI"].between(a,b)) | (df["FIN_EPI"].between(a,b)))
+generated_files = []
 
-    semaine = df[mask(week_start,today)]
-    mois = df[mask(month_start,next_month)]
-    annee = df[mask(year_start,month_start)]
+for site, (dsn_env, sql, txt) in CONFIGS.items():
+    site_dir = OUTPUT / site
+    run_sqlplus(BASE/"sql"/sql, site_dir,
+                os.environ["ORACLE_USER"],
+                os.environ["ORACLE_PASSWORD"],
+                os.environ[dsn_env])
 
-    if "IPP" in df.columns:
-        mois = mois[~mois["IPP"].isin(semaine["IPP"])]
-        annee = annee[~annee["IPP"].isin(semaine["IPP"]) & ~annee["IPP"].isin(mois["IPP"])]
+    xlsx = site_dir / f"{site}.xlsx"
+    final = site_dir / f"{site}_FINAL.xlsx"
 
-    for d in (semaine, mois, annee):
-        for c in ["DEBUT_EPI","FIN_EPI"]:
-            d[c] = d[c].dt.strftime("%d/%m/%Y")
+    txt_to_excel(site_dir/txt, xlsx)
+    decouper_excel(xlsx, final)
 
-    with pd.ExcelWriter(output_file, engine="openpyxl") as w:
-        semaine.to_excel(w,"SEMAINE_CCH",index=False)
-        mois.to_excel(w,"MOIS_CCH",index=False)
-        annee.to_excel(w,"ANNEE_CCH",index=False)
+    generated_files.append(final)
+
+send_mail(
+    subject="MONO UHCD – Rapport hebdomadaire",
+    body="Veuillez trouver les fichiers en pièce jointe.",
+    attachments=generated_files
+)
