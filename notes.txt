@@ -1,3 +1,1 @@
-CONTAINER ID   IMAGE            COMMAND                  CREATED       STATUS                   PORTS     NAMES
-869f1cc9f127   portail-outils   "python3.7 -m stream…"   2 weeks ago   Exited (0) 2 weeks ago             strange_newton
-2e2571a38e51   portail-outils   "python3.7 -m stream…"   2 weeks ago   Exited (0) 2 weeks ago             inspiring_vaughan
+portail-outils   latest    f04ffb3ea892   2 weeks ago   1.56GB
