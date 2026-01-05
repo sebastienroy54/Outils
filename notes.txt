@@ -1,2 +1,20 @@
-LISTEN 0      128          0.0.0.0:8501       0.0.0.0:*    users:(("streamlit",pid=7877,fd=6))      
-LISTEN 0      128             [::]:8501          [::]:*    users:(("streamlit",pid=7877,fd=7)) 
+SELECT
+    COUNT(DISTINCT CASE
+        WHEN S.AGEE >= 71 THEN R.NOIP
+    END) AS NB_70P,
+    COUNT(DISTINCT R.NOIP) AS NB_TOTAL,
+    ROUND(
+        COUNT(DISTINCT CASE
+            WHEN S.AGEE >= 71 THEN R.NOIP
+        END)
+        / COUNT(DISTINCT R.NOIP)
+        * 100
+    , 2) AS TAUX_70P
+FROM
+    RSM R,
+    SDO S
+WHERE
+    R.NODA = S.KYNODA
+    AND R.CDURM_P IN ('011','011J')
+    AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+    AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY');
