@@ -1,21 +1,50 @@
 SELECT
-    E.KYNODA AS NDA,
-    E.NORES  AS KYRES,
-    E.D8SOUE AS SORTIE_UE,
-    COUNT(D.KYCDDG) AS NB_DAS
+    NDA,
+    KYRES,
+    UM,
+    UH,
+    ENTREE_UE,
+    SORTIE_UE,
+    DP,
+    MAX(CASE WHEN RN = 1 THEN DAS END) AS DAS1,
+    MAX(CASE WHEN RN = 2 THEN DAS END) AS DAS2,
+    MAX(CASE WHEN RN = 3 THEN DAS END) AS DAS3,
+    MAX(CASE WHEN RN = 4 THEN DAS END) AS DAS4
 FROM
-    EPI E,
-    RSM R,
-    DGN D
-WHERE
-    E.NORES = R.KYRES
-    AND D.KYRES(+) = R.KYRES
-    AND E.CDURM_P = '146J'
-    AND E.D8SOUE >= TO_DATE('01/11/2024','DD/MM/YYYY')
-    AND E.D8SOUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+(
+    SELECT
+        E.KYNODA     AS NDA,
+        E.NORES      AS KYRES,
+        E.CDURM_P    AS UM,
+        E.UE         AS UH,
+        E.D8EEUE     AS ENTREE_UE,
+        E.D8SOUE     AS SORTIE_UE,
+        R.CDDNC9     AS DP,
+        D.KYCDDG     AS DAS,
+        ROW_NUMBER() OVER (
+            PARTITION BY E.NORES
+            ORDER BY D.KYCDDG
+        ) AS RN
+    FROM
+        EPI E,
+        RSM R,
+        DGN D
+    WHERE
+        E.NORES = R.KYRES
+        AND D.KYRES(+) = R.KYRES
+        AND E.CDURM_P = '146J'
+        AND E.D8SOUE >= TO_DATE('01/11/2024','DD/MM/YYYY')
+        AND E.D8SOUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+)
 GROUP BY
-    E.KYNODA, E.NORES, E.D8SOUE
-HAVING
-    COUNT(D.KYCDDG) > 1
+    NDA,
+    KYRES,
+    UM,
+    UH,
+    ENTREE_UE,
+    SORTIE_UE,
+    DP
 ORDER BY
-    NB_DAS DESC, SORTIE_UE;
+    SORTIE_UE, NDA;
+
+SPOOL OFF
