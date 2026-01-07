@@ -1,105 +1,34 @@
-try:
-    res = pd.DataFrame(rows).drop_duplicates()
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 400
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
 
-    # Génère un identifiant de paire stable (une paire = 2 lignes dans l’Excel)
-    # Ici : un ID simple basé sur l’index (suffisant pour usage Excel)
-    res = res.reset_index(drop=True)
-    res["PAIR_ID"] = res.index + 1  # 1,2,3...
+SPOOL C:/Users/4251352/Documents/hdj_146J_nov2024_dec2025_detail.csv
 
-    def build_rows_instead_of_columns(df_rel, keep_ghm: bool):
-        """
-        Transforme un DF relationnel (NDA1...NDA2...) en format lignes :
-        2 lignes par relation + colonne COMMENTAIRE vide.
-        """
-        # LIGNE "séjour 1"
-        left_cols = {
-            "IPP": "IPP",
-            "DATE_NAISSANCE": "DATE_NAISSANCE",
-            "NDA": "NDA1",
-            "UMA": "UMA1",
-            "DATE_ENTREE": "DATEE1",
-            "DATE_SORTIE": "DATES1",
-            "PAIR_ID": "PAIR_ID"
-        }
-        if keep_ghm:
-            left_cols["GHM"] = "GHM1"
+SELECT
+    E.KYNODA         AS NDA,
+    E.NORES          AS KYRES,
+    E.CDURM_P        AS UM,
+    E.UE             AS UH,
+    E.D8EEUE         AS ENTREE_UE,
+    E.D8SOUE         AS SORTIE_UE,
+    R.CDDNC9         AS DP,
+    D.KYCDDG         AS DAS
+FROM
+    EPI E,
+    RSM R,
+    DGN D
+WHERE
+    E.NORES = R.KYRES
+    AND D.KYRES(+) = R.KYRES
+    AND E.CDURM_P = '146J'
+    AND E.D8SOUE >= TO_DATE('01/11/2024','DD/MM/YYYY')
+    AND E.D8SOUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+ORDER BY
+    E.D8SOUE, E.KYNODA, D.KYCDDG;
 
-        df1 = df_rel[list(left_cols.values())].copy()
-        df1.columns = list(left_cols.keys())
-        df1["LIGNE"] = 1
-
-        # LIGNE "séjour 2"
-        right_cols = {
-            "IPP": "IPP",
-            "DATE_NAISSANCE": "DATE_NAISSANCE",
-            "NDA": "NDA2",
-            "UMA": "UMA2",
-            "DATE_ENTREE": "DATEE2",
-            "DATE_SORTIE": "DATES2",
-            "PAIR_ID": "PAIR_ID"
-        }
-        if keep_ghm:
-            right_cols["GHM"] = "GHM2"
-
-        df2 = df_rel[list(right_cols.values())].copy()
-        df2.columns = list(right_cols.keys())
-        df2["LIGNE"] = 2
-
-        out = pd.concat([df1, df2], ignore_index=True)
-
-        # Formatage dates dd/mm/yyyy
-        for c in ["DATE_ENTREE", "DATE_SORTIE"]:
-            out[c] = pd.to_datetime(out[c], errors="coerce").dt.strftime("%d/%m/%Y")
-
-        # Colonne commentaire à remplir par les utilisateurs
-        out["COMMENTAIRE"] = ""
-
-        # Réorganisation colonnes
-        if keep_ghm:
-            out = out[["IPP", "DATE_NAISSANCE", "PAIR_ID", "LIGNE", "NDA", "UMA", "GHM",
-                       "DATE_ENTREE", "DATE_SORTIE", "COMMENTAIRE"]]
-        else:
-            out = out[["IPP", "DATE_NAISSANCE", "PAIR_ID", "LIGNE", "NDA", "UMA",
-                       "DATE_ENTREE", "DATE_SORTIE", "COMMENTAIRE"]]
-
-        # Tri pour lecture
-        out = out.sort_values(["IPP", "PAIR_ID", "LIGNE"]).reset_index(drop=True)
-        return out
-
-    with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
-        for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
-            subset = res[res["TYPE_RELATION"] == groupe].copy()
-
-            # On enlève la colonne interne TYPE_RELATION (pas d’export)
-            subset = subset.drop(columns=["TYPE_RELATION"], errors="ignore")
-
-            keep_ghm = (groupe == "CONTIGUS")
-
-            if subset.empty:
-                # Patron vide
-                if keep_ghm:
-                    df_to_write = pd.DataFrame([{
-                        "IPP": "N/A", "DATE_NAISSANCE": "N/A", "PAIR_ID": "N/A", "LIGNE": "N/A",
-                        "NDA": "N/A", "UMA": "N/A", "GHM": "N/A",
-                        "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A", "COMMENTAIRE": ""
-                    }])
-                else:
-                    df_to_write = pd.DataFrame([{
-                        "IPP": "N/A", "DATE_NAISSANCE": "N/A", "PAIR_ID": "N/A", "LIGNE": "N/A",
-                        "NDA": "N/A", "UMA": "N/A",
-                        "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A", "COMMENTAIRE": ""
-                    }])
-            else:
-                df_to_write = build_rows_instead_of_columns(subset, keep_ghm=keep_ghm)
-
-            df_to_write.to_excel(writer, sheet_name=groupe, index=False)
-
-            # Ajuste largeur des colonnes
-            ws = writer.sheets[groupe]
-            for i, col in enumerate(df_to_write.columns):
-                max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
-                ws.column_dimensions[ws.cell(row=1, column=i + 1).column_letter].width = max_len
-
-except Exception as e:
-    st.error(f"Erreur écriture Excel : {e}")
-    return
+SPOOL OFF
