@@ -1,2 +1,11 @@
-CONTAINER ID   IMAGE            COMMAND                  CREATED      STATUS                    PORTS                                         NAMES
-aa1e3630e6d2   portail-outils   "python3.7 -m stream…"   3 days ago   Exited (255) 3 days ago   0.0.0.0:8501->8501/tcp, [::]:8501->8501/tcp   portail-outils
+vitrygtr@Pro:/media/sf_Portail_outils$ docker exec -it portail-outils bash -lc 'ls -la /app | head'
+total 36825
+drwxrwx--- 1 root  999     4096 Jan  5 10:31 .
+drwxr-xr-x 1 root root     4096 Jan  8 13:34 ..
+-rwxrwx--- 1 root  999       36 Dec  8 17:35 .dockerignore
+-rwxrwx--- 1 root  999     1840 Dec 16 17:26 Dockerfile
+drwxrwx--- 1 root  999     4096 Jan  6 09:32 SQL
+-rwxrwx--- 1 root  999      859 Dec  1 08:59 app.py
+-rwxrwx--- 1 root  999 36840810 Oct 15 07:44 basic-10.2.0.5.0-linux-x64.zip
+-rwxrwx--- 1 root  999    16647 Oct 14 14:08 chirurgiens_urologie.xlsx
+drwxrwx--- 1 root  999     4096 Dec 15 16:59 data
