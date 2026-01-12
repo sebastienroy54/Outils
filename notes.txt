@@ -1,1 +1,1 @@
-docker exec -it portail-outils bash -lc 'ls -la /app/data && touch /app/data/_test_write && ls -la /app/data/_test_write'
+docker exec -it portail-outils bash -lc 'sqlplus -S "USER/PASS@TON_DSN" @/app/SQL/contigus.sql; echo "RC=$?"'
