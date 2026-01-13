@@ -1,46 +1,3 @@
-import streamlit as st
-import pandas as pd
-import subprocess
-from io import BytesIO
-from datetime import datetime
-from pathlib import Path
-import tempfile
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-SQL_DIR = BASE_DIR / "SQL"
-DATA_DIR = BASE_DIR / "data"
-
-TEST_SQL = SQL_DIR / "test_connexion.sql"
-MAIN_SQL = SQL_DIR / "contigus.sql"
-CSV_PATH = DATA_DIR / "resultat.csv"
-OUTPUT_PATH = DATA_DIR / "doublons.xlsx"
-
-def test_oracle_connection(user, password, tns_alias):
-    cmd = ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{TEST_SQL}"]
-
-    try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=10
-        )
-
-        if result.returncode != 0:
-            st.error("Connexion Oracle échouée")
-            st.code(result.stderr or result.stdout)
-            return False
-
-        return True
-
-    except subprocess.TimeoutExpired:
-        st.error("Connexion Oracle: timeout")
-        return False
-    except Exception as e:
-        st.error(f"Connexion Oracle: erreur inattendue: {e}")
-        return False
-
 def main():
     st.title("Détection des Doublons, Contigus et Chevauchements")
     st.markdown(
@@ -143,14 +100,20 @@ def main():
             df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
             df = df.sort_values(["IPP", "DATE_ENTREE", "DATE_SORTIE"]).reset_index(drop=True)
 
+            df_contigus = df.copy()
+            df_base = df.drop_duplicates(
+                subset=["IPP", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"],
+                keep="first"
+            ).copy()
+
         except Exception as e:
             st.error(f"Erreur nettoyage données : {e}")
             st.stop()
 
-    # 5) Détection des relations
+    seen_pairs = set()
     rows = []
     try:
-        for ipp, group in df.groupby("IPP", sort=False):
+        for ipp, group in df_contigus.groupby("IPP", sort=False):
             g = group.reset_index(drop=True)
             n = len(g)
 
@@ -158,6 +121,7 @@ def main():
                 nda1, uma1, ghm1, de1, ds1 = g.loc[
                     i, ["NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
                 ]
+                key1 = (ipp, nda1, uma1, de1, ds1)
 
                 j = i + 1
                 while j < n:
@@ -171,6 +135,7 @@ def main():
                     nda2, uma2, ghm2, ds2 = g.loc[
                         j, ["NDA", "UMA", "GHM", "DATE_SORTIE"]
                     ]
+                    key2 = (ipp, nda2, uma2, de2, ds2)
 
                     if nda1 == nda2:
                         j += 1
@@ -202,6 +167,12 @@ def main():
                             rel = "CHEVAUCHEMENT"
 
                     if rel:
+                        pair_key = (rel, key1, key2)
+                        if pair_key in seen_pairs:
+                            j += 1
+                            continue
+                        seen_pairs.add(pair_key)
+                        
                         rows.append({
                             "IPP": ipp,
                             "DATE_NAISSANCE": g.loc[i, "DATE_NAISSANCE"],
