@@ -27,11 +27,10 @@ def main():
     except Exception:
         pass
 
-    # 1) Test connexion (doit stopper si KO)
+    # 1) Test connexion
     with st.spinner("🔐 Test de connexion Oracle..."):
         ok = test_oracle_connection(user, password, tns_alias)
         if not ok:
-            # Si ta fonction n’affiche pas déjà les détails :
             st.error("Connexion Oracle échouée.")
             st.stop()
 
@@ -45,10 +44,9 @@ def main():
         )
         if result.returncode != 0:
             st.error("Erreur lors de l'exécution SQL*Plus")
-            #st.code(result.stderr or result.stdout)
             st.stop()
 
-    # 3) Vérifier que le CSV a bien été produit
+    # 3) Vérifier CSV
     if not CSV_PATH.exists():
         st.error(
             f"Le fichier {CSV_PATH.name} n'existe pas après exécution SQL. "
@@ -60,7 +58,7 @@ def main():
     st.success("✅ Requête SQL terminée et fichier CSV généré.")
     st.divider()
 
-    # 4) Lecture / préparation des données
+    # 4) Lecture / préparation
     with st.spinner("🔎 Analyse des séjours en cours..."):
         try:
             df = pd.read_csv(
@@ -78,15 +76,9 @@ def main():
             df = df.dropna(how="all")
             df.columns = [col.strip().upper() for col in df.columns]
 
-            expected_cols = [
-                "IPP", "DATE_NAISSANCE", "NDA", "UMA",
-                "GHM", "DATE_ENTREE", "DATE_SORTIE"
-            ]
+            expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
             if df.shape[1] >= len(expected_cols):
-                df.columns = expected_cols + [
-                    f"COL_EXTRA_{i}"
-                    for i in range(df.shape[1] - len(expected_cols))
-                ]
+                df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
 
             df["IPP"] = df["IPP"].astype(str).str.strip()
             df["UMA"] = df["UMA"].fillna("").astype(str).str.strip()
@@ -96,32 +88,140 @@ def main():
             df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"], dayfirst=True, errors="coerce")
             df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"], dayfirst=True, errors="coerce")
 
+            # Exclusion UMA
             df = df[~df["UMA"].isin(["540", "543"])]
+
             df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
             df = df.sort_values(["IPP", "DATE_ENTREE", "DATE_SORTIE"]).reset_index(drop=True)
 
-            df_contigus = df.copy()
+            # Vue "métier" (option A) : ignore GHM => 1 ligne par séjour au sens métier
             df_base = df.drop_duplicates(
                 subset=["IPP", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"],
                 keep="first"
             ).copy()
 
+            # Vue "contigus" : garde les GHM (peut contenir plusieurs GHM pour un même séjour)
+            df_contigus = df.copy()
+
         except Exception as e:
             st.error(f"Erreur nettoyage données : {e}")
             st.stop()
 
-    seen_pairs = set()
+    # 5) Détection des relations avec ordre de priorité
     rows = []
     try:
-        for ipp, group in df_contigus.groupby("IPP", sort=False):
+        # --- Helpers ---
+        def stay_key(ipp, nda, uma, de, ds):
+            return (ipp, nda, uma, de, ds)
+
+        # Mapping séjour -> liste de GHM (pour CONTIGUS seulement)
+        # On garde les GHM valides (len>=5) et non vides
+        stay_to_ghm = {}
+        stay_to_ghm_full = {}  # pour garder un exemple de GHM complet par racine
+        for _, r in df_contigus.iterrows():
+            ipp = r["IPP"]
+            nda = r["NDA"]
+            uma = r["UMA"]
+            de = r["DATE_ENTREE"]
+            ds = r["DATE_SORTIE"]
+            ghm = str(r["GHM"]).strip()
+
+            k = stay_key(ipp, nda, uma, de, ds)
+            if ghm and ghm.upper() not in ("NAN", "NONE") and len(ghm) >= 5:
+                root = ghm[:5]
+                stay_to_ghm.setdefault(k, set()).add(root)
+                # garde un exemple de libellé complet pour cette racine
+                stay_to_ghm_full.setdefault(k, {})
+                stay_to_ghm_full[k].setdefault(root, ghm)
+
+        # Dédoublonnage global des paires (symétrique) : une paire ne peut être classée qu'une fois
+        assigned = set()  # contient (keyA,keyB) ordonné
+
+        def pair_id(k1, k2):
+            # clé symétrique
+            return tuple(sorted([k1, k2]))
+
+        # Pour la date naissance, on prend celle de la ligne i (stable au sein d'un IPP)
+        # (si jamais ça varie, on garde celle du premier séjour)
+        def get_dn(g, i):
+            try:
+                return g.loc[i, "DATE_NAISSANCE"]
+            except Exception:
+                return ""
+
+        # --- PASS PRIORITÉ 1,2,4 sur df_base (sans GHM) ---
+        for ipp, group in df_base.groupby("IPP", sort=False):
             g = group.reset_index(drop=True)
             n = len(g)
 
             for i in range(n):
-                nda1, uma1, ghm1, de1, ds1 = g.loc[
-                    i, ["NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
-                ]
-                key1 = (ipp, nda1, uma1, de1, ds1)
+                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+
+                j = i + 1
+                while j < n:
+                    de2 = g.loc[j, "DATE_ENTREE"]
+                    if pd.isna(de2):
+                        j += 1
+                        continue
+                    # optimisation : si le prochain commence après la sortie et pas contigu, break
+                    if de2 > ds1 and de2 != ds1:
+                        break
+
+                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
+                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+
+                    if nda1 == nda2:
+                        j += 1
+                        continue
+
+                    pid = pair_id(k1, k2)
+                    if pid in assigned:
+                        j += 1
+                        continue
+
+                    rel = None
+                    # 1) vrai doublon
+                    if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
+                        rel = "VRAI_DOUBLON"
+                    # 2) doublon 0 nuit
+                    elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
+                        rel = "DOUBLON_0_NUIT"
+                    # (CONTIGUS géré après)
+                    # 4) chevauchement (strict)
+                    elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
+                        # on NE l'assigne pas tout de suite : priorité 3 (contigus) passe avant
+                        # => on le stocke en "candidat" local
+                        rel = "CHEVAUCHEMENT_CANDIDAT"
+                    else:
+                        rel = None
+
+                    if rel and rel != "CHEVAUCHEMENT_CANDIDAT":
+                        assigned.add(pid)
+                        rows.append({
+                            "IPP": ipp,
+                            "DATE_NAISSANCE": get_dn(g, i),
+
+                            "NDA1": nda1, "UMA1": uma1, "GHM1": "",
+                            "DATEE1": de1, "DATES1": ds1,
+
+                            "NDA2": nda2, "UMA2": uma2, "GHM2": "",
+                            "DATEE2": de2, "DATES2": ds2,
+
+                            "TYPE_RELATION": rel
+                        })
+
+                    j += 1
+
+        # --- PRIORITÉ 3 : CONTIGUS sur base des séjours métier, avec GHM roots (option A) ---
+        # On parcourt les séjours métier (df_base), mais on vérifie la condition GHM via stay_to_ghm
+        for ipp, group in df_base.groupby("IPP", sort=False):
+            g = group.reset_index(drop=True)
+            n = len(g)
+
+            for i in range(n):
+                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
 
                 j = i + 1
                 while j < n:
@@ -132,50 +232,38 @@ def main():
                     if de2 > ds1 and de2 != ds1:
                         break
 
-                    nda2, uma2, ghm2, ds2 = g.loc[
-                        j, ["NDA", "UMA", "GHM", "DATE_SORTIE"]
-                    ]
-                    key2 = (ipp, nda2, uma2, de2, ds2)
+                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
+                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
 
                     if nda1 == nda2:
                         j += 1
                         continue
 
-                    rel = None
-                    if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                        rel = "VRAI_DOUBLON"
-                    elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                        rel = "DOUBLON_0_NUIT"
-                    else:
-                        root1 = str(ghm1).strip()
-                        root2 = str(ghm2).strip()
-                        valid_ghm = (
-                            root1 not in ("", "NAN", "None", "NONE")
-                            and root2 not in ("", "NAN", "None", "NONE")
-                            and len(root1) >= 5
-                            and len(root2) >= 5
-                        )
+                    pid = pair_id(k1, k2)
+                    if pid in assigned:
+                        j += 1
+                        continue
 
-                        if (
-                            uma1 != uma2
-                            and ((ds1 == de2) or (ds2 == de1))
-                            and valid_ghm
-                            and root1[:5] == root2[:5]
-                        ):
-                            rel = "CONTIGUS"
-                        elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
-                            rel = "CHEVAUCHEMENT"
+                    # contiguïté date
+                    is_contig = (ds1 == de2) or (ds2 == de1)
+                    if not is_contig or uma1 == uma2:
+                        j += 1
+                        continue
 
-                    if rel:
-                        pair_key = (rel, key1, key2)
-                        if pair_key in seen_pairs:
-                            j += 1
-                            continue
-                        seen_pairs.add(pair_key)
-                        
+                    roots1 = stay_to_ghm.get(k1, set())
+                    roots2 = stay_to_ghm.get(k2, set())
+                    common = roots1.intersection(roots2)
+
+                    if common:
+                        # on choisit une racine commune (la première)
+                        root = sorted(list(common))[0]
+                        ghm1 = stay_to_ghm_full.get(k1, {}).get(root, "")
+                        ghm2 = stay_to_ghm_full.get(k2, {}).get(root, "")
+
+                        assigned.add(pid)
                         rows.append({
                             "IPP": ipp,
-                            "DATE_NAISSANCE": g.loc[i, "DATE_NAISSANCE"],
+                            "DATE_NAISSANCE": get_dn(g, i),
 
                             "NDA1": nda1, "UMA1": uma1, "GHM1": ghm1,
                             "DATEE1": de1, "DATES1": ds1,
@@ -183,7 +271,55 @@ def main():
                             "NDA2": nda2, "UMA2": uma2, "GHM2": ghm2,
                             "DATEE2": de2, "DATES2": ds2,
 
-                            "TYPE_RELATION": rel
+                            "TYPE_RELATION": "CONTIGUS"
+                        })
+
+                    j += 1
+
+        # --- PRIORITÉ 4 : CHEVAUCHEMENT (après contigus) ---
+        for ipp, group in df_base.groupby("IPP", sort=False):
+            g = group.reset_index(drop=True)
+            n = len(g)
+
+            for i in range(n):
+                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+
+                j = i + 1
+                while j < n:
+                    de2 = g.loc[j, "DATE_ENTREE"]
+                    if pd.isna(de2):
+                        j += 1
+                        continue
+                    if de2 > ds1 and de2 != ds1:
+                        break
+
+                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
+                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+
+                    if nda1 == nda2:
+                        j += 1
+                        continue
+
+                    pid = pair_id(k1, k2)
+                    if pid in assigned:
+                        j += 1
+                        continue
+
+                    # chevauchement strict
+                    if (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
+                        assigned.add(pid)
+                        rows.append({
+                            "IPP": ipp,
+                            "DATE_NAISSANCE": get_dn(g, i),
+
+                            "NDA1": nda1, "UMA1": uma1, "GHM1": "",
+                            "DATEE1": de1, "DATES1": ds1,
+
+                            "NDA2": nda2, "UMA2": uma2, "GHM2": "",
+                            "DATEE2": de2, "DATES2": ds2,
+
+                            "TYPE_RELATION": "CHEVAUCHEMENT"
                         })
 
                     j += 1
