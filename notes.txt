@@ -521,13 +521,16 @@ def page_connexion():
             submitted = st.form_submit_button("🚀 Se connecter")
 
         if submitted:
+            st.session_state.logged_in = False
+            st.session_state.oracle_connected = False
+            st.session_state.page = "connexion"
             if not user or not password:
                 st.error("Veuillez renseigner vos identifiants Oracle.")
                 return
             try:
                 st.info("Test de connexion...")
 
-                dsn = f"//{TNS_MAP['CCH']}"
+                dsn = TNS_MAP["CCH"]
 
                 test_sql_path = SQL_DIR / "test_connexion.sql"
 
