@@ -1,3 +1,525 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import subprocess
+import time
+from pathlib import Path
+from datetime import datetime
+from openpyxl import load_workbook
+from copy import copy
+import re
+from openpyxl.styles import Border, Side, Alignment, Font
+from collections import defaultdict
+
+# Chemins à paramétrer
+BASE_DIR = Path(__file__).resolve().parents[1]
+DATA_DIR = BASE_DIR / "data"
+SQL_DIR = BASE_DIR / "SQL"
+PATRON_TIM_XLSX = DATA_DIR / "tableau_rum_tim.xlsx"
+PATRON_FILL_XLSX = DATA_DIR / "Tableau.xlsx"
+
+# Liste des TNS des sites pour SIMPA
+TNS_MAP = {
+    "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH",
+    "BRC": "//o-simpa-b1.brc.aphp.fr:8105/SIP1BRC",
+    "HTD": "//o-simpa-b1.htd.aphp.fr:8855/SIP_HTD"
+}
+
+# Fonction pour afficher les détails techniques d'une erreur
+def safe_show_exception(e):
+    st.session_state.last_exception_str = str(e)
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if "show_exception" not in st.session_state:
+        st.session_state.show_exception = False
+    st.session_state.show_exception = st.checkbox("Afficher détails techniques", value=st.session_state.show_exception)
+    if st.session_state.show_exception and "last_exception_str" in st.session_state:
+        st.code(st.session_state.last_exception_str)
+
+# Fonction de test de connexion à SIMPA
+def run_sqlplus_and_wait(cmd, timeout=30):
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    start = time.time()
+    output = ""
+    while True:
+        if proc.poll() is not None:
+            out, _ = proc.communicate()
+            output += (out or "")
+            break
+        if time.time() - start > timeout:
+            proc.kill()
+            raise TimeoutError("Timeout lors de l'exécution sqlplus.")
+        time.sleep(0.1)
+    return output
+
+# Fonction pour construire la requête SQL pour récupérer les RUMs
+def build_sql_spool_rum(site_label, file_spool_path, mode, month, year):
+    if mode == "mois":
+        start = f"01/{int(month):02d}/{year}"
+        end_expr = f"LAST_DAY(TO_DATE('01/{int(month):02d}/{year}','DD/MM/YYYY'))"
+        where_clause = (f"D8EEUE BETWEEN TO_DATE('{start}','DD/MM/YYYY') AND {end_expr}")
+    else:
+        start = f"01/01/{year}"
+        end_expr = f"LAST_DAY(TO_DATE('01/{int(month):02d}/{year}','DD/MM/YYYY'))"
+        where_clause = (f"D8SOUE >= TO_DATE('{start}','DD/MM/YYYY') AND D8EEUE <= {end_expr}")
+    sql = f"""
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 2000
+SET TRIMSPOOL ON
+spool {file_spool_path}
+SELECT CDURM_P || ';' || COUNT(*)
+FROM EPI
+WHERE {where_clause}
+GROUP BY CDURM_P;
+spool off
+exit;
+"""
+    return sql
+
+# Fonction pour lire la sortie CSV de la requête SQL et la transformer en dataframe
+def read_spool_csv_to_df(spool_path):
+    p = Path(spool_path)
+    if not p.exists():
+        return pd.DataFrame(columns=["UMA", "COUNT"])
+    try:
+        df = pd.read_csv(p, sep=';', header=None, dtype=str, names=["UMA", "COUNT"], engine="python")
+        df["UMA"] = df["UMA"].astype(str).str.strip()
+        df["COUNT"] = pd.to_numeric(df["COUNT"].astype(str).str.strip().replace("", "0"), errors="coerce").fillna(0).astype(int)
+        return df
+    except Exception:
+        lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+        rows = []
+        for line in lines:
+            if ";" in line:
+                a, b = line.split(";", 1)
+                rows.append({"UMA": a.strip(), "COUNT": int(b.strip() or 0)})
+        return pd.DataFrame(rows)
+
+# Fonction permettant d'extraire la liste des UMAs
+def extract_uma_code_by_space(uma):
+    if not isinstance(uma, str):
+        return ""
+    s = uma.strip()
+    return s.split(" ", 1)[0].strip() if s else ""
+
+# Fonction permettant d'avoir la liste des TIMs
+def split_tims(cell):
+    if not isinstance(cell, str):
+        return []
+    cell = cell.strip()
+    if cell.lower() in {"nan", "none", ""}:
+        return []
+    parts = re.split(r'[/;,|]+', cell)
+    return [p.strip() for p in parts if p.strip()]
+
+# Fonction permettant de normaliser la liste des DMUs
+def normalize_dmu(raw):
+    if not isinstance(raw, str):
+        return ""
+    s = raw.strip()
+    return s.split(" ", 1)[0].strip() if s else ""
+
+# Fonction pour construire le dictionnaire d'association des TIMs à leurs sites, UMAs et DMUs respectifs
+def build_tim_uma_dict(patron_path):
+    df = pd.read_excel(patron_path, engine="openpyxl", dtype=str)
+    df.columns = [c.strip() for c in df.columns]
+
+    for col in ["Site", "UMA", "DMU"]:
+        if col not in df.columns:
+            raise KeyError(f"Colonne manquante : {col}")
+
+    tim_ref_col = "TIM Référent" if "TIM Référent" in df.columns else None
+    relance_col = "Relance" if "Relance" in df.columns else None
+    type_col = "Type" if "Type" in df.columns else None
+
+    result = {}
+
+    for idx, row in df.iterrows():
+
+        raw_uma_full = row.get("UMA", "")
+        if not isinstance(raw_uma_full, str) or raw_uma_full.strip() == "" or raw_uma_full.startswith("Total DMU"):
+            continue
+
+        uma_code = extract_uma_code_by_space(raw_uma_full)
+        uma_type_raw = row.get(type_col, "") if type_col else ""
+        uma_type = (str(uma_type_raw).strip().upper() if isinstance(uma_type_raw, str) else "")
+        if uma_type not in {"HC", "HDJ"}:
+            uma_type = "HC"
+
+        site = str(row.get("Site", "")).strip()
+        dmu = str(row.get("DMU", "")).split(" ", 1)[0].strip()
+
+        tims = []
+        if tim_ref_col: tims += split_tims(row.get(tim_ref_col, ""))
+        if relance_col: tims += split_tims(row.get(relance_col, ""))
+
+        if not tims:
+            continue
+
+        for tim in tims:
+            result.setdefault(tim, {}).setdefault(site, {}).setdefault(dmu, []).append(
+                {"code": uma_code, "libelle": raw_uma_full, "type": uma_type}
+            )
+
+    return result
+
+# Fonction pour la fusion verticale des cases ayant le même site ou DMU par TIM
+def merge_vertical_conditionnel(ws, col_idx, df_col, start_row, group_col=None):
+    if len(df_col) == 0:
+        return
+    current_val = df_col.iloc[0]
+    current_group = group_col.iloc[0] if group_col is not None else None
+    start_idx = 0
+    for i in range(1, len(df_col)):
+        val = df_col.iloc[i]
+        group_val = group_col.iloc[i] if group_col is not None else None
+        same = (val == current_val) and (group_col is None or group_val == current_group)
+        if not same:
+            if i - 1 > start_idx:
+                ws.merge_cells(start_row=start_row + start_idx, start_column=col_idx,
+                               end_row=start_row + i - 1, end_column=col_idx)
+            start_idx = i
+            current_val = val
+            current_group = group_val
+
+    if len(df_col) - 1 > start_idx:
+        ws.merge_cells(start_row=start_row + start_idx, start_column=col_idx,
+                       end_row=start_row + len(df_col) - 1, end_column=col_idx)
+
+# Fonction permettant de tracer les bordures dans le tabkeau
+def draw_border_lines_for_tim_blocks(ws, start_row, df_sorted, first_col, last_col, site_col_idx=None):
+    thin = Side(border_style="thin", color="000000")
+    #top_border = Border(top=thin)
+    #bottom_border = Border(bottom=thin)
+
+    tim_groups = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
+    for tim, (start_idx, end_idx) in tim_groups.items():
+        top_row = start_row + start_idx
+        bottom_row = start_row + end_idx
+        for c in range(first_col, last_col + 1):
+            ws.cell(row=top_row, column=c).border = Border(
+                left=ws.cell(row=top_row, column=c).border.left,
+                right=ws.cell(row=top_row, column=c).border.right,
+                top=thin,
+                bottom=ws.cell(row=top_row, column=c).border.bottom
+            )
+            ws.cell(row=bottom_row, column=c).border = Border(
+                left=ws.cell(row=bottom_row, column=c).border.left,
+                right=ws.cell(row=bottom_row, column=c).border.right,
+                top=ws.cell(row=bottom_row, column=c).border.top,
+                bottom=thin
+            )
+
+    if site_col_idx is not None:
+        for i in range(1, len(df_sorted)):
+            if df_sorted["SITE"].iloc[i] != df_sorted["SITE"].iloc[i - 1]:
+                row = start_row + i
+                for c in range(first_col, last_col + 1):
+                    ws.cell(row=row, column=c).border = Border(
+                        left=ws.cell(row=row, column=c).border.left,
+                        right=ws.cell(row=row, column=c).border.right,
+                        top=thin,
+                        bottom=ws.cell(row=row, column=c).border.bottom
+                    )
+
+# Fonction permettant d'associer les RUMs d'UMAs d'exceptions à la bonne colonne (ex: 040X HC qui doit être codé mais qui est relancé)
+def apply_uma_exceptions(df):
+    mask_150_hc = (df["SITE"] == "HTD") & (df["UMA_HC_code"] == "150")
+    if mask_150_hc.any():
+        #debug_rows = df.loc[mask_150_hc, ["TIM", "SITE", "UMA HC", "RUM codés mois"]]
+
+        val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
+        val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
+
+        mask_cliniciens_150 = mask_150_hc & (df["TIM"] == "Cliniciens")
+        df.loc[mask_cliniciens_150, "RUM codés mois"] = val_mois
+        df.loc[mask_cliniciens_150, "RUM codés cumulés"] = val_cum
+
+        mask_other_tim_150 = mask_150_hc & (df["TIM"] != "Cliniciens")
+        df.loc[mask_other_tim_150, "RUM relancés mois"] = val_mois
+        df.loc[mask_other_tim_150, "RUM relancés cumulés"] = val_cum
+
+        df.loc[mask_other_tim_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+    mask_040x = (df["SITE"] == "CCH") & (df["UMA_HC_code"] == "040X")
+    if mask_040x.any():
+
+        df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
+        df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
+
+        df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+    HDJ_SPECIAL = ["561C", "591C", "591J"]
+
+    for code in HDJ_SPECIAL:
+        mask_hdj_special = (df["SITE"] == "CCH") & (df["UMA_HDJ_code"] == code)
+
+        if mask_hdj_special.any():
+
+            df.loc[mask_hdj_special, "RUM codés mois"] = df.loc[mask_hdj_special, "RUM relancés mois"]
+            df.loc[mask_hdj_special, "RUM codés cumulés"] = df.loc[mask_hdj_special, "RUM relancés cumulés"]
+
+            df.loc[mask_hdj_special, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
+
+    return df
+
+# Fonction pour l'écriture des résultats dans le patron
+def write_copy_with_values_to_patron(df, patron_path):
+    from io import BytesIO
+    wb = load_workbook(filename=str(patron_path))
+    ws = wb.active
+
+    header_row = None
+    for r in range(1, 30):
+        values = [(ws.cell(row=r, column=c).value or "").strip().lower() for c in range(1, ws.max_column+1)]
+        if "tim" in values and "site" in values:
+            header_row = r
+            break
+    if not header_row:
+        header_row = 1
+
+    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip(): c for c in range(1, ws.max_column+1)}
+
+    col_map = {
+        "TIM": name_to_col.get("TIM"),
+        "SITE": name_to_col.get("SITE"),
+        "UMA HC": name_to_col.get("UMA HC"),
+        "RUM_codes_mois": name_to_col.get("RUM codés mois"),
+        "RUM_codes_cumulés": name_to_col.get("RUM codés cumulés"),
+        "UMA HDJ": name_to_col.get("UMA HDJ"),
+        "DMU": name_to_col.get("DMU"),
+        "RUM_rel_mois": name_to_col.get("RUM relancés mois"),
+        "RUM_rel_cum": name_to_col.get("RUM relancés cumulés")
+    }
+
+    start = header_row + 1
+
+    df_sorted = df.sort_values(
+        by=["TIM", "SITE", "DMU", "UMA HC", "UMA HDJ"]
+    ).reset_index(drop=True)
+
+    for idx, row in df_sorted.iterrows():
+        excel_row = start + idx
+
+        ws.cell(row=excel_row, column=col_map["TIM"]).value = row["TIM"]
+        ws.cell(row=excel_row, column=col_map["SITE"]).value = row["SITE"]
+        ws.cell(row=excel_row, column=col_map["DMU"]).value = row["DMU"]
+
+        if row["UMA HC"]:
+            ws.cell(row=excel_row, column=col_map["UMA HC"]).value = row["UMA HC"]
+
+        if row["UMA HDJ"]:
+            ws.cell(row=excel_row, column=col_map["UMA HDJ"]).value = row["UMA HDJ"]
+
+        ws.cell(row=excel_row, column=col_map["RUM_codes_mois"]).value = (
+            int(row["RUM codés mois"]) if pd.notna(row["RUM codés mois"]) else None
+        )
+        ws.cell(row=excel_row, column=col_map["RUM_codes_cumulés"]).value = (
+            int(row["RUM codés cumulés"]) if pd.notna(row["RUM codés cumulés"]) else None
+        )
+
+        ws.cell(row=excel_row, column=col_map["RUM_rel_mois"]).value = (
+            int(row["RUM relancés mois"]) if pd.notna(row["RUM relancés mois"]) else None
+        )
+        ws.cell(row=excel_row, column=col_map["RUM_rel_cum"]).value = (
+            int(row["RUM relancés cumulés"]) if pd.notna(row["RUM relancés cumulés"]) else None
+        )
+
+    merge_vertical_conditionnel(ws, col_map["TIM"], df_sorted["TIM"], start)
+    merge_vertical_conditionnel(ws, col_map["SITE"], df_sorted["SITE"], start, group_col=df_sorted["TIM"])
+    merge_vertical_conditionnel(ws, col_map["DMU"], df_sorted["DMU"], start, group_col=df_sorted["TIM"])
+
+    draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_map["SITE"])
+
+    thin = Side(border_style="thin", color="000000")
+    for r in range(1, ws.max_row + 1):
+        for c in range(1, ws.max_column + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.border = Border(left=thin, right=thin, top=cell.border.top, bottom=cell.border.bottom)
+
+    for idx in range(len(df_sorted)):
+        excel_row = start + idx
+        for c in [col_map["TIM"], col_map["SITE"], col_map["DMU"]]:
+            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
+
+    tim_col = col_map["TIM"]
+    if tim_col:
+        for idx in range(len(df_sorted)):
+            excel_row = start + idx
+            cell = ws.cell(row=excel_row, column=tim_col)
+            new_font = copy(cell.font)
+            new_font.bold = True
+            cell.font = new_font
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+# Fonction de la page de RUM dans laquelle on vient choisir le mois et l'année et on va faire le traitement en conséquence
+def page_rum():
+    st.title("Remplissage RUM — TIM")
+    if "oracle_connected" not in st.session_state or not st.session_state.oracle_connected:
+        st.error("Vous devez d'abord vous connecter sur la page Connexion.")
+        return
+
+    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
+    annees = list(range(2013, datetime.now().year + 1))
+    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
+    bouton = st.button("Lancer le traitement RUM")
+    st.markdown("**Remarque :** le script va interroger les 3 bases (CCH, BRC, HTD) et générer un tableau par TIM.")
+    if not bouton:
+        return
+
+    try:
+        progress = st.progress(0)
+        progress.progress(5)
+
+        tim_dict = build_tim_uma_dict(PATRON_TIM_XLSX)
+
+        UMA_WEIGHTS = {
+            ("130", "Clara HEBRARD"): 1/3,
+            ("130", "Maria Louisa ESTEVES"): 2/3
+        }
+
+        rows = []
+        for tim, sites in tim_dict.items():
+            for site, dmus in sites.items():
+                for dmu, umas in dmus.items():
+                    for uma in umas:
+                        rows.append({
+                            "TIM": tim,
+                            "SITE": site,
+                            "UMA HC": uma["libelle"] if uma["type"] == "HC" else "",
+                            "RUM codés mois": 0.0 if uma["type"] == "HC" else np.nan,
+                            "RUM codés cumulés": 0.0 if uma["type"] == "HC" else np.nan,
+                            "UMA HDJ": uma["libelle"] if uma["type"] == "HDJ" else "",
+                            "DMU": dmu,
+                            "RUM relancés mois": 0.0 if uma["type"] == "HDJ" else np.nan,
+                            "RUM relancés cumulés": 0.0 if uma["type"] == "HDJ" else np.nan,
+                        })
+        df_patron = pd.DataFrame(rows)
+
+        progress.progress(20)
+
+        df_patron["UMA_HC_code"] = df_patron["UMA HC"].apply(extract_uma_code_by_space)
+        df_patron["UMA_HDJ_code"] = df_patron["UMA HDJ"].apply(extract_uma_code_by_space)
+
+        uma_to_tim_count = defaultdict(int)
+        for tim, sites in tim_dict.items():
+            for site, dmus in sites.items():
+                for dmu, umas in dmus.items():
+                    for uma in umas:
+                        uma_to_tim_count[uma["code"]] += 1
+
+        progress.progress(30)
+
+        for idx_site, (site_label, tns) in enumerate(TNS_MAP.items()):
+            st.write(f"🔹 Traitement site {site_label} ({idx_site+1}/{len(TNS_MAP)})")
+
+            spool_mois = DATA_DIR / f"RUM_MOIS_{site_label}.csv"
+            spool_cum = DATA_DIR / f"RUM_CUMULE_{site_label}.csv"
+
+            sql_mois = build_sql_spool_rum(site_label, str(spool_mois), "mois", mois, annee)
+            sql_cum = build_sql_spool_rum(site_label, str(spool_cum), "cumule", mois, annee)
+
+            tmp_sql_mois = SQL_DIR / f"rum_mois_{site_label}.sql"
+            tmp_sql_cum = SQL_DIR / f"rum_cumule_{site_label}.sql"
+
+            tmp_sql_mois.write_text(sql_mois, encoding="utf-8")
+            tmp_sql_cum.write_text(sql_cum, encoding="utf-8")
+
+            run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}", timeout=60)
+
+            run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}", timeout=60)
+
+            df_m = read_spool_csv_to_df(spool_mois)
+            df_c = read_spool_csv_to_df(spool_cum)
+
+            tims_for_site = {tim: sites for tim, sites in tim_dict.items() if site_label in sites}
+
+            for tim, sites in tims_for_site.items():
+                dmus = sites[site_label]
+
+                for dmu, umas in dmus.items():
+                    for uma in umas:
+
+                        uma_code = uma["code"]
+                        uma_type = uma["type"]
+
+                        base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
+                        base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
+
+                        if base_m == 0 and base_c == 0:
+                            continue
+
+                        default_count = uma_to_tim_count.get(uma_code, 1)
+                        weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count)
+                        
+                        assigned_m = base_m * weight
+                        assigned_c = base_c * weight
+
+                        mask_hc = (
+                            (df_patron["TIM"] == tim) &
+                            (df_patron["SITE"] == site_label) &
+                            (df_patron["DMU"] == dmu) &
+                            (df_patron["UMA_HC_code"] == uma_code)
+                        )
+
+                        mask_hdj = (
+                            (df_patron["TIM"] == tim) &
+                            (df_patron["SITE"] == site_label) &
+                            (df_patron["DMU"] == dmu) &
+                            (df_patron["UMA_HDJ_code"] == uma_code)
+                        )
+
+                        if uma_type == "HC":
+                            df_patron.loc[mask_hc, "RUM codés mois"] = assigned_m
+                            df_patron.loc[mask_hc, "RUM codés cumulés"] = assigned_c
+                        else:
+                            df_patron.loc[mask_hdj, "RUM relancés mois"] = assigned_m
+                            df_patron.loc[mask_hdj, "RUM relancés cumulés"] = assigned_c
+
+            try:
+                tmp_sql_mois.unlink()
+            except FileNotFoundError:
+                pass
+
+            try:
+                tmp_sql_cum.unlink()
+            except FileNotFoundError:
+                pass
+
+            progress.progress(30 + int((idx_site + 1) * 20))
+
+        df_patron = apply_uma_exceptions(df_patron)
+        output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
+
+        progress.progress(100)
+        st.success("Fichier prêt au téléchargement 🎉")
+
+        st.download_button(
+            "Télécharger le fichier rempli",
+            data=output,
+            file_name=f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except Exception as e:
+        st.write("Exception capturée :", e)
+        safe_show_exception(e)
+
+# Fonction de la page de connexion permettant de se connecter à la base SQL et garder les identifiants en session
+def page_connexion():
+    st.title("Connexion Oracle")
+    if not st.session_state.logged_in:
+        with st.form("connexion"):
+            st.subheader("Connexion Oracle")
+            user = st.text_input("👤 Nom d'utilisateur Oracle :", key="conn_user")
+            password = st.text_input("🔑 Mot de passe :", type="password", key="conn_pwd")
+            submitted = st.form_submit_button("🚀 Se connecter")
+
         if submitted:
             if not user or not password:
                 st.error("Veuillez renseigner vos identifiants Oracle.")
@@ -5,11 +527,9 @@
             try:
                 st.info("Test de connexion...")
 
-                # ✅ EZCONNECT (à adapter au service/port réels)
-                # Exemple: //host:1521/SERVICE
-                dsn = f"//{TNS_MAP['CCH']}:1521/SIP1CCH"
+                dsn = f"//{TNS_MAP['CCH']}"
 
-                test_sql_path = SQL_DIR / "test_connexion.sql"  # celui que tu as déjà, avec whenever
+                test_sql_path = SQL_DIR / "test_connexion.sql"
 
                 result = subprocess.run(
                     ["sqlplus", "-S", f"{user}/{password}@{dsn}", f"@{test_sql_path}"],
@@ -27,8 +547,44 @@
                     st.session_state.page = "rum"
                     st.rerun()
                 else:
-                    st.error("Connexion échouée. Vérifiez vos identifiants Oracle / host / service.")
+                    st.error("Connexion échouée. Vérifiez vos identifiants Oracle.")
                     st.code(result.stderr or result.stdout)
 
             except Exception as e:
                 safe_show_exception(e)
+    else:
+        st.success("Connexion active.")
+        if st.button("➡ Aller à la page RUM"):
+            st.session_state.page = "rum"
+            st.rerun()
+
+def ensure_session_vars():
+    defaults = {
+        "logged_in": False,
+        "oracle_connected": False,
+        "page": "connexion",
+        "oracle_user": "",
+        "oracle_password": "",
+        "last_exception_str": "",
+        "show_exception": False
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+def main():
+    st.title("Tableau d'exhaustivité des RUMs par TIM")
+    ensure_session_vars()
+    if st.session_state.page == "connexion":
+        page_connexion()
+    elif st.session_state.page == "rum":
+        if not st.session_state.logged_in:
+            st.session_state.page = "connexion"
+            st.rerun()
+        page_rum()
+    else:
+        st.session_state.page = "connexion"
+        st.rerun()
+
+if __name__ == "__main__":
+    main()
