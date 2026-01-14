@@ -11,6 +11,14 @@ import re
 from openpyxl.styles import Border, Side, Alignment, Font
 from collections import defaultdict
 
+# -----------------------------
+# Namespace session_state (anti-collision portail)
+# -----------------------------
+RUMTIM_NS = "rumtim__"
+
+def ss_key(name: str) -> str:
+    return f"{RUMTIM_NS}{name}"
+
 # Chemins à paramétrer
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / "data"
@@ -18,24 +26,43 @@ SQL_DIR = BASE_DIR / "SQL"
 PATRON_TIM_XLSX = DATA_DIR / "tableau_rum_tim.xlsx"
 PATRON_FILL_XLSX = DATA_DIR / "Tableau.xlsx"
 
-# Liste des TNS des sites pour SIMPA
+# Liste des TNS des sites pour SIMPA (EZCONNECT)
 TNS_MAP = {
     "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH",
     "BRC": "//o-simpa-b1.brc.aphp.fr:8105/SIP1BRC",
     "HTD": "//o-simpa-b1.htd.aphp.fr:8855/SIP_HTD"
 }
 
-# Fonction pour afficher les détails techniques d'une erreur
-def safe_show_exception(e):
-    st.session_state.last_exception_str = str(e)
-    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
-    if "show_exception" not in st.session_state:
-        st.session_state.show_exception = False
-    st.session_state.show_exception = st.checkbox("Afficher détails techniques", value=st.session_state.show_exception)
-    if st.session_state.show_exception and "last_exception_str" in st.session_state:
-        st.code(st.session_state.last_exception_str)
+# -----------------------------
+# Erreurs: affichage technique propre (namespaced + checkbox key)
+# -----------------------------
+def safe_show_exception(e, extra_text=None):
+    # On stocke un bloc de debug lisible
+    msg = str(e)
+    if extra_text:
+        msg = f"{msg}\n\n---\nDETAILS:\n{extra_text}"
 
-# Fonction de test de connexion à SIMPA
+    st.session_state[ss_key("last_exception_str")] = msg
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+
+    if ss_key("show_exception") not in st.session_state:
+        st.session_state[ss_key("show_exception")] = False
+
+    show = st.checkbox(
+        "Afficher détails techniques",
+        value=st.session_state[ss_key("show_exception")],
+        key=ss_key("show_exception_checkbox"),
+    )
+    st.session_state[ss_key("show_exception")] = show
+
+    if show:
+        st.code(st.session_state.get(ss_key("last_exception_str"), ""))
+
+# -----------------------------
+# SQL*Plus: exécution + détection erreurs Oracle/SP2
+# -----------------------------
+ORA_RE = re.compile(r"(ORA-\d{5}|SP2-\d{4})")
+
 def run_sqlplus_and_wait(cmd, timeout=30):
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     start = time.time()
@@ -50,6 +77,14 @@ def run_sqlplus_and_wait(cmd, timeout=30):
             raise TimeoutError("Timeout lors de l'exécution sqlplus.")
         time.sleep(0.1)
     return output
+
+def raise_if_sqlplus_error(output: str, context: str = ""):
+    if not output:
+        return
+    m = ORA_RE.search(output)
+    if m:
+        # On lève avec toute la sortie, c'est ce que tu veux pour diagnostiquer
+        raise RuntimeError(f"Erreur SQL*Plus détectée ({m.group(1)}) {context}\n\nSortie SQL*Plus:\n{output}")
 
 # Fonction pour construire la requête SQL pour récupérer les RUMs
 def build_sql_spool_rum(site_label, file_spool_path, mode, month, year):
@@ -187,11 +222,9 @@ def merge_vertical_conditionnel(ws, col_idx, df_col, start_row, group_col=None):
         ws.merge_cells(start_row=start_row + start_idx, start_column=col_idx,
                        end_row=start_row + len(df_col) - 1, end_column=col_idx)
 
-# Fonction permettant de tracer les bordures dans le tabkeau
+# Fonction permettant de tracer les bordures dans le tableau
 def draw_border_lines_for_tim_blocks(ws, start_row, df_sorted, first_col, last_col, site_col_idx=None):
     thin = Side(border_style="thin", color="000000")
-    #top_border = Border(top=thin)
-    #bottom_border = Border(bottom=thin)
 
     tim_groups = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
     for tim, (start_idx, end_idx) in tim_groups.items():
@@ -223,12 +256,10 @@ def draw_border_lines_for_tim_blocks(ws, start_row, df_sorted, first_col, last_c
                         bottom=ws.cell(row=row, column=c).border.bottom
                     )
 
-# Fonction permettant d'associer les RUMs d'UMAs d'exceptions à la bonne colonne (ex: 040X HC qui doit être codé mais qui est relancé)
+# Fonction permettant d'associer les RUMs d'UMAs d'exceptions à la bonne colonne
 def apply_uma_exceptions(df):
     mask_150_hc = (df["SITE"] == "HTD") & (df["UMA_HC_code"] == "150")
     if mask_150_hc.any():
-        #debug_rows = df.loc[mask_150_hc, ["TIM", "SITE", "UMA HC", "RUM codés mois"]]
-
         val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
         val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
 
@@ -239,27 +270,20 @@ def apply_uma_exceptions(df):
         mask_other_tim_150 = mask_150_hc & (df["TIM"] != "Cliniciens")
         df.loc[mask_other_tim_150, "RUM relancés mois"] = val_mois
         df.loc[mask_other_tim_150, "RUM relancés cumulés"] = val_cum
-
         df.loc[mask_other_tim_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
 
     mask_040x = (df["SITE"] == "CCH") & (df["UMA_HC_code"] == "040X")
     if mask_040x.any():
-
         df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
         df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
-
         df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
 
     HDJ_SPECIAL = ["561C", "591C", "591J"]
-
     for code in HDJ_SPECIAL:
         mask_hdj_special = (df["SITE"] == "CCH") & (df["UMA_HDJ_code"] == code)
-
         if mask_hdj_special.any():
-
             df.loc[mask_hdj_special, "RUM codés mois"] = df.loc[mask_hdj_special, "RUM relancés mois"]
             df.loc[mask_hdj_special, "RUM codés cumulés"] = df.loc[mask_hdj_special, "RUM relancés cumulés"]
-
             df.loc[mask_hdj_special, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
 
     return df
@@ -357,17 +381,20 @@ def write_copy_with_values_to_patron(df, patron_path):
     output.seek(0)
     return output
 
-# Fonction de la page de RUM dans laquelle on vient choisir le mois et l'année et on va faire le traitement en conséquence
+# -----------------------------
+# Page RUM
+# -----------------------------
 def page_rum():
     st.title("Remplissage RUM — TIM")
-    if "oracle_connected" not in st.session_state or not st.session_state.oracle_connected:
+
+    if not st.session_state.get(ss_key("oracle_connected"), False):
         st.error("Vous devez d'abord vous connecter sur la page Connexion.")
         return
 
-    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
+    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1, key=ss_key("mois"))
     annees = list(range(2013, datetime.now().year + 1))
-    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
-    bouton = st.button("Lancer le traitement RUM")
+    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1, key=ss_key("annee"))
+    bouton = st.button("Lancer le traitement RUM", key=ss_key("run_rum"))
     st.markdown("**Remarque :** le script va interroger les 3 bases (CCH, BRC, HTD) et générer un tableau par TIM.")
     if not bouton:
         return
@@ -415,11 +442,24 @@ def page_rum():
 
         progress.progress(30)
 
+        oracle_user = st.session_state.get(ss_key("oracle_user"), "")
+        oracle_password = st.session_state.get(ss_key("oracle_password"), "")
+
         for idx_site, (site_label, tns) in enumerate(TNS_MAP.items()):
             st.write(f"🔹 Traitement site {site_label} ({idx_site+1}/{len(TNS_MAP)})")
 
             spool_mois = DATA_DIR / f"RUM_MOIS_{site_label}.csv"
             spool_cum = DATA_DIR / f"RUM_CUMULE_{site_label}.csv"
+
+            # Nettoyage spool précédents pour éviter "vieux fichiers" silencieux
+            try:
+                spool_mois.unlink()
+            except FileNotFoundError:
+                pass
+            try:
+                spool_cum.unlink()
+            except FileNotFoundError:
+                pass
 
             sql_mois = build_sql_spool_rum(site_label, str(spool_mois), "mois", mois, annee)
             sql_cum = build_sql_spool_rum(site_label, str(spool_cum), "cumule", mois, annee)
@@ -430,9 +470,25 @@ def page_rum():
             tmp_sql_mois.write_text(sql_mois, encoding="utf-8")
             tmp_sql_cum.write_text(sql_cum, encoding="utf-8")
 
-            run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}", timeout=60)
+            out_m = run_sqlplus_and_wait(
+                f"sqlplus -S {oracle_user}/{oracle_password}@{tns} @{tmp_sql_mois}",
+                timeout=60
+            )
+            raise_if_sqlplus_error(out_m, context=f"(site={site_label}, mode=mois)")
+            if not spool_mois.exists():
+                raise RuntimeError(
+                    f"Spool manquant après exécution SQL*Plus (site={site_label}, mode=mois).\n\nSortie SQL*Plus:\n{out_m}"
+                )
 
-            run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}", timeout=60)
+            out_c = run_sqlplus_and_wait(
+                f"sqlplus -S {oracle_user}/{oracle_password}@{tns} @{tmp_sql_cum}",
+                timeout=60
+            )
+            raise_if_sqlplus_error(out_c, context=f"(site={site_label}, mode=cumul)")
+            if not spool_cum.exists():
+                raise RuntimeError(
+                    f"Spool manquant après exécution SQL*Plus (site={site_label}, mode=cumul).\n\nSortie SQL*Plus:\n{out_c}"
+                )
 
             df_m = read_spool_csv_to_df(spool_mois)
             df_c = read_spool_csv_to_df(spool_cum)
@@ -441,10 +497,8 @@ def page_rum():
 
             for tim, sites in tims_for_site.items():
                 dmus = sites[site_label]
-
                 for dmu, umas in dmus.items():
                     for uma in umas:
-
                         uma_code = uma["code"]
                         uma_type = uma["type"]
 
@@ -456,7 +510,7 @@ def page_rum():
 
                         default_count = uma_to_tim_count.get(uma_code, 1)
                         weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count)
-                        
+
                         assigned_m = base_m * weight
                         assigned_c = base_c * weight
 
@@ -485,7 +539,6 @@ def page_rum():
                 tmp_sql_mois.unlink()
             except FileNotFoundError:
                 pass
-
             try:
                 tmp_sql_cum.unlink()
             except FileNotFoundError:
@@ -503,35 +556,39 @@ def page_rum():
             "Télécharger le fichier rempli",
             data=output,
             file_name=f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=ss_key("download")
         )
 
     except Exception as e:
-        st.write("Exception capturée :", e)
         safe_show_exception(e)
 
-# Fonction de la page de connexion permettant de se connecter à la base SQL et garder les identifiants en session
+# -----------------------------
+# Page Connexion
+# -----------------------------
 def page_connexion():
     st.title("Connexion Oracle")
-    if not st.session_state.logged_in:
-        with st.form("connexion"):
+
+    if not st.session_state.get(ss_key("logged_in"), False):
+        with st.form(ss_key("connexion_form")):
             st.subheader("Connexion Oracle")
-            user = st.text_input("👤 Nom d'utilisateur Oracle :", key="conn_user")
-            password = st.text_input("🔑 Mot de passe :", type="password", key="conn_pwd")
+            user = st.text_input("👤 Nom d'utilisateur Oracle :", key=ss_key("conn_user"))
+            password = st.text_input("🔑 Mot de passe :", type="password", key=ss_key("conn_pwd"))
             submitted = st.form_submit_button("🚀 Se connecter")
 
         if submitted:
-            st.session_state.logged_in = False
-            st.session_state.oracle_connected = False
-            st.session_state.page = "connexion"
+            st.session_state[ss_key("logged_in")] = False
+            st.session_state[ss_key("oracle_connected")] = False
+            st.session_state[ss_key("page")] = "connexion"
+
             if not user or not password:
                 st.error("Veuillez renseigner vos identifiants Oracle.")
                 return
+
             try:
                 st.info("Test de connexion...")
 
                 dsn = TNS_MAP["CCH"]
-
                 test_sql_path = SQL_DIR / "test_connexion.sql"
 
                 result = subprocess.run(
@@ -539,37 +596,40 @@ def page_connexion():
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    timeout=10
+                    timeout=15
                 )
 
-                if result.returncode == 0:
-                    st.session_state.oracle_connected = True
-                    st.session_state.logged_in = True
-                    st.session_state.oracle_user = user
-                    st.session_state.oracle_password = password
-                    st.session_state.page = "rum"
+                combined = (result.stdout or "") + ("\n" + result.stderr if result.stderr else "")
+                # Si ORA-/SP2- apparaît, on considère que c'est un échec explicite
+                if result.returncode == 0 and not ORA_RE.search(combined):
+                    st.session_state[ss_key("oracle_connected")] = True
+                    st.session_state[ss_key("logged_in")] = True
+                    st.session_state[ss_key("oracle_user")] = user
+                    st.session_state[ss_key("oracle_password")] = password
+                    st.session_state[ss_key("page")] = "rum"
                     st.rerun()
                 else:
-                    st.error("Connexion échouée. Vérifiez vos identifiants Oracle.")
-                    st.code(result.stderr or result.stdout)
+                    st.error("Connexion échouée. Vérifiez vos identifiants Oracle ou la connectivité (listener/DSN).")
+                    st.code(combined)
 
             except Exception as e:
                 safe_show_exception(e)
+
     else:
         st.success("Connexion active.")
-        if st.button("➡ Aller à la page RUM"):
-            st.session_state.page = "rum"
+        if st.button("➡ Aller à la page RUM", key=ss_key("go_rum")):
+            st.session_state[ss_key("page")] = "rum"
             st.rerun()
 
 def ensure_session_vars():
     defaults = {
-        "logged_in": False,
-        "oracle_connected": False,
-        "page": "connexion",
-        "oracle_user": "",
-        "oracle_password": "",
-        "last_exception_str": "",
-        "show_exception": False
+        ss_key("logged_in"): False,
+        ss_key("oracle_connected"): False,
+        ss_key("page"): "connexion",
+        ss_key("oracle_user"): "",
+        ss_key("oracle_password"): "",
+        ss_key("last_exception_str"): "",
+        ss_key("show_exception"): False,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -578,15 +638,18 @@ def ensure_session_vars():
 def main():
     st.title("Tableau d'exhaustivité des RUMs par TIM")
     ensure_session_vars()
-    if st.session_state.page == "connexion":
+
+    current_page = st.session_state.get(ss_key("page"), "connexion")
+
+    if current_page == "connexion":
         page_connexion()
-    elif st.session_state.page == "rum":
-        if not st.session_state.logged_in:
-            st.session_state.page = "connexion"
+    elif current_page == "rum":
+        if not st.session_state.get(ss_key("logged_in"), False):
+            st.session_state[ss_key("page")] = "connexion"
             st.rerun()
         page_rum()
     else:
-        st.session_state.page = "connexion"
+        st.session_state[ss_key("page")] = "connexion"
         st.rerun()
 
 if __name__ == "__main__":
