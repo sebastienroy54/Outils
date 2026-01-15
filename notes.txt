@@ -1,6 +1,25 @@
-    if st.session_state.get("debug_log"):
-        st.subheader("DEBUG connexion (persistant)")
-        st.code(st.session_state.debug_log)
-        if st.button("Effacer debug", key=f"debug_clear_btn{key_suffix}"):
-            st.session_state.debug_log = ""
-            st.rerun()
+EXCEPTION dans page_connexion() (debug brut)
+
+Type:
+
+RUM_TIM.main()classbuiltins.AttributeError(...)
+Attribute not found.
+argsgetset_descriptor	<attribute 'args' of 'BaseException' objects>
+with_tracebackmethod_descriptor	Exception.with_traceback(tb) --
+repr(e):
+
+AttributeError("module 'streamlit' has no attribute 'succes'")
+
+Traceback:
+
+Traceback (most recent call last):
+  File "/app/outils/RUM_TIM.py", line 634, in page_connexion
+    st.succes("Connexion OK (debug affiché ci-dessus).")
+AttributeError: module 'streamlit' has no attribute 'succes'
+
+Etat session_state (extraits):
+
+logged_in=True
+oracle_connected=True
+page=rum
+debug_log_present=True
