@@ -1,14 +1,17 @@
-        # Infos environnement (très utile en Docker)
-        try:
-            w = subprocess.run(["which", "sqlplus"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            dbg_append(f"which sqlplus: {w.stdout.strip()} {w.stderr.strip()}")
-        except Exception as e:
-            dbg_append(f"which sqlplus failed: {e}")
+=== Tentative d connexion Oracle ===
+User: *****
+DSN: //o-simpa-b1.cch.aphp.fr:10805/SIP1CCH
+test_sql_path: /app/SQL/test_connexion.sql
+test_sql_exists: True
+which sqlplus: /opt/oracle/instantclient_10_2/sqlplus 
+PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ORACLE_HOME: /opt/oracle/instantclient_10_2
+LD_LIBRARY_PATH: /opt/oracle/instantclient_10_2
+Command (password masked):
+sqlplus -S *****/******@//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH @/app/SQL/test_connexion.sql
+returncode: 0
+---- STDOUT ----
+	 1
 
-        dbg_append(f"PATH: {subprocess.run(['sh','-lc','echo $PATH'], stdout=subprocess.PIPE, text=True).stdout.strip()}")
-        dbg_append(f"ORACLE_HOME: {subprocess.run(['sh','-lc','echo $ORACLE_HOME'], stdout=subprocess.PIPE, text=True).stdout.strip()}")
-        dbg_append(f"LD_LIBRARY_PATH: {subprocess.run(['sh','-lc','echo $LD_LIBRARY_PATH'], stdout=subprocess.PIPE, text=True).stdout.strip()}")
-
-        # Commande réelle (on masque le password)
-        dbg_append("Command (password masked):")
-        dbg_append(f"sqlplus -S {user}/******@{dsn} @{test_sql_path}")
+---- STDERR ----
+(vide)
