@@ -1,21 +1,14 @@
-out_mois = run_sqlplus_and_wait(
-    f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}",
-    timeout=60
-)
-out_cum = run_sqlplus_and_wait(
-    f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}",
-    timeout=60
-)
+        # Infos environnement (très utile en Docker)
+        try:
+            w = subprocess.run(["which", "sqlplus"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            dbg_append(f"which sqlplus: {w.stdout.strip()} {w.stderr.strip()}")
+        except Exception as e:
+            dbg_append(f"which sqlplus failed: {e}")
 
-# Debug: afficher la sortie uniquement pour HTD (ou si ORA-/SP2- détecté)
-def looks_like_sqlplus_error(txt: str) -> bool:
-    if not txt:
-        return False
-    return ("ORA-" in txt) or ("SP2-" in txt)
+        dbg_append(f"PATH: {subprocess.run(['sh','-lc','echo $PATH'], stdout=subprocess.PIPE, text=True).stdout.strip()}")
+        dbg_append(f"ORACLE_HOME: {subprocess.run(['sh','-lc','echo $ORACLE_HOME'], stdout=subprocess.PIPE, text=True).stdout.strip()}")
+        dbg_append(f"LD_LIBRARY_PATH: {subprocess.run(['sh','-lc','echo $LD_LIBRARY_PATH'], stdout=subprocess.PIPE, text=True).stdout.strip()}")
 
-if site_label == "HTD" or looks_like_sqlplus_error(out_mois) or looks_like_sqlplus_error(out_cum):
-    st.subheader(f"Debug SQL*Plus — {site_label}")
-    st.write("Sortie MOIS :")
-    st.code(out_mois[-4000:] if out_mois else "(vide)")
-    st.write("Sortie CUMUL :")
-    st.code(out_cum[-4000:] if out_cum else "(vide)")
+        # Commande réelle (on masque le password)
+        dbg_append("Command (password masked):")
+        dbg_append(f"sqlplus -S {user}/******@{dsn} @{test_sql_path}")
