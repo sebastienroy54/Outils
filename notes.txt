@@ -1,3 +1,5 @@
+MARKER: avant st.rerun()
+
 EXCEPTION dans page_connexion() (debug brut)
 
 Type:
@@ -8,14 +10,14 @@ argsgetset_descriptor	<attribute 'args' of 'BaseException' objects>
 with_tracebackmethod_descriptor	Exception.with_traceback(tb) --
 repr(e):
 
-AttributeError("module 'streamlit' has no attribute 'succes'")
+AttributeError("module 'streamlit' has no attribute 'rerun'")
 
 Traceback:
 
 Traceback (most recent call last):
-  File "/app/outils/RUM_TIM.py", line 634, in page_connexion
-    st.succes("Connexion OK (debug affiché ci-dessus).")
-AttributeError: module 'streamlit' has no attribute 'succes'
+  File "/app/outils/RUM_TIM.py", line 636, in page_connexion
+    st.rerun()
+AttributeError: module 'streamlit' has no attribute 'rerun'
 
 Etat session_state (extraits):
 
