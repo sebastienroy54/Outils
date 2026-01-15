@@ -1,16 +1,58 @@
-hostname -f
-cat /etc/debian_version
-whoami
-uptime
+hostname -f : g12-dim-p001.cch.aphp.fr
+cat /etc/debian_version : 12.12
+whoami : root
+uptime :
 
-docker --version
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}'
-docker network ls
-docker volume ls
+docker --version : Docker version 28.5.1, build e180ab8
+
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}\t{{.Status}}' :
+NAMES                 IMAGE                                    PORTS                                                      STATUS
+stream-nginx-1        localhost:5000/stream-nginx:0.0.1        0.0.0.0:12603->80/tcp, [::]:12603->80/tcp                  Up 12 days
+stream-phpmyadmin-1   phpmyadmin/phpmyadmin                    0.0.0.0:12602->80/tcp, [::]:12602->80/tcp                  Up 12 days
+stream-php-worker-1   localhost:5000/stream-php-worker:0.0.1   9000/tcp                                                   Up 12 days
+stream-php-1          localhost:5000/stream-php:0.0.1          9000/tcp                                                   Up 12 days
+stream-db_primary-1   mysql:8.0.20                             33060/tcp, 0.0.0.0:12601->3306/tcp, [::]:12601->3306/tcp   Up 12 days
+stream-swag-1         swaggerapi/swagger-ui                    80/tcp, 0.0.0.0:12605->8080/tcp, [::]:12605->8080/tcp      Up 12 days
+
+
+docker network ls :
+NETWORK ID     NAME            DRIVER    SCOPE
+ee8536ae32f9   bridge          bridge    local
+f53308c11d01   host            host      local
+e938bb21a205   none            null      local
+273870d89c3d   stream_stream   bridge    local
+
+docker volume ls :
+DRIVER     VOLUME NAME
 
 # Ports qui écoutent (très important)
-ss -lntp
+ss -lntp :
+State     Recv-Q    Send-Q       Local Address:Port        Peer Address:Port    Process
+LISTEN    0         128              127.0.0.1:631              0.0.0.0:*        users:(("cupsd",pid=149762,fd=7))
+LISTEN    0         20               127.0.0.1:25               0.0.0.0:*        users:(("exim4",pid=1345,fd=4))
+LISTEN    0         50                 0.0.0.0:139              0.0.0.0:*        users:(("smbd",pid=1415,fd=31))
+LISTEN    0         128                0.0.0.0:22               0.0.0.0:*        users:(("sshd",pid=904,fd=3))
+LISTEN    0         4096               0.0.0.0:111              0.0.0.0:*        users:(("rpcbind",pid=585,fd=4),("systemd",pid=1,fd=35))
+LISTEN    0         50                 0.0.0.0:445              0.0.0.0:*        users:(("smbd",pid=1415,fd=30))
+LISTEN    0         2                  0.0.0.0:33221            0.0.0.0:*        users:(("pmd",pid=851,fd=257))
+LISTEN    0         4096               0.0.0.0:12605            0.0.0.0:*        users:(("docker-proxy",pid=2292,fd=7))
+LISTEN    0         4096               0.0.0.0:12601            0.0.0.0:*        users:(("docker-proxy",pid=2369,fd=7))
+LISTEN    0         4096               0.0.0.0:12603            0.0.0.0:*        users:(("docker-proxy",pid=2218,fd=7))
+LISTEN    0         4096               0.0.0.0:12602            0.0.0.0:*        users:(("docker-proxy",pid=2327,fd=7))
+LISTEN    0         511                0.0.0.0:13001            0.0.0.0:*        users:(("julia",pid=48062,fd=19))
+LISTEN    0         50                    [::]:139                 [::]:*        users:(("smbd",pid=1415,fd=29))
+LISTEN    0         128                   [::]:22                  [::]:*        users:(("sshd",pid=904,fd=4))
+LISTEN    0         4096                  [::]:111                 [::]:*        users:(("rpcbind",pid=585,fd=6),("systemd",pid=1,fd=37))
+LISTEN    0         511                      *:80                     *:*        users:(("apache2",pid=149770,fd=4),("apache2",pid=149769,fd=4),("apache2",pid=149768,fd=4),("apache2",pid=950,fd=4))
+LISTEN    0         50                    [::]:445                 [::]:*        users:(("smbd",pid=1415,fd=28))
+LISTEN    0         4096                  [::]:12605               [::]:*        users:(("docker-proxy",pid=2298,fd=7))
+LISTEN    0         4096                  [::]:12601               [::]:*        users:(("docker-proxy",pid=2384,fd=7))
+LISTEN    0         4096                  [::]:12603               [::]:*        users:(("docker-proxy",pid=2247,fd=7))
+LISTEN    0         4096                  [::]:12602               [::]:*        users:(("docker-proxy",pid=2333,fd=7))
+LISTEN    0         20                   [::1]:25                  [::]:*        users:(("exim4",pid=1345,fd=5))
+LISTEN    0         128                  [::1]:631                 [::]:*        users:(("cupsd",pid=149762,fd=6))
+
 
 # Si un reverse proxy existe (nginx/apache)
-systemctl is-active nginx || true
-systemctl is-active apache2 || true
+systemctl is-active nginx || true : inactive
+systemctl is-active apache2 || true : active
