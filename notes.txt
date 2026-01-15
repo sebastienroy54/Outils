@@ -1,17 +1,49 @@
-=== Tentative d connexion Oracle ===
-User: *****
-DSN: //o-simpa-b1.cch.aphp.fr:10805/SIP1CCH
-test_sql_path: /app/SQL/test_connexion.sql
-test_sql_exists: True
-which sqlplus: /opt/oracle/instantclient_10_2/sqlplus 
-PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ORACLE_HOME: /opt/oracle/instantclient_10_2
-LD_LIBRARY_PATH: /opt/oracle/instantclient_10_2
-Command (password masked):
-sqlplus -S *****/******@//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH @/app/SQL/test_connexion.sql
-returncode: 0
----- STDOUT ----
-	 1
+DEBUG connexion (persistant)
+=== ensure_session_vars() called ===
 
----- STDERR ----
-(vide)
+--- STATE DANS ensure_session_vars (avant defaults) ---
+logged_in = (absent)
+oracle_conencted = (absent)
+page = (absent)
+oracle_user = (absent)
+show_exception = (absent)
+last_exception_str = (absent)
+
+=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
+
+=== ensure_session_vars() called ===
+
+--- STATE DANS ensure_session_vars (avant defaults) ---
+logged_in = False
+oracle_conencted = (absent)
+page = connexion
+oracle_user = 
+show_exception = False
+last_exception_str = 
+
+=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
+CONNEXION ORACLE
+DEBUG connexion (persistant)
+=== ensure_session_vars() called ===
+
+--- STATE DANS ensure_session_vars (avant defaults) ---
+logged_in = (absent)
+oracle_conencted = (absent)
+page = (absent)
+oracle_user = (absent)
+show_exception = (absent)
+last_exception_str = (absent)
+
+=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
+
+=== ensure_session_vars() called ===
+
+--- STATE DANS ensure_session_vars (avant defaults) ---
+logged_in = False
+oracle_conencted = (absent)
+page = connexion
+oracle_user = 
+show_exception = False
+last_exception_str = 
+
+=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
