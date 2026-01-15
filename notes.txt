@@ -1,49 +1,6 @@
-EXCEPTION dans page_connexion() (debug brut)
-
-Type:
-
-RUM_TIM.main()classstreamlit.errors.DuplicateWidgetID(...)
-Base class for Streamlit API exceptions.
-
-An API exception should be thrown when user code interacts with the
-Streamlit API incorrectly. (That is, when we throw an exception as a
-result of a user's malformed `st.foo` call, it should be a
-StreamlitAPIException or subclass.)
-
-When displaying these exceptions on the frontend, we strip Streamlit
-entries from the stack trace so that the user doesn't see a bunch of
-noise related to Streamlit internals.
-argsgetset_descriptor	<attribute 'args' of 'BaseException' objects>
-with_tracebackmethod_descriptor	Exception.with_traceback(tb) --
-repr(e):
-
-DuplicateWidgetID()
-
-Traceback:
-
-Traceback (most recent call last):
-  File "/app/outils/RUM_TIM.py", line 624, in page_connexion
-    dbg_show("_conn")
-  File "/app/outils/RUM_TIM.py", line 41, in dbg_show
-    if st.button("Effacer debug", key=f"debug_clear_btn{key_suffix}"):
-  File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/metrics_util.py", line 356, in wrapped_func
-    result = non_optional_func(*args, **kwargs)
-  File "/usr/local/lib/python3.7/site-packages/streamlit/elements/button.py", line 166, in button
-    ctx=ctx,
-  File "/usr/local/lib/python3.7/site-packages/streamlit/elements/button.py", line 438, in _button
-    ctx=ctx,
-  File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/state/widgets.py", line 163, in register_widget
-    return register_widget_from_metadata(metadata, ctx, widget_func_name, element_type)
-  File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/state/widgets.py", line 199, in register_widget_from_metadata
-    user_key,
-streamlit.errors.DuplicateWidgetID: There are multiple widgets with the same `key='debug_clear_btn_conn'`.
-
-To fix this, please make sure that the `key` argument is unique for each
-widget you create.
-
-Etat session_state (extraits):
-
-logged_in=False
-oracle_connected=False
-page=connexion
-debug_log_present=True
+    if st.session_state.get("debug_log"):
+        st.subheader("DEBUG connexion (persistant)")
+        st.code(st.session_state.debug_log)
+        if st.button("Effacer debug", key=f"debug_clear_btn{key_suffix}"):
+            st.session_state.debug_log = ""
+            st.rerun()
