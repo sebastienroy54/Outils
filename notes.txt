@@ -1,13 +1,16 @@
+Tableau d'exhaustivité des RUMs par TIM
 DEBUG connexion (persistant)
 === ensure_session_vars() called ===
 
 --- STATE DANS ensure_session_vars (avant defaults) ---
 logged_in = (absent)
-oracle_conencted = (absent)
+oracle_connected = (absent)
 page = (absent)
 oracle_user = (absent)
 show_exception = (absent)
 last_exception_str = (absent)
+
+=== RUN #1 2026-01-15T09:30:14.214109 ===
 
 === MAIN routing: page=connexion logged_in=False oracle_connected=False ===
 
@@ -15,24 +18,30 @@ last_exception_str = (absent)
 
 --- STATE DANS ensure_session_vars (avant defaults) ---
 logged_in = False
-oracle_conencted = (absent)
+oracle_connected = False
 page = connexion
 oracle_user = 
 show_exception = False
 last_exception_str = 
 
+=== RUN #2 2026-01-15T09:30:30.507430 ===
+
 === MAIN routing: page=connexion logged_in=False oracle_connected=False ===
-CONNEXION ORACLE
+
+
+Connexion Oracle
 DEBUG connexion (persistant)
 === ensure_session_vars() called ===
 
 --- STATE DANS ensure_session_vars (avant defaults) ---
 logged_in = (absent)
-oracle_conencted = (absent)
+oracle_connected = (absent)
 page = (absent)
 oracle_user = (absent)
 show_exception = (absent)
 last_exception_str = (absent)
+
+=== RUN #1 2026-01-15T09:30:14.214109 ===
 
 === MAIN routing: page=connexion logged_in=False oracle_connected=False ===
 
@@ -40,10 +49,43 @@ last_exception_str = (absent)
 
 --- STATE DANS ensure_session_vars (avant defaults) ---
 logged_in = False
-oracle_conencted = (absent)
+oracle_connected = False
 page = connexion
 oracle_user = 
 show_exception = False
 last_exception_str = 
 
+=== RUN #2 2026-01-15T09:30:30.507430 ===
+
 === MAIN routing: page=connexion logged_in=False oracle_connected=False ===
+
+
+Connexion Oracle
+👤 Nom d'utilisateur Oracle :
+
+*****
+🔑 Mot de passe :
+
+•••••••
+
+
+Test de connexion...
+
+DEBUG connexion (persistant)
+=== Tentative d connexion Oracle ===
+User: ****
+DSN: //o-simpa-b1.cch.aphp.fr:10805/SIP1CCH
+test_sql_path: /app/SQL/test_connexion.sql
+test_sql_exists: True
+which sqlplus: /opt/oracle/instantclient_10_2/sqlplus 
+PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ORACLE_HOME: /opt/oracle/instantclient_10_2
+LD_LIBRARY_PATH: /opt/oracle/instantclient_10_2
+Command (password masked):
+sqlplus -S ****/******@//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH @/app/SQL/test_connexion.sql
+returncode: 0
+---- STDOUT ----
+	 1
+
+---- STDERR ----
+(vide)
