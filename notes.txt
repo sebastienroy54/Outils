@@ -1,91 +1,49 @@
-Tableau d'exhaustivité des RUMs par TIM
-DEBUG connexion (persistant)
-=== ensure_session_vars() called ===
+EXCEPTION dans page_connexion() (debug brut)
 
---- STATE DANS ensure_session_vars (avant defaults) ---
-logged_in = (absent)
-oracle_connected = (absent)
-page = (absent)
-oracle_user = (absent)
-show_exception = (absent)
-last_exception_str = (absent)
+Type:
 
-=== RUN #1 2026-01-15T09:30:14.214109 ===
+RUM_TIM.main()classstreamlit.errors.DuplicateWidgetID(...)
+Base class for Streamlit API exceptions.
 
-=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
+An API exception should be thrown when user code interacts with the
+Streamlit API incorrectly. (That is, when we throw an exception as a
+result of a user's malformed `st.foo` call, it should be a
+StreamlitAPIException or subclass.)
 
-=== ensure_session_vars() called ===
+When displaying these exceptions on the frontend, we strip Streamlit
+entries from the stack trace so that the user doesn't see a bunch of
+noise related to Streamlit internals.
+argsgetset_descriptor	<attribute 'args' of 'BaseException' objects>
+with_tracebackmethod_descriptor	Exception.with_traceback(tb) --
+repr(e):
 
---- STATE DANS ensure_session_vars (avant defaults) ---
-logged_in = False
-oracle_connected = False
-page = connexion
-oracle_user = 
-show_exception = False
-last_exception_str = 
+DuplicateWidgetID()
 
-=== RUN #2 2026-01-15T09:30:30.507430 ===
+Traceback:
 
-=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
+Traceback (most recent call last):
+  File "/app/outils/RUM_TIM.py", line 624, in page_connexion
+    dbg_show("_conn")
+  File "/app/outils/RUM_TIM.py", line 41, in dbg_show
+    if st.button("Effacer debug", key=f"debug_clear_btn{key_suffix}"):
+  File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/metrics_util.py", line 356, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+  File "/usr/local/lib/python3.7/site-packages/streamlit/elements/button.py", line 166, in button
+    ctx=ctx,
+  File "/usr/local/lib/python3.7/site-packages/streamlit/elements/button.py", line 438, in _button
+    ctx=ctx,
+  File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/state/widgets.py", line 163, in register_widget
+    return register_widget_from_metadata(metadata, ctx, widget_func_name, element_type)
+  File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/state/widgets.py", line 199, in register_widget_from_metadata
+    user_key,
+streamlit.errors.DuplicateWidgetID: There are multiple widgets with the same `key='debug_clear_btn_conn'`.
 
+To fix this, please make sure that the `key` argument is unique for each
+widget you create.
 
-Connexion Oracle
-DEBUG connexion (persistant)
-=== ensure_session_vars() called ===
+Etat session_state (extraits):
 
---- STATE DANS ensure_session_vars (avant defaults) ---
-logged_in = (absent)
-oracle_connected = (absent)
-page = (absent)
-oracle_user = (absent)
-show_exception = (absent)
-last_exception_str = (absent)
-
-=== RUN #1 2026-01-15T09:30:14.214109 ===
-
-=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
-
-=== ensure_session_vars() called ===
-
---- STATE DANS ensure_session_vars (avant defaults) ---
-logged_in = False
-oracle_connected = False
-page = connexion
-oracle_user = 
-show_exception = False
-last_exception_str = 
-
-=== RUN #2 2026-01-15T09:30:30.507430 ===
-
-=== MAIN routing: page=connexion logged_in=False oracle_connected=False ===
-
-
-Connexion Oracle
-👤 Nom d'utilisateur Oracle :
-
-*****
-🔑 Mot de passe :
-
-•••••••
-
-
-Test de connexion...
-
-DEBUG connexion (persistant)
-=== Tentative d connexion Oracle ===
-User: ****
-DSN: //o-simpa-b1.cch.aphp.fr:10805/SIP1CCH
-test_sql_path: /app/SQL/test_connexion.sql
-test_sql_exists: True
-which sqlplus: /opt/oracle/instantclient_10_2/sqlplus 
-PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ORACLE_HOME: /opt/oracle/instantclient_10_2
-LD_LIBRARY_PATH: /opt/oracle/instantclient_10_2
-Command (password masked):
-sqlplus -S ****/******@//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH @/app/SQL/test_connexion.sql
-returncode: 0
----- STDOUT ----
-	 1
-
----- STDERR ----
-(vide)
+logged_in=False
+oracle_connected=False
+page=connexion
+debug_log_present=True
