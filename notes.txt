@@ -1,35 +1,16 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 400
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
+version: "3.9"
 
-SPOOL C:/Users/4251352/Documents/ndas_identite_dates.csv
+services:
+  streamlit:
+    build: .
+    container_name: portail-outils-dev
+    ports:
+      - "8501:8501"
 
-SELECT
-    S.KYNODA AS NDA,
-    S.NMMAL  AS NOM,
-    S.NMPMAL AS PRENOM,
-    MIN(R.D8EEUE) AS DATE_ENTREE,
-    MAX(R.D8SOUE) AS DATE_SORTIE
-FROM
-    SDO S,
-    RSM R
-WHERE
-    S.KYNODA = R.NODA
-    AND S.KYNODA IN (
-        /* === COLLE ICI TA LISTE DE NDA === */
-        123456,
-        234567,
-        345678
-    )
-GROUP BY
-    S.KYNODA, S.NMMAL, S.NMPMAL
-ORDER BY
-    S.KYNODA;
-
-SPOOL OFF
-SET TERMOUT ON
+    volumes:
+      - .:/app
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    
+    command: streamlit run app.py
