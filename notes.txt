@@ -1,11 +1,103 @@
-vitrygtr@Pro:/media/sf_python$ ls
-automatisation  monouhcd  python_monouhcd.sh
-vitrygtr@Pro:/media/sf_python$ ls automatisation/
-mail_monouhcd.json
-vitrygtr@Pro:/media/sf_python$ ls monouhcd/
-app                             Dockerfile          output            sql
-basic-10.2.0.5.0-linux-x64.zip  monouhcd-image.tar  requirements.txt  sqlplus-10.2.0.5.0-linux-x64.zip
-vitrygtr@Pro:/media/sf_python$ ls monouhcd/app/
-code_decoupage.py  mailer.py  main.py  oracle_runner.py  txt_to_excel.py
-vitrygtr@Pro:/media/sf_python$ ls monouhcd/sql
-MONO_UHCD_CCH.sql  MONO_UHCD_HTD.sql
+vitrygtr@Pro:/media/sf_python$ sed -n '1,200p' /media/sf_python/monouhcd/app/oracle_runner.py 
+import subprocess
+from pathlib import Path
+
+def run_sqlplus(sql_file: Path, output_dir: Path, host: str, port: int, user: str, password: str):
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    connect = f"{user}/{password}@{host}:{port}"
+    cmd = f"sqlplus -S {connect} @{sql_file}"
+    subprocess.run(cmd, shell=True, check=True)
+
+import json
+import yaml
+from pathlib import Path
+
+from oracle_runner import run_sqlplus
+from txt_to_excel import txt_to_excel
+from code_decoupage import decouper_excel
+from mailer import send_mail
+
+APP_DIR = Path("/app")
+CONFIG_DIR = Path("/config")
+GITHUB_DIR = Path("/github")
+
+SQL_DIR = APP_DIR / "sql"
+OUTPUT_DIR = APP_DIR / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+MAIL_CONFIG_FILE = CONFIG_DIR / "mail_monouhcd.json"
+
+CCH_DSN = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
+HTD_DSN = "//o-simpa-b1.htd.aphp.fr:8855/SIP1HTD"
+
+with MAIL_CONFIG_FILE.open(encoding="utf-8") as f:
+    mail_config = json.load(f)
+
+MAIL_FROM = mail_config["from"]
+
+def load_oracle_dbal(yml_path: Path):
+    with yml_path.open("r", encoding="utf-8") as f:
+        yaml_cfg = yaml.safe_load(f)
+
+    return yaml_cfg["doctrine"]["dbal"]
+
+
+oracle_configs = {
+    "CCH": load_oracle_dbal(CCH_DSN),
+    "HTD": load_oracle_dbal(HTD_DSN),
+}
+
+
+SITES = {
+    "CCH": {"sql": "MONO_UHCD_CCH.sql"},
+    "HTD": {"sql": "MONO_UHCD_HTD.sql"},
+}
+
+
+generated_files = {}
+
+for site_name, site_cfg in SITES.items():
+
+    site_output = OUTPUT_DIR / site_name
+    site_output.mkdir(parents=True, exist_ok=True)
+
+    ora = oracle_configs[site_name]
+
+    for key in ("host", "user", "password"):
+        if key not in ora:
+            raise RuntimeError(f"Config Oracle invalide pour {site_name} : clé manquante '{key}'")
+
+    run_sqlplus(
+        sql_file=SQL_DIR / site_cfg["sql"],
+        output_dir=site_output,
+        host=ora["host"],
+        port=int(ora.get("port", 1521)),
+        user=ora["user"],
+        password=ora["password"],
+    )
+
+    txt_file = site_output / f"MONO_UHCD_{site_name}.txt"
+    excel_file = site_output / f"MONO_UHCD_{site_name}.xlsx"
+
+    txt_to_excel(txt_file, excel_file)
+    decouper_excel(excel_file, excel_file)
+
+    if txt_file.exists():
+        txt_file.unlink()
+
+    generated_files[site_name] = excel_file
+
+for site_name, excel_path in generated_files.items():
+    send_mail(
+        mail_from=MAIL_FROM,
+        recipients=mail_config[site_name]["to"],
+        subject=f"MONO UHCD – Rapport {site_name}",
+        body=(
+            "Bonjour,\n\n"
+            f"Veuillez trouver en pièce jointe le rapport MONO UHCD – {site_name}.\n\n"
+            "---\n"
+            "Mail généré automatiquement – merci de ne pas répondre."
+        ),
+        attachments=[excel_path],
+    )
