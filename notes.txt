@@ -1,84 +1,454 @@
-SELECT
-    COUNT(DISTINCT R.NOIP) AS NB_PATIENTS_SUIVIS_2025
-FROM
-    RSM R
-WHERE
-    R.CDURM_P IN ('450','451','450J')
-    AND R.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-    AND R.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY');
+import streamlit as st
+import pandas as pd
+import subprocess
+from io import BytesIO
+from datetime import datetime
+from pathlib import Path
+import tempfile
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+SQL_DIR = BASE_DIR / "SQL"
+DATA_DIR = BASE_DIR / "data"
 
-SELECT
-    COUNT(*) AS NB_NOUVEAUX_PATIENTS_2025
-FROM
-(
-    SELECT
-        R.NOIP,
-        MIN(R.D8EEUE) AS DATE_PREMIER_PASSAGE
-    FROM
-        RSM R
-    WHERE
-        R.CDURM_P IN ('450','451','450J')
-    GROUP BY
-        R.NOIP
-)
-WHERE
-    DATE_PREMIER_PASSAGE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-    AND DATE_PREMIER_PASSAGE <  TO_DATE('01/01/2026','DD/MM/YYYY');
+TEST_SQL = SQL_DIR / "test_connexion.sql"
+MAIN_SQL = SQL_DIR / "contigus.sql"
+CSV_PATH = DATA_DIR / "resultat.csv"
+OUTPUT_PATH = DATA_DIR / "doublons.xlsx"
 
+def test_oracle_connection(user, password, tns_alias):
+    cmd = ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{TEST_SQL}"]
 
-SELECT
-    NB_NOUVEAUX,
-    NB_TOTAL,
-    ROUND(NB_NOUVEAUX / NB_TOTAL * 100, 2) AS TAUX_NOUVEAUX_2025
-FROM
-(
-    SELECT
-        COUNT(DISTINCT R1.NOIP) AS NB_TOTAL,
-        (
-            SELECT COUNT(*)
-            FROM
-            (
-                SELECT
-                    R2.NOIP,
-                    MIN(R2.D8EEUE) AS DATE_PREMIER_PASSAGE
-                FROM
-                    RSM R2
-                WHERE
-                    R2.CDURM_P IN ('450','451','450J')
-                GROUP BY
-                    R2.NOIP
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode != 0:
+            st.error("Connexion Oracle échouée")
+            st.code(result.stderr or result.stdout)
+            return False
+
+        return True
+
+    except subprocess.TimeoutExpired:
+        st.error("Connexion Oracle: timeout")
+        return False
+    except Exception as e:
+        st.error(f"Connexion Oracle: erreur inattendue: {e}")
+        return False
+
+def main():
+    st.title("Détection des Doublons, Contigus et Chevauchements")
+    st.markdown(
+        "Cet outil exécute la requête SQL, analyse les séjours "
+        "et génère un fichier Excel structuré."
+    )
+
+    with st.form("connexion"):
+        st.subheader("Connexion Oracle")
+        user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
+        password = st.text_input("🔑 Mot de passe :", type="password")
+        submitted = st.form_submit_button("🚀 Lancer le traitement")
+
+    if not submitted:
+        return
+
+    if not user or not password:
+        st.error("Veuillez renseigner vos identifiants Oracle.")
+        st.stop()
+
+    tns_alias = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
+
+    try:
+        if CSV_PATH.exists():
+            CSV_PATH.unlink()
+    except Exception:
+        pass
+
+    with st.spinner("🔐 Test de connexion Oracle..."):
+        ok = test_oracle_connection(user, password, tns_alias)
+        if not ok:
+            st.error("Connexion Oracle échouée.")
+            st.stop()
+
+    with st.spinner("🧠 Exécution de la requête SQL, veuillez patienter..."):
+        result = subprocess.run(
+            ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{MAIN_SQL}"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        if result.returncode != 0:
+            st.error("Erreur lors de l'exécution SQL*Plus")
+            st.stop()
+
+    if not CSV_PATH.exists():
+        if '01017' in result.stdout:
+            st.error("Connexion échouée. Veuillez vérifier vos identifiants.")
+        else:
+            st.error(
+                f"Le fichier {CSV_PATH.name} n'existe pas après exécution SQL. "
+                "Vérifie le spool dans contigus.sql et le chemin de sortie."
             )
-            WHERE
-                DATE_PREMIER_PASSAGE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-                AND DATE_PREMIER_PASSAGE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-        ) AS NB_NOUVEAUX
-    FROM
-        RSM R1
-    WHERE
-        R1.CDURM_P IN ('450','451','450J')
-        AND R1.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-        AND R1.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-);
+        #st.code(result.stderr or result.stdout)
+        st.stop()
 
+    st.success("✅ Requête SQL terminée et fichier CSV généré.")
+    st.divider()
 
-SELECT
-    NOIP,
-    DATE_PREMIER_PASSAGE
-FROM
-(
-    SELECT
-        R.NOIP,
-        MIN(R.D8EEUE) AS DATE_PREMIER_PASSAGE
-    FROM
-        RSM R
-    WHERE
-        R.CDURM_P IN ('450','451','450J')
-    GROUP BY
-        R.NOIP
-)
-WHERE
-    DATE_PREMIER_PASSAGE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-    AND DATE_PREMIER_PASSAGE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-ORDER BY
-    DATE_PREMIER_PASSAGE;
+    with st.spinner("🔎 Analyse des séjours en cours..."):
+        try:
+            df = pd.read_csv(
+                CSV_PATH,
+                sep=";",
+                skip_blank_lines=True,
+                dtype=str,
+                encoding="latin-1"
+            )
+        except Exception as e:
+            st.error(f"Erreur lecture CSV : {e}")
+            st.stop()
+
+        try:
+            df = df.dropna(how="all")
+            df.columns = [col.strip().upper() for col in df.columns]
+
+            expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
+            if df.shape[1] >= len(expected_cols):
+                df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
+
+            df["IPP"] = df["IPP"].astype(str).str.strip()
+            df["UMA"] = df["UMA"].fillna("").astype(str).str.strip()
+            df["NDA"] = df["NDA"].astype(str).str.strip()
+            df["GHM"] = df["GHM"].fillna("").astype(str).str.strip()
+
+            df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"], dayfirst=True, errors="coerce")
+            df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"], dayfirst=True, errors="coerce")
+
+            df = df[~df["UMA"].isin(["540", "543"])]
+
+            df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
+            df = df.sort_values(["IPP", "DATE_ENTREE", "DATE_SORTIE"]).reset_index(drop=True)
+
+            df_base = df.drop_duplicates(
+                subset=["IPP", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"],
+                keep="first"
+            ).copy()
+
+            df_contigus = df.copy()
+
+        except Exception as e:
+            st.error(f"Erreur nettoyage données : {e}")
+            st.stop()
+
+    rows = []
+    try:
+        def stay_key(ipp, nda, uma, de, ds):
+            return (ipp, nda, uma, de, ds)
+
+        stay_to_ghm = {}
+        stay_to_ghm_full = {} 
+        for _, r in df_contigus.iterrows():
+            ipp = r["IPP"]
+            nda = r["NDA"]
+            uma = r["UMA"]
+            de = r["DATE_ENTREE"]
+            ds = r["DATE_SORTIE"]
+            ghm = str(r["GHM"]).strip()
+
+            k = stay_key(ipp, nda, uma, de, ds)
+            if ghm and ghm.upper() not in ("NAN", "NONE") and len(ghm) >= 5:
+                root = ghm[:5]
+                stay_to_ghm.setdefault(k, set()).add(root)
+                stay_to_ghm_full.setdefault(k, {})
+                stay_to_ghm_full[k].setdefault(root, ghm)
+
+        assigned = set()
+
+        def pair_id(k1, k2):
+            return tuple(sorted([k1, k2]))
+
+        def get_dn(g, i):
+            try:
+                return g.loc[i, "DATE_NAISSANCE"]
+            except Exception:
+                return ""
+
+        for ipp, group in df_base.groupby("IPP", sort=False):
+            g = group.reset_index(drop=True)
+            n = len(g)
+
+            for i in range(n):
+                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+
+                j = i + 1
+                while j < n:
+                    de2 = g.loc[j, "DATE_ENTREE"]
+                    if pd.isna(de2):
+                        j += 1
+                        continue
+                    if de2 > ds1 and de2 != ds1:
+                        break
+
+                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
+                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+
+                    if nda1 == nda2:
+                        j += 1
+                        continue
+
+                    pid = pair_id(k1, k2)
+                    if pid in assigned:
+                        j += 1
+                        continue
+
+                    rel = None
+                    if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
+                        rel = "VRAI_DOUBLON"
+                    elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
+                        rel = "DOUBLON_0_NUIT"
+                    elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
+                        rel = "CHEVAUCHEMENT_CANDIDAT"
+                    else:
+                        rel = None
+
+                    if rel and rel != "CHEVAUCHEMENT_CANDIDAT":
+                        assigned.add(pid)
+                        rows.append({
+                            "IPP": ipp,
+                            "DATE_NAISSANCE": get_dn(g, i),
+
+                            "NDA1": nda1, "UMA1": uma1, "GHM1": "",
+                            "DATEE1": de1, "DATES1": ds1,
+
+                            "NDA2": nda2, "UMA2": uma2, "GHM2": "",
+                            "DATEE2": de2, "DATES2": ds2,
+
+                            "TYPE_RELATION": rel
+                        })
+
+                    j += 1
+
+        for ipp, group in df_base.groupby("IPP", sort=False):
+            g = group.reset_index(drop=True)
+            n = len(g)
+
+            for i in range(n):
+                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+
+                j = i + 1
+                while j < n:
+                    de2 = g.loc[j, "DATE_ENTREE"]
+                    if pd.isna(de2):
+                        j += 1
+                        continue
+                    if de2 > ds1 and de2 != ds1:
+                        break
+
+                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
+                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+
+                    if nda1 == nda2:
+                        j += 1
+                        continue
+
+                    pid = pair_id(k1, k2)
+                    if pid in assigned:
+                        j += 1
+                        continue
+
+                    is_contig = (ds1 == de2) or (ds2 == de1)
+                    if not is_contig or uma1 == uma2:
+                        j += 1
+                        continue
+
+                    roots1 = stay_to_ghm.get(k1, set())
+                    roots2 = stay_to_ghm.get(k2, set())
+                    common = roots1.intersection(roots2)
+
+                    if common:
+                        root = sorted(list(common))[0]
+                        ghm1 = stay_to_ghm_full.get(k1, {}).get(root, "")
+                        ghm2 = stay_to_ghm_full.get(k2, {}).get(root, "")
+
+                        assigned.add(pid)
+                        rows.append({
+                            "IPP": ipp,
+                            "DATE_NAISSANCE": get_dn(g, i),
+
+                            "NDA1": nda1, "UMA1": uma1, "GHM1": ghm1,
+                            "DATEE1": de1, "DATES1": ds1,
+
+                            "NDA2": nda2, "UMA2": uma2, "GHM2": ghm2,
+                            "DATEE2": de2, "DATES2": ds2,
+
+                            "TYPE_RELATION": "CONTIGUS"
+                        })
+
+                    j += 1
+
+        for ipp, group in df_base.groupby("IPP", sort=False):
+            g = group.reset_index(drop=True)
+            n = len(g)
+
+            for i in range(n):
+                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
+                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+
+                j = i + 1
+                while j < n:
+                    de2 = g.loc[j, "DATE_ENTREE"]
+                    if pd.isna(de2):
+                        j += 1
+                        continue
+                    if de2 > ds1 and de2 != ds1:
+                        break
+
+                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
+                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+
+                    if nda1 == nda2:
+                        j += 1
+                        continue
+
+                    pid = pair_id(k1, k2)
+                    if pid in assigned:
+                        j += 1
+                        continue
+
+                    if (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
+                        assigned.add(pid)
+                        rows.append({
+                            "IPP": ipp,
+                            "DATE_NAISSANCE": get_dn(g, i),
+
+                            "NDA1": nda1, "UMA1": uma1, "GHM1": "",
+                            "DATEE1": de1, "DATES1": ds1,
+
+                            "NDA2": nda2, "UMA2": uma2, "GHM2": "",
+                            "DATEE2": de2, "DATES2": ds2,
+
+                            "TYPE_RELATION": "CHEVAUCHEMENT"
+                        })
+
+                    j += 1
+
+    except Exception as e:
+        st.error(f"Erreur détection relations : {e}")
+        st.stop()
+
+    try:
+        res = pd.DataFrame(rows).drop_duplicates().reset_index(drop=True)
+        res["PAIR_ID"] = res.index + 1
+
+        def build_rows_instead_of_columns(df_rel, keep_ghm: bool):
+            left_cols = {
+                "IPP": "IPP",
+                "DATE_NAISSANCE": "DATE_NAISSANCE",
+                "NDA": "NDA1",
+                "UMA": "UMA1",
+                "DATE_ENTREE": "DATEE1",
+                "DATE_SORTIE": "DATES1",
+                "PAIR_ID": "PAIR_ID",
+            }
+            if keep_ghm:
+                left_cols["GHM"] = "GHM1"
+
+            df1 = df_rel[list(left_cols.values())].copy()
+            df1.columns = list(left_cols.keys())
+            df1["LIGNE"] = 1
+
+            right_cols = {
+                "IPP": "IPP",
+                "DATE_NAISSANCE": "DATE_NAISSANCE",
+                "NDA": "NDA2",
+                "UMA": "UMA2",
+                "DATE_ENTREE": "DATEE2",
+                "DATE_SORTIE": "DATES2",
+                "PAIR_ID": "PAIR_ID",
+            }
+            if keep_ghm:
+                right_cols["GHM"] = "GHM2"
+
+            df2 = df_rel[list(right_cols.values())].copy()
+            df2.columns = list(right_cols.keys())
+            df2["LIGNE"] = 2
+
+            out = pd.concat([df1, df2], ignore_index=True)
+
+            for c in ["DATE_ENTREE", "DATE_SORTIE"]:
+                out[c] = pd.to_datetime(out[c], errors="coerce").dt.strftime("%d/%m/%Y")
+
+            out["COMMENTAIRE"] = ""
+
+            if keep_ghm:
+                out = out[["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM",
+                           "DATE_ENTREE", "DATE_SORTIE", "COMMENTAIRE"]]
+            else:
+                out = out[["IPP", "DATE_NAISSANCE", "NDA", "UMA",
+                           "DATE_ENTREE", "DATE_SORTIE", "COMMENTAIRE"]]
+
+            out = out.sort_values(["IPP"]).reset_index(drop=True)
+            return out
+
+        with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
+            for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
+                subset = res[res["TYPE_RELATION"] == groupe].copy()
+                subset = subset.drop(columns=["TYPE_RELATION"], errors="ignore")
+
+                keep_ghm = (groupe == "CONTIGUS")
+
+                if subset.empty:
+                    if keep_ghm:
+                        df_to_write = pd.DataFrame([{
+                            "IPP": "N/A", "DATE_NAISSANCE": "N/A",
+                            "NDA": "N/A", "UMA": "N/A", "GHM": "N/A",
+                            "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A", "COMMENTAIRE": ""
+                        }])
+                    else:
+                        df_to_write = pd.DataFrame([{
+                            "IPP": "N/A", "DATE_NAISSANCE": "N/A",
+                            "NDA": "N/A", "UMA": "N/A",
+                            "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A", "COMMENTAIRE": ""
+                        }])
+                else:
+                    df_to_write = build_rows_instead_of_columns(subset, keep_ghm=keep_ghm)
+
+                df_to_write.to_excel(writer, sheet_name=groupe, index=False)
+
+                ws = writer.sheets[groupe]
+                for i, col in enumerate(df_to_write.columns):
+                    max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
+                    ws.column_dimensions[ws.cell(row=1, column=i + 1).column_letter].width = max_len
+
+    except Exception as e:
+        st.error(f"Erreur écriture Excel : {e}")
+        st.stop()
+
+    st.success("✅ Analyse terminée avec succès !")
+
+    try:
+        excel_bytes = OUTPUT_PATH.read_bytes()
+    except Exception as e:
+        st.error(f"Impossible de lire le fichier Excel généré : {e}")
+        st.stop()
+
+    st.download_button(
+        label="📥 Télécharger le fichier Excel",
+        data=excel_bytes,
+        file_name=f"doublons_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    for p in (CSV_PATH, OUTPUT_PATH):
+        try:
+            if p.exists():
+                p.unlink()
+        except Exception:
+            pass
