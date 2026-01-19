@@ -1,15 +1,84 @@
-version: "3.9"
+SELECT
+    COUNT(DISTINCT R.NOIP) AS NB_PATIENTS_SUIVIS_2025
+FROM
+    RSM R
+WHERE
+    R.CDURM_P IN ('450','451','450J')
+    AND R.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+    AND R.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY');
 
-services:
-  streamlit:
-    image: portail-outils:latest
-    container_name: portail-outils
-    ports:
-      - "18501:8501"
-    volumes:
-      - .:/app
-    environment:
-      - STREAMLIT_SERVER_PORT=8501
-      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
-    command: streamlit run app.py
-    restart: unless-stopped
+
+SELECT
+    COUNT(*) AS NB_NOUVEAUX_PATIENTS_2025
+FROM
+(
+    SELECT
+        R.NOIP,
+        MIN(R.D8EEUE) AS DATE_PREMIER_PASSAGE
+    FROM
+        RSM R
+    WHERE
+        R.CDURM_P IN ('450','451','450J')
+    GROUP BY
+        R.NOIP
+)
+WHERE
+    DATE_PREMIER_PASSAGE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+    AND DATE_PREMIER_PASSAGE <  TO_DATE('01/01/2026','DD/MM/YYYY');
+
+
+SELECT
+    NB_NOUVEAUX,
+    NB_TOTAL,
+    ROUND(NB_NOUVEAUX / NB_TOTAL * 100, 2) AS TAUX_NOUVEAUX_2025
+FROM
+(
+    SELECT
+        COUNT(DISTINCT R1.NOIP) AS NB_TOTAL,
+        (
+            SELECT COUNT(*)
+            FROM
+            (
+                SELECT
+                    R2.NOIP,
+                    MIN(R2.D8EEUE) AS DATE_PREMIER_PASSAGE
+                FROM
+                    RSM R2
+                WHERE
+                    R2.CDURM_P IN ('450','451','450J')
+                GROUP BY
+                    R2.NOIP
+            )
+            WHERE
+                DATE_PREMIER_PASSAGE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+                AND DATE_PREMIER_PASSAGE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+        ) AS NB_NOUVEAUX
+    FROM
+        RSM R1
+    WHERE
+        R1.CDURM_P IN ('450','451','450J')
+        AND R1.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+        AND R1.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+);
+
+
+SELECT
+    NOIP,
+    DATE_PREMIER_PASSAGE
+FROM
+(
+    SELECT
+        R.NOIP,
+        MIN(R.D8EEUE) AS DATE_PREMIER_PASSAGE
+    FROM
+        RSM R
+    WHERE
+        R.CDURM_P IN ('450','451','450J')
+    GROUP BY
+        R.NOIP
+)
+WHERE
+    DATE_PREMIER_PASSAGE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+    AND DATE_PREMIER_PASSAGE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+ORDER BY
+    DATE_PREMIER_PASSAGE;
