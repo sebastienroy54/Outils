@@ -1,12 +1,49 @@
-vitrygtr@Pro:/media/sf_python/monouhcd$ docker run --rm \
-  -v "/media/sf_python/monouhcd/app":/app \
-  -v "/media/sf_python/monouhcd/sql":/app/sql \
-  -v "/media/sf_python/monouhcd/output":/app/output \
-  -v "/media/sf_python/automatisation":/config \
-  monouhcd-image
-Traceback (most recent call last):
-  File "/app/main.py", line 61, in <module>
-    txt_to_excel(txt_file, excel_file)
-  File "/app/txt_to_excel.py", line 9, in txt_to_excel
-    header_idx = next(i for i,l in enumerate(lines) if re.match(r"^-{2,}", l.strip()))
-StopIteration
+    to_char(EPI.D8SOUE,'DD/MM/YYYY') AS FIN_EPI,
+    *
+ERROR at line 10:
+ORA-01843: not a valid month 
+
+
+set verify off
+set linesize 300
+set pagesize 6000
+spool MONO_UHCD_CCH.txt
+set termout off
+SELECT DISTINCT 
+    SDO.KYNOIP AS IPP,
+    SDO.NMMAL AS NOM,
+    SDO.NMPMAL AS PRENOM,
+    EPI.KYNODA AS NDA,
+    EPI.UE AS UH,
+    EPI.CDURM_P AS UMA, 
+    to_char(EPI.D8EEUE,'DD/MM/YYYY') AS DEBUT_EPI,
+    to_char(EPI.D8EEUE,'hh24:mi') AS HDEBUT_EPI,
+    to_char(EPI.D8SOUE,'DD/MM/YYYY') AS FIN_EPI, 
+    to_char(EPI.D8SOUE,'hh24:mi') AS HFIN_EPI,
+    EPI.MDSOUE as mdsor,
+    (floor((EPI.D8SOUE-EPI.D8EEUE)*24)) as hours_nb
+FROM EPI, SDO WHERE EPI.KYNODA = SDO.KYNODA
+AND SDO.DASOR >= to_date('01/11/2025','DD/MM/YYYY') 
+AND SDO.DASOR  < SYSDATE
+AND EPI.UE = '322'
+AND 
+(
+(floor((EPI.D8SOUE-EPI.D8EEUE)*24)) > 24
+OR
+(EPI.MDSOUE = '9' AND (to_date(SDO.DASOR) - to_date(SDO.DAENTR)) >= 1)
+OR
+(
+ EPI.MDSOUE = '7' AND EPI.TYTRDS in ('1', '2', '4') AND (to_date(SDO.DASOR) - to_date(SDO.DAENTR)) >= 1
+ )
+)
+AND EPI.KYNODA NOT IN
+(
+SELECT DISTINCT EPI.KYNODA
+FROM EPI, SDO WHERE EPI.KYNODA = SDO.KYNODA
+AND SDO.DASOR >= to_date('01/11/2025','DD/MM/YYYY') 
+AND SDO.DASOR < SYSDATE
+AND EPI.UE <> '322' 
+)
+ORDER BY to_date(to_char(EPI.D8SOUE,'DD/MM/YYYY')) ASC;
+spool off
+EXIT;
