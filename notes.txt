@@ -1,163 +1,187 @@
+import streamlit as st
+import subprocess
 import pandas as pd
+import plotly.graph_objects as go
+from datetime import datetime
+from pathlib import Path
 
-CSV_PATH = "resultat.csv"  # adapte si besoin
+BASE_DIR = Path(__file__).resolve().parents[1]
+SQL_DIR = BASE_DIR / "SQL"
+DATA_DIR = BASE_DIR / "data"
+OUTILS_DIR = BASE_DIR / "outils"
 
-expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
+SQL_FILE = SQL_DIR / "Requete_RUM.sql"
+CSV_FILE = DATA_DIR / "dashboard.csv"
+CSS_FILE = OUTILS_DIR / "styles_dashboard_rum.css"
 
-df = pd.read_csv(CSV_PATH, sep=";", skip_blank_lines=True, dtype=str, encoding="latin-1").dropna(how="all")
-df.columns = [c.strip().upper() for c in df.columns]
+def load_css(file_path):
+    if not file_path.exists():
+        st.warning(f"CSS introuvable : {file_path}")
+        return
+    with open(file_path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Comme ton code: si plus de colonnes, on renomme les 7 premières
-if df.shape[1] >= len(expected_cols):
-    df = df.iloc[:, :len(expected_cols)]
-    df.columns = expected_cols
+def run_sqlplus(user, password, tns_alias, sql_file):
+    cmd = [
+        "sqlplus",
+        "-S",
+        f"{user}/{password}@{tns_alias}",
+        f"@{sql_file}"
+    ]
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    if result.returncode != 0:
+        st.error("Erreur SQL*Plus")
+        st.code(result.stderr or result.stdout)
 
-for c in ["IPP", "NDA", "UMA", "GHM"]:
-    df[c] = df[c].fillna("").astype(str).str.strip()
+def load_data(csv_file):
+    cols = [
+        "UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
+        "NB_JOURNEES", "NB_JOURNEES_SUPPL",
+        "%_RUM_SUPPL", "%_JOURNEES_SUPPL"
+    ]
 
-df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"], dayfirst=True, errors="coerce")
-df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"], dayfirst=True, errors="coerce")
+    df = pd.read_csv(
+        csv_file,
+        sep=";",
+        engine="python",
+        names=cols,
+        header=None,
+        encoding="cp1252"
+    )
 
-df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
-df = df.sort_values(["IPP", "DATE_ENTREE", "DATE_SORTIE"]).reset_index(drop=True)
+    df = df.dropna(subset=["UNIT"])
+    df["ANNEE"] = df["ANNEE"].astype(int)
+    df["UNIT"] = df["UNIT"].astype(str).str.strip()
 
-# Comme ton code
-df_base = df.drop_duplicates(subset=["IPP", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"], keep="first").copy()
+    numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
 
-def stay_key(ipp, nda, uma, de, ds):
-    return (ipp, nda, uma, de, ds)
+    df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
+    df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
 
-def pair_id(k1, k2):
-    return tuple(sorted([k1, k2]))
+    return df.sort_values("UNIT").reset_index(drop=True)
 
-# build map racine GHM par séjour (comme ton code)
-stay_to_roots = {}
-stay_to_root_full = {}
-for _, r in df.iterrows():
-    ipp, nda, uma, de, ds = r["IPP"], r["NDA"], r["UMA"], r["DATE_ENTREE"], r["DATE_SORTIE"]
-    ghm = str(r["GHM"]).strip()
-    k = stay_key(ipp, nda, uma, de, ds)
-    if ghm and ghm.upper() not in ("NAN", "NONE") and len(ghm) >= 5:
-        root = ghm[:5]
-        stay_to_roots.setdefault(k, set()).add(root)
-        stay_to_root_full.setdefault(k, {})
-        stay_to_root_full[k].setdefault(root, ghm)
+def afficher_tableau(df, annee1, annee2):
 
-assigned = set()
+    mois_actuel = datetime.now().month
+    mois_precedent = 12 if mois_actuel == 1 else mois_actuel - 1
+    suffixe_mois = f"M{mois_precedent:02d}"
 
-# Étape 1: classer vrais doublons + "0 nuit" (comme ton code)
-vrai_doublon = 0
-doublon_0_nuit = 0
+    um_names = {
+        "103": "Réa CHIR",
+        "104": "USC",
+        "21": "SI Cardiologie",
+        "340": "Med Intensive Rea",
+        "341": "USIP MIR",
+        "451": "SI Hématologie",
+        "91": "Réa Néonat",
+        "92": "SI Néonat"
+    }
 
-for ipp, group in df_base.groupby("IPP", sort=False):
-    g = group.reset_index(drop=True)
-    n = len(g)
-    for i in range(n):
-        nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
-        k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+    st.markdown("""
+    <style>
+    .block-container { max-width: 95% !important; }
+    .table-grouped { width: 100% !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-        j = i + 1
-        while j < n:
-            de2 = g.loc[j, "DATE_ENTREE"]
-            if pd.isna(de2):
-                j += 1
-                continue
-            if de2 > ds1 and de2 != ds1:
-                break
+    df["UNIT_NOM"] = df["UNIT"].map(um_names).fillna(df["UNIT"])
 
-            nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
-            k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+    rows = []
 
-            if nda1 == nda2:
-                j += 1
-                continue
+    for unit in sorted(df["UNIT"].unique()):
+        d1 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee1)]
+        d2 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee2)]
 
-            pid = pair_id(k1, k2)
-            if pid in assigned:
-                j += 1
-                continue
+        d1 = d1.iloc[0] if not d1.empty else None
+        d2 = d2.iloc[0] if not d2.empty else None
 
-            if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                vrai_doublon += 1
-                assigned.add(pid)
-            elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                doublon_0_nuit += 1
-                assigned.add(pid)
+        nb_rum1 = d1["NB_RUM"] if d1 is not None else 0
+        nb_rum_sup1 = d1["NB_RUM_SUPPL"] if d1 is not None else 0
+        pct_rum1 = d1["%_RUM_SUPPL"] if d1 is not None else 0
+        nb_journees1 = d1["NB_JOURNEES"] if d1 is not None else 0
+        nb_journees_sup1 = d1["NB_JOURNEES_SUPPL"] if d1 is not None else 0
+        pct_journees1 = d1["%_JOURNEES_SUPPL"] if d1 is not None else 0
 
-            j += 1
+        nb_rum2 = d2["NB_RUM"] if d2 is not None else 0
+        nb_rum_sup2 = d2["NB_RUM_SUPPL"] if d2 is not None else 0
+        pct_rum2 = d2["%_RUM_SUPPL"] if d2 is not None else 0
+        nb_journees2 = d2["NB_JOURNEES"] if d2 is not None else 0
+        nb_journees_sup2 = d2["NB_JOURNEES_SUPPL"] if d2 is not None else 0
+        pct_journees2 = d2["%_JOURNEES_SUPPL"] if d2 is not None else 0
 
-# Étape 2: contigus stricts + UMA différente + même root GHM (comme ton code)
-contig_candidats_stricts = 0
-contig_avec_root = 0
-examples = []
+        evol_rum = round(nb_rum_sup1 / nb_rum_sup2, 1) if nb_rum_sup2 else 0
+        evol_journees = round(nb_journees_sup1 / nb_journees_sup2, 1) if nb_journees_sup2 else 0
 
-for ipp, group in df_base.groupby("IPP", sort=False):
-    g = group.reset_index(drop=True)
-    n = len(g)
-    for i in range(n):
-        nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
-        k1 = stay_key(ipp, nda1, uma1, de1, ds1)
+        unit_nom = f"UM {unit} - {d1['UNIT_NOM'] if d1 is not None else (d2['UNIT_NOM'] if d2 is not None else unit)}"
 
-        j = i + 1
-        while j < n:
-            de2 = g.loc[j, "DATE_ENTREE"]
-            if pd.isna(de2):
-                j += 1
-                continue
-            if de2 > ds1 and de2 != ds1:
-                break
+        sign_rum = "+" if evol_rum > 0 else ""
+        sign_journees = "+" if evol_journees >0 else ""
 
-            nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
-            k2 = stay_key(ipp, nda2, uma2, de2, ds2)
+        rows.append(
+            f"<tr>"
+            f"<td>{unit_nom}</td>"
+            f"<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td>{pct_rum2}%</td>"
+            f"<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td>{pct_journees2}%</td>"
+            f"<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td>{pct_rum1}%</td>"
+            f"<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td>{pct_journees1}%</td>"
+            f"<td>{sign_rum}{evol_rum}%</td>"
+            f"<td>{sign_journees}{evol_journees}%</td>"
+            f"</tr>"
+        )
 
-            if nda1 == nda2:
-                j += 1
-                continue
+    tableau_html = f"""
+    <h2>Évolution {annee1} vs {annee2} - {suffixe_mois}</h2>
+    <table class="table-grouped">
+        <thead>
+        <tr>
+          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
+          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
+          <th colspan="3" class="group-border-right th-jours">{annee2} Journées</th>
+          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
+          <th colspan="3" class="group-border-right th-jours">{annee1} Journées</th>
+          <th colspan="2" class="th-evol">Évolution</th>
+        </tr>
+        <tr>
+          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
+          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
+          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(rows)}
+      </tbody>
+    </table>
+    """
+    st.markdown(tableau_html, unsafe_allow_html=True)
 
-            pid = pair_id(k1, k2)
-            if pid in assigned:
-                j += 1
-                continue
+def main():
+    st.title("Dashboard d'évolution des RUMs")
 
-            is_contig = (ds1 == de2) or (ds2 == de1)
-            if not is_contig or uma1 == uma2:
-                j += 1
-                continue
+    annee1 = 2024
+    annee2 = 2025
 
-            contig_candidats_stricts += 1
+    load_css(CSS_FILE)
 
-            roots1 = stay_to_roots.get(k1, set())
-            roots2 = stay_to_roots.get(k2, set())
-            common = roots1.intersection(roots2)
+    user = "consult"
+    password = "consult"
+    tns_alias = "o-simpa-b1.cch.aphp.fr"
 
-            if common:
-                contig_avec_root += 1
-                assigned.add(pid)
+    if st.button("Actualiser le tableau"):
+        try:
+            run_sqlplus(user, password, tns_alias, SQL_FILE)
+            df = load_data(CSV_FILE)
+            afficher_tableau(df, annee1, annee2)
+        except Exception as e:
+            st.error(f"Erreur lors de l'exécution : {e}")
 
-                if len(examples) < 10:
-                    root = sorted(list(common))[0]
-                    ghm1 = stay_to_root_full.get(k1, {}).get(root, "")
-                    ghm2 = stay_to_root_full.get(k2, {}).get(root, "")
-                    examples.append({
-                        "IPP": ipp,
-                        "NDA1": nda1, "UMA1": uma1, "DE1": de1, "DS1": ds1, "GHM1": ghm1,
-                        "NDA2": nda2, "UMA2": uma2, "DE2": de2, "DS2": ds2, "GHM2": ghm2,
-                        "ROOT": root
-                    })
-
-            j += 1
-
-print("=== Résumé ===")
-print("VRAI_DOUBLON:", vrai_doublon)
-print("DOUBLON_0_NUIT:", doublon_0_nuit)
-print("CONTIGUS stricts candidats (avant filtre root):", contig_candidats_stricts)
-print("CONTIGUS stricts avec root commun:", contig_avec_root)
-
-if examples:
-    ex = pd.DataFrame(examples)
-    print("\n=== Exemples CONTIGUS (10) ===")
-    # affichage compact
-    cols = ["IPP","NDA1","UMA1","DE1","DS1","GHM1","NDA2","UMA2","DE2","DS2","GHM2","ROOT"]
-    print(ex[cols].to_string(index=False))
-else:
-    print("\nAucun exemple contigu trouvé avec tes règles.")
+if __name__ == "__main__":
+    main()
