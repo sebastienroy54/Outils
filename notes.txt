@@ -1,66 +1,11 @@
-import pandas as pd
-
-def decouper_excel(input_file, output_file, date_cols=("DEBUT_EPI", "FIN_EPI")):
-    df = pd.read_excel(input_file)
-
-    # Convertir dates en datetime pour filtrer
-    for col in date_cols:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
-
-    # --- Date de référence = date max dans le fichier (évite le bug en 2026 pour les exports 2025)
-    candidates = []
-    for col in date_cols:
-        if col in df.columns:
-            candidates.append(df[col])
-    max_date = pd.concat(candidates).max() if candidates else pd.NaT
-
-    if pd.isna(max_date):
-        ref = pd.Timestamp.today().normalize()
-    else:
-        ref = pd.Timestamp(max_date).normalize()
-
-    week_start = ref - pd.Timedelta(days=7)
-    week_end = ref
-
-    # Mois de la date ref
-    month_start = ref.replace(day=1)
-    next_month_start = month_start + pd.offsets.MonthBegin(1)
-    month_end = next_month_start - pd.Timedelta(days=1)
-
-    # Année jusqu’au mois courant (comme ton R : year_end = month_start - 1)
-    year_start = pd.Timestamp(ref.year, 1, 1)
-    year_end = month_start - pd.Timedelta(days=1)
-
-    def in_range(col, start, end, inclusive_end=False):
-        if col not in df.columns:
-            return pd.Series(False, index=df.index)
-        if inclusive_end:
-            return (df[col] >= start) & (df[col] <= end)
-        return (df[col] >= start) & (df[col] < end)
-
-    mask_week = in_range("DEBUT_EPI", week_start, week_end) | in_range("FIN_EPI", week_start, week_end)
-    mask_month = in_range("DEBUT_EPI", month_start, month_end, inclusive_end=True) | in_range("FIN_EPI", month_start, month_end, inclusive_end=True)
-    mask_year = in_range("DEBUT_EPI", year_start, month_start) | in_range("FIN_EPI", year_start, month_start)
-
-    semaine = df[mask_week].sort_values(by="DEBUT_EPI", na_position="last").copy()
-    mois = df[mask_month].sort_values(by="DEBUT_EPI", na_position="last").copy()
-    annee = df[mask_year].sort_values(by="DEBUT_EPI", na_position="last").copy()
-
-    # Exclure doublons d'IPP entre périodes
-    if "IPP" in df.columns:
-        ipp_semaine = set(semaine["IPP"].dropna().astype(str))
-        ipp_mois = set(mois["IPP"].dropna().astype(str))
-        mois = mois[~mois["IPP"].astype(str).isin(ipp_semaine)]
-        annee = annee[~annee["IPP"].astype(str).isin(ipp_semaine | ipp_mois)]
-
-    # Formater dates pour export
-    for d in (semaine, mois, annee):
-        for col in date_cols:
-            if col in d.columns:
-                d[col] = d[col].dt.strftime("%d/%m/%Y")
-
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        semaine.to_excel(writer, sheet_name="SEMAINE_CCH", index=False)
-        mois.to_excel(writer, sheet_name="MOIS_CCH", index=False)
-        annee.to_excel(writer, sheet_name="ANNEE_CCH", index=False)
+vitrygtr@Pro:/media/sf_python$ ls
+automatisation  monouhcd  python_monouhcd.sh
+vitrygtr@Pro:/media/sf_python$ ls automatisation/
+mail_monouhcd.json
+vitrygtr@Pro:/media/sf_python$ ls monouhcd/
+app                             Dockerfile          output            sql
+basic-10.2.0.5.0-linux-x64.zip  monouhcd-image.tar  requirements.txt  sqlplus-10.2.0.5.0-linux-x64.zip
+vitrygtr@Pro:/media/sf_python$ ls monouhcd/app/
+code_decoupage.py  mailer.py  main.py  oracle_runner.py  txt_to_excel.py
+vitrygtr@Pro:/media/sf_python$ ls monouhcd/sql
+MONO_UHCD_CCH.sql  MONO_UHCD_HTD.sql
