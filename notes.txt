@@ -1,30 +1,6 @@
-import subprocess
-from pathlib import Path
-
-def run_sqlplus(sql_file: Path, output_dir: Path, dsn: str, user: str, password: str, timeout: int = 120):
-    """
-    dsn attendu au format EZCONNECT: //host:port/service
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    cmd = ["sqlplus", "-S", f"{user}/{password}@{dsn}", f"@{str(sql_file)}"]
-
-    # Très important: exécuter dans output_dir pour que les spool relatifs tombent là
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        cwd=str(output_dir),
-        timeout=timeout,
-    )
-
-    out = (result.stdout or "") + "\n" + (result.stderr or "")
-    if result.returncode != 0:
-        raise RuntimeError(f"SQL*Plus returncode={result.returncode}\n{out}")
-
-    # Si jamais Oracle écrit une ORA- même avec returncode 0 (ça arrive selon scripts)
-    if "ORA-" in out or "SP2-" in out:
-        raise RuntimeError(f"SQL*Plus a retourné une erreur\n{out}")
-
-    return out
+docker run --rm \
+  -v "/media/sf_python/monouhcd/app":/app \
+  -v "/media/sf_python/monouhcd/sql":/app/sql \
+  -v "/media/sf_python/monouhcd/output":/app/output \
+  -v "/media/sf_python/automatisation":/config \
+  monouhcd:latest
