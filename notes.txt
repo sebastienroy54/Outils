@@ -1,6 +1,12 @@
-vitrygtr@Pro:/media/sf_python/monouhcd$ grep -n -i "spool" /media/sf_python/monouhcd/sql/MONO_UHCD_CCH.sql 
-5:spool output/CCH/MONO_UHCD_CCH_2025_old.txt
-43:spool off
-vitrygtr@Pro:/media/sf_python/monouhcd$ grep -n -i "spool" /media/sf_python/monouhcd/sql/MONO_UHCD_HTD.sql 
-5:spool output/HTD/MONO_UHCD_HTD_2025_old.txt
-43:spool off
+vitrygtr@Pro:/media/sf_python/monouhcd$ docker run --rm \
+  -v "/media/sf_python/monouhcd/app":/app \
+  -v "/media/sf_python/monouhcd/sql":/app/sql \
+  -v "/media/sf_python/monouhcd/output":/app/output \
+  -v "/media/sf_python/automatisation":/config \
+  monouhcd-image
+Traceback (most recent call last):
+  File "/app/main.py", line 61, in <module>
+    txt_to_excel(txt_file, excel_file)
+  File "/app/txt_to_excel.py", line 9, in txt_to_excel
+    header_idx = next(i for i,l in enumerate(lines) if re.match(r"^-{2,}", l.strip()))
+StopIteration
