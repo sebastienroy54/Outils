@@ -1,130 +1,66 @@
-set verify off
-set linesize 300
-set pagesize 6000
-/* ligne suivante (chemin disque) à adapter  */
-spool C:/Users/4251352/Documents/MONO_UHCD_CCH_2025_old.txt
-set termout off
-SELECT DISTINCT 
-    SDO.KYNOIP AS IPP,
-    SDO.NMMAL AS NOM,
-    SDO.NMPMAL AS PRENOM,
-    EPI.KYNODA AS NDA,
-    EPI.UE AS UH,
-    EPI.CDURM_P AS UMA, 
-    to_char(EPI.D8EEUE,'DD/MM/YYYY') AS DEBUT_EPI,
-    to_char(EPI.D8EEUE,'hh24:mi') AS HDEBUT_EPI,
-    to_char(EPI.D8SOUE,'DD/MM/YYYY') AS FIN_EPI, 
-    to_char(EPI.D8SOUE,'hh24:mi') AS HFIN_EPI,
-    EPI.MDSOUE as mdsor,
-    (floor((EPI.D8SOUE-EPI.D8EEUE)*24)) as hours_nb
-FROM EPI, SDO WHERE EPI.KYNODA = SDO.KYNODA
-AND SDO.DASOR >= to_date('01/11/2025','DD/MM/YYYY') 
-AND SDO.DASOR  < SYSDATE
-AND EPI.UE = '322'
-AND 
-(
-(floor((EPI.D8SOUE-EPI.D8EEUE)*24)) > 24
-OR
-(EPI.MDSOUE = '9' AND (to_date(SDO.DASOR) - to_date(SDO.DAENTR)) >= 1)
-OR
-(
- EPI.MDSOUE = '7' AND EPI.TYTRDS in ('1', '2', '4') AND (to_date(SDO.DASOR) - to_date(SDO.DAENTR)) >= 1
- )
-)
-AND EPI.KYNODA NOT IN
-(
-SELECT DISTINCT EPI.KYNODA
-FROM EPI, SDO WHERE EPI.KYNODA = SDO.KYNODA
-AND SDO.DASOR >= to_date('01/11/2025','DD/MM/YYYY') 
-AND SDO.DASOR < SYSDATE
-AND EPI.UE <> '322' 
-)
-ORDER BY to_date(to_char(EPI.D8SOUE,'DD/MM/YYYY')) ASC;
-spool off
-EXIT;
+import pandas as pd
 
+def decouper_excel(input_file, output_file, date_cols=("DEBUT_EPI", "FIN_EPI")):
+    df = pd.read_excel(input_file)
 
-import subprocess
-import getpass
-import os
-from openpyxl import Workbook
-import re
-import code_decoupage
+    # Convertir dates en datetime pour filtrer
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
 
-# Identification pour accès à la base de données
-user = input("Veuillez entrer le nom d'utilisateur : ")
-password = getpass.getpass("Mot de passe : ")
-tns_alias = "SIP1CCH.WORLD"
+    # --- Date de référence = date max dans le fichier (évite le bug en 2026 pour les exports 2025)
+    candidates = []
+    for col in date_cols:
+        if col in df.columns:
+            candidates.append(df[col])
+    max_date = pd.concat(candidates).max() if candidates else pd.NaT
 
-# Chemin de la requête SQL à modifier si nécessaire
-sql_file = r"C:\Users\4251352\Documents\Requetes_du_lundi\monouhcd\MONO_UHCD_CCH.sql"
+    if pd.isna(max_date):
+        ref = pd.Timestamp.today().normalize()
+    else:
+        ref = pd.Timestamp(max_date).normalize()
 
-# Exécution de la requête SQL
-cmd = f'sqlplus {user}/{password}@{tns_alias} @{sql_file}'
-subprocess.run(
-    cmd,
-    shell=True
-)
+    week_start = ref - pd.Timedelta(days=7)
+    week_end = ref
 
-# Chemin du fichier texte contenant le résultat de la requête à modifier si nécessaire
-txt_file = r"C:\Users\4251352\Documents\MONO_UHCD_CCH_2025_old.txt"
+    # Mois de la date ref
+    month_start = ref.replace(day=1)
+    next_month_start = month_start + pd.offsets.MonthBegin(1)
+    month_end = next_month_start - pd.Timedelta(days=1)
 
-# Ouverture du fichier texte
-with open(txt_file, "r", encoding="cp1252") as f:
-    lines = [line.rstrip("\n") for line in f if line.strip()]
+    # Année jusqu’au mois courant (comme ton R : year_end = month_start - 1)
+    year_start = pd.Timestamp(ref.year, 1, 1)
+    year_end = month_start - pd.Timedelta(days=1)
 
-header_idx = None
-for i, line in enumerate(lines):
-    if re.match(r"^-{2,}", line.strip()):
-        header_idx = i
-        break
+    def in_range(col, start, end, inclusive_end=False):
+        if col not in df.columns:
+            return pd.Series(False, index=df.index)
+        if inclusive_end:
+            return (df[col] >= start) & (df[col] <= end)
+        return (df[col] >= start) & (df[col] < end)
 
-dash_line = lines[header_idx]
-columns = []
-in_dash = False
-start = 0
+    mask_week = in_range("DEBUT_EPI", week_start, week_end) | in_range("FIN_EPI", week_start, week_end)
+    mask_month = in_range("DEBUT_EPI", month_start, month_end, inclusive_end=True) | in_range("FIN_EPI", month_start, month_end, inclusive_end=True)
+    mask_year = in_range("DEBUT_EPI", year_start, month_start) | in_range("FIN_EPI", year_start, month_start)
 
-# Détection des différentes colonnes du fichier texte
-for idx, char in enumerate(dash_line + " "):
-    if not in_dash and char == "-":
-        in_dash = True
-        start = idx
-    elif in_dash and char != "-":
-        in_dash = False
-        columns.append((start, idx))
+    semaine = df[mask_week].sort_values(by="DEBUT_EPI", na_position="last").copy()
+    mois = df[mask_month].sort_values(by="DEBUT_EPI", na_position="last").copy()
+    annee = df[mask_year].sort_values(by="DEBUT_EPI", na_position="last").copy()
 
-print(f"Colonnes détectées : {len(columns)}")
+    # Exclure doublons d'IPP entre périodes
+    if "IPP" in df.columns:
+        ipp_semaine = set(semaine["IPP"].dropna().astype(str))
+        ipp_mois = set(mois["IPP"].dropna().astype(str))
+        mois = mois[~mois["IPP"].astype(str).isin(ipp_semaine)]
+        annee = annee[~annee["IPP"].astype(str).isin(ipp_semaine | ipp_mois)]
 
-# Récupération des noms des colonnes
-header_line = lines[header_idx - 1]
-headers = [header_line[start:end].strip() for start, end in columns]
+    # Formater dates pour export
+    for d in (semaine, mois, annee):
+        for col in date_cols:
+            if col in d.columns:
+                d[col] = d[col].dt.strftime("%d/%m/%Y")
 
-# Création du fichier Excel
-excel_file = os.path.splitext(txt_file)[0] + ".xlsx"
-wb = Workbook()
-ws = wb.active
-ws.title = "Résultats"
-
-for col_idx, header in enumerate(headers, start=1):
-    ws.cell(row=1, column=col_idx, value=header)
-
-# Remplissage du fichier Excel
-excel_row = 2
-for line in lines[header_idx + 1:]:
-    if (
-        not line.strip()
-        or set(line.strip()) <= {"-"} 
-        or re.search(r"ligne\(s\)\s+sélectionnée\(s\)", line)
-        or re.search(r"ligne\s+sélectionnée", line)
-    ):
-        continue
-
-    values = [line[start:end].strip() for start, end in columns]
-    for col_idx, value in enumerate(values, start=1):
-        ws.cell(row=excel_row, column=col_idx, value=value)
-    excel_row += 1
-
-wb.save(excel_file)
-
-excel_final = r"C:\Users\4251352\Documents\MONO_UHCD_CCH.xlsx"
-code_decoupage.decouper_excel(excel_file, excel_final)
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        semaine.to_excel(writer, sheet_name="SEMAINE_CCH", index=False)
+        mois.to_excel(writer, sheet_name="MOIS_CCH", index=False)
+        annee.to_excel(writer, sheet_name="ANNEE_CCH", index=False)
