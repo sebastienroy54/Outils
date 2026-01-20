@@ -1,11 +1,11 @@
-#!/bin/bash
-set -euo pipefail
-
-BASE="/home/python/monouhcd"
-
-docker run --rm \
-  -v "$BASE/app":/app \
-  -v "$BASE/sql":/app/sql \
-  -v "$BASE/output":/app/output \
-  -v "/home/python/automatisation":/config \
-  monouhcd-image
+ls -la /home/python/monouhcd/
+total 36808
+drwxr-xr-x 5 root root     4096 18 déc.  19:42 .
+drwxr-xr-x 5 root root     4096 15 janv. 11:56 ..
+drwxr-xr-x 5 root root     4096 18 déc.  18:22 app
+-rwxr--r-- 1 root root 36840810 15 oct.  09:44 basic-10.2.0.5.0-linux-x64.zip
+-rwxr--r-- 1 root root     1831 18 déc.  17:43 Dockerfile
+drwxr-xr-x 4 root root     4096 18 déc.  17:56 output
+-rwxr--r-- 1 root root       24 18 déc.  17:34 requirements.txt
+drwxr-xr-x 2 root root     4096 18 déc.  17:56 sql
+-rwxr--r-- 1 root root   801671 16 déc.  17:29 sqlplus-10.2.0.5.0-linux-x64.zip
