@@ -1,7 +1,11 @@
 #!/bin/bash
+set -euo pipefail
 
-docker run -rm \
-    -v /python/monouhcd:/app \
-    -v /python/automatisation:/config \
-    -v /github:/github \
-    monouhcd-image
+BASE="/home/python/monouhcd"
+
+docker run --rm \
+  -v "$BASE/app":/app \
+  -v "$BASE/sql":/app/sql \
+  -v "$BASE/output":/app/output \
+  -v "/home/python/automatisation":/config \
+  monouhcd-image
