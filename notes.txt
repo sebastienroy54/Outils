@@ -1,6 +1,123 @@
-docker run --rm \
-  -v "/media/sf_python/monouhcd/app":/app \
-  -v "/media/sf_python/monouhcd/sql":/app/sql \
-  -v "/media/sf_python/monouhcd/output":/app/output \
-  -v "/media/sf_python/automatisation":/config \
-  monouhcd-image
+main.py :
+import json
+from pathlib import Path
+
+from oracle_runner import run_sqlplus
+from txt_to_excel import txt_to_excel
+from code_decoupage import decouper_excel
+from mailer import send_mail
+
+APP_DIR = Path("/app")
+CONFIG_DIR = Path("/config")
+
+SQL_DIR = APP_DIR / "sql"
+OUTPUT_DIR = APP_DIR / "output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+MAIL_CONFIG_FILE = CONFIG_DIR / "mail_monouhcd.json"
+
+ORACLE_USER = "consult"
+ORACLE_PASSWORD = "consult"
+
+CCH_DSN = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
+HTD_DSN = "//o-simpa-b1.htd.aphp.fr:8855/SIP1HTD"
+
+with MAIL_CONFIG_FILE.open(encoding="utf-8") as f:
+    mail_config = json.load(f)
+
+MAIL_FROM = mail_config["from"]
+
+oracle_configs = {
+    "CCH": {"dsn": CCH_DSN, "user": ORACLE_USER, "password": ORACLE_PASSWORD},
+    "HTD": {"dsn": HTD_DSN, "user": ORACLE_USER, "password": ORACLE_PASSWORD},
+}
+
+
+SITES = {
+    "CCH": {"sql": "MONO_UHCD_CCH.sql"},
+    "HTD": {"sql": "MONO_UHCD_HTD.sql"},
+}
+
+
+generated_files = {}
+
+for site_name, site_cfg in SITES.items():
+
+    site_output = OUTPUT_DIR / site_name
+    site_output.mkdir(parents=True, exist_ok=True)
+
+    ora = oracle_configs[site_name]
+
+    run_sqlplus(
+        sql_file=SQL_DIR / site_cfg["sql"],
+        output_dir=site_output,
+        dsn=ora["dsn"],
+        user=ora["user"],
+        password=ora["password"],
+    )
+
+    txt_file = site_output / f"MONO_UHCD_{site_name}.txt"
+    excel_file = site_output / f"MONO_UHCD_{site_name}.xlsx"
+
+    txt_to_excel(txt_file, excel_file)
+    decouper_excel(excel_file, excel_file, site_name)
+
+    if txt_file.exists():
+        txt_file.unlink()
+
+    generated_files[site_name] = excel_file
+
+for site_name, excel_path in generated_files.items():
+    send_mail(
+        mail_from=MAIL_FROM,
+        recipients=mail_config[site_name]["to"],
+        subject=f"MONO UHCD – Rapport {site_name}",
+        body=(
+            "Bonjour,\n\n"
+            f"Veuillez trouver en pièce jointe le rapport MONO UHCD – {site_name}.\n\n"
+            "---\n"
+            "Mail généré automatiquement – merci de ne pas répondre."
+        ),
+        attachments=[excel_path],
+    )
+
+code_decoupage.py :
+import pandas as pd
+
+def decouper_excel(input_file, output_file, site_name,
+                   date_cols=("DEBUT_EPI", "FIN_EPI")):
+    df = pd.read_excel(input_file)
+
+    for col in date_cols:
+        if col in df.columns:
+            df[col] = pd.to_datetime(df[col], dayfirst=True, errors="coerce")
+
+    today = pd.Timestamp.today().normalize()
+    week_start = today - pd.Timedelta(days=7)
+    month_start = today.replace(day=1)
+    next_month = month_start + pd.offsets.MonthBegin(1)
+    year_start = pd.Timestamp(today.year, 1, 1)
+
+    def mask(a, b):
+        return (
+            df["DEBUT_EPI"].between(a, b)
+            | df["FIN_EPI"].between(a, b)
+        )
+
+    semaine = df[mask(week_start, today)]
+    mois = df[mask(month_start, next_month)]
+    annee = df[mask(year_start, month_start)]
+
+    if "IPP" in df.columns:
+        mois = mois[~mois["IPP"].isin(semaine["IPP"])]
+        annee = annee[~annee["IPP"].isin(semaine["IPP"]) & ~annee["IPP"].isin(mois["IPP"])]
+
+    for d in (semaine, mois, annee):
+        for col in date_cols:
+            if col in d.columns:
+                d[col] = d[col].dt.strftime("%d/%m/%Y")
+
+    with pd.ExcelWriter(output_file, engine="openpyxl") as w:
+        semaine.to_excel(w, "SEMAINE_{site_name}", index=False)
+        mois.to_excel(w, "MOIS_{site_name}", index=False)
+        annee.to_excel(w, "ANNEE_{site_name}", index=False)
