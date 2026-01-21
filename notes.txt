@@ -1,18 +1,6 @@
-### EXH JULIA ###
-00 08 * * *  /home/crontab/julia_exh.sh >> /var/log/exh.log 2>1
-#40 06 * * *  /home/crontab/julia_exhghu.sh >> /var/log/exh.log 2>1
-#35 06 * * 1  /home/crontab/julia_exh_ssr.sh >> /var/log/exh.log 2>1
-#30 08 * * *  /home/crontab/julia_exh-daily.sh >> /var/log/exh.log 2>1
-
-### REJETS JULIA ###
-#50 06 * * *  /home/crontab/julia_rejets_simpa.sh >> /var/log/exh.log 2>1
-
-### MONORUM UHCD > 0j ### Execution le Lundi Matin
-#00 08 * * 1 /home/crontab/julia_monorum_uhcd.sh
-
-### EOH ISO ### Execution le premier jour du mois
-#00 05 01 * * /home/crontab/julia_eoh.sh
-
-### DBAI ### Execution le premier jour du mois (trimestriel)
-#00 07 01 * * /home/crontab/julia_dbai.sh
-
+docker run --rm \
+  -v "/media/sf_python/monouhcd/app":/app \
+  -v "/media/sf_python/monouhcd/sql":/app/sql \
+  -v "/media/sf_python/monouhcd/output":/app/output \
+  -v "/media/sf_python/automatisation":/config \
+  monouhcd-image
