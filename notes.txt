@@ -43,3 +43,7 @@ AND (
 	OR dgn.KYCDDG Like 'B24%' 
 	OR dgn.KYCDDG In ('F024','O987','R75','Z21')
 )
+
+
+Pourriez-vous m’envoyer le fichier PMSI des patients VIH venus de août à décembre 2025 sur les hôpitaux Cochin (tous les services) et Hôtel Dieu. Il s’agit des hospitalisations saisis dans Nadis.
+Merci d’indiquer comme la dernière fois les diagnostics principaux de ces hospitalisations.
