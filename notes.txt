@@ -1,49 +1,333 @@
--- Date début
-SET @DATE_DEBUT = '2021-09-01 00:00:00';
--- Date fin
-SET @DATE_FIN = '2021-12-01 00:00:00';
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from openpyxl.utils import get_column_letter
 
--- Liste patient/RUM avec VIH en DP, DR ou DAS (HC + HJ). [Temps estimé = 2 min pour année entière sur CCH].
-SELECT DISTINCT sdo.KYNOIP as NIP, sdo.NMMAL as NOM, sdo.NMPMAL as PRENOM, sdo.NMPATR as NOM_PAT, TO_CHAR(sdo.DANAIS,'DD/MM/YYYY') as DDN, sdo.SXPMSI as SEXE, sdo.TYDOS as T, rsm.CDURM as URMC, rsm.UE as UH, rsm.NODA as NDA, TO_CHAR(rsm.D8EEUE,'DD/MM/YYYY') as DDE_UH, TO_CHAR(rsm.D8SOUE,'DD/MM/YYYY') as DDS_UH, TO_CHAR(sdo.DASOR,'DD/MM/YYYY') as DDS_HOSP, rsm.CDDNC9 as DP
-FROM rsm, sdo
-WHERE rsm.NODA = sdo.KYNODA
-AND sdo.TYDOS <> 'M'
-AND sdo.DASOR >= TO_DATE(@DATE_DEBUT,'YYYY-MM-DD HH24:MI:SS')
-AND sdo.DASOR < TO_DATE(@DATE_FIN,'YYYY-MM-DD HH24:MI:SS')
-AND
-((
-	rsm.CDDNC9 Like 'B20%'
-	Or rsm.CDDNC9 Like 'B21%'
-	Or rsm.CDDNC9 Like 'B22%'
-	Or rsm.CDDNC9 Like 'B23%'
-	Or rsm.CDDNC9 Like 'B24%'
-	Or rsm.CDDNC9 In ('F024','O987','R75','Z21')
+# ============================================================
+# PARAMÈTRES CHEMINS (à adapter)
+# ============================================================
+BASE_DIR = Path(r"C:\Users\4251352\Documents\DMI")
+
+PATH_ORBIS = BASE_DIR / "Liste des DMI codés.csv"
+PATH_SIMPA = BASE_DIR / "DMI_NAS.csv"  # (optionnel ici, non utilisé pour le comptage)
+PATH_SAG   = BASE_DIR / "Extraction_SAG.csv"
+PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
+
+OUT_MISSING = BASE_DIR / "DMI_SEDITRACE_NON_CODES_ORBIS.xlsx"
+
+# ============================================================
+# HELPERS
+# ============================================================
+def read_csv_auto(path: Path) -> pd.DataFrame:
+    encodings = ["utf-8", "cp1252", "latin1"]
+    seps = [None, ";", ",", "\t", "|"]
+    last_err = None
+    for enc in encodings:
+        for sep in seps:
+            try:
+                if sep is None:
+                    return pd.read_csv(path, sep=None, engine="python", encoding=enc)
+                return pd.read_csv(path, sep=sep, engine="python", encoding=enc)
+            except Exception as e:
+                last_err = e
+    raise RuntimeError(f"Impossible de lire {path}. Dernière erreur: {last_err}")
+
+def read_csv_sag_safe(path: Path) -> pd.DataFrame:
+    # SAG peut avoir des guillemets cassés -> lecture tolérante
+    return pd.read_csv(
+        path,
+        sep=";",
+        engine="python",
+        encoding="cp1252",
+        on_bad_lines="warn"  # mettre "skip" si tu ne veux pas de warnings
+    )
+
+def ensure_cols(df: pd.DataFrame, required: list, label: str):
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f"{label}: colonnes manquantes: {missing}")
+
+def get_col(df: pd.DataFrame, options: list, label: str) -> pd.Series:
+    for c in options:
+        if c in df.columns:
+            return df[c]
+    raise KeyError(f"{label}: aucune des colonnes {options} n'existe dans le fichier.")
+
+def norm_str(s: pd.Series) -> pd.Series:
+    return (
+        s.astype("string")
+         .str.strip()
+         .str.replace(r"\s+", " ", regex=True)
+    )
+
+def norm_ref(s: pd.Series) -> pd.Series:
+    # normalisation "douce" (pas de suppression de '-' etc. pour éviter les faux matchs)
+    return norm_str(s).str.upper()
+
+def norm_date_day(s: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(s, errors="coerce", dayfirst=True)
+    return dt.dt.normalize()
+
+def fmt_ddmmyyyy(s: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(s, errors="coerce", dayfirst=True).dt.normalize()
+    return dt.dt.strftime("%d/%m/%Y")
+
+def fmt_ddmmyyyy_hhmmss(s: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(s, errors="coerce", dayfirst=True)
+    return dt.dt.strftime("%d/%m/%Y %H:%M:%S")
+
+def make_key(nip: pd.Series, date_pose: pd.Series, ref: pd.Series) -> pd.Series:
+    nip_n = norm_str(nip)
+    dt_n = norm_date_day(date_pose)
+    ref_n = norm_ref(ref)
+    return nip_n + "|" + dt_n.dt.strftime("%Y-%m-%d") + "|" + ref_n
+
+def to_num(s: pd.Series) -> pd.Series:
+    # gère virgules éventuelles
+    x = s.astype("string").str.replace(",", ".", regex=False)
+    return pd.to_numeric(x, errors="coerce")
+
+def normalize_code_uh_from_orbis(x: pd.Series) -> pd.Series:
+    # ORBIS ex: "021X683" -> "683" (on garde après le dernier X)
+    s = norm_str(x)
+    return s.str.split("X").str[-1].str.strip()
+
+def autosize_worksheet_columns(ws, min_width=10, max_width=60):
+    for col_idx, col_cells in enumerate(ws.columns, start=1):
+        max_len = 0
+        for cell in col_cells:
+            if cell.value is None:
+                continue
+            max_len = max(max_len, len(str(cell.value)))
+        width = max(min_width, min(max_width, max_len + 2))
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+# ============================================================
+# 1) ORBIS : DMI codés -> agrégation par (IPP + jour + ref)
+#    => quantité codée
+# ============================================================
+orbis = read_csv_auto(PATH_ORBIS)
+
+ORBI_REQ = [
+    "IPP du patient",
+    "Date de l’intervention",
+    "Référence commerciale du DMI",
+    "Quantité de DMI posés",
+    "Unité demandeuse",
+    "LPP",
+]
+ensure_cols(orbis, ORBI_REQ, "ORBIS")
+
+orbis_qty = to_num(orbis["Quantité de DMI posés"]).fillna(0)
+
+orbis_std = pd.DataFrame({
+    "NIP": orbis["IPP du patient"],
+    "Date_pose_dt": norm_date_day(orbis["Date de l’intervention"]),
+    "Ref_commerciale_norm": norm_ref(orbis["Référence commerciale du DMI"]),
+    "QTE_CODEE_ORBIS": orbis_qty,
+    "CODE_UH_ORBIS": normalize_code_uh_from_orbis(orbis["Unité demandeuse"]),
+    "LPP": orbis["LPP"],
+})
+
+orbis_std["KEY"] = (
+    norm_str(orbis_std["NIP"])
+    + "|"
+    + orbis_std["Date_pose_dt"].dt.strftime("%Y-%m-%d")
+    + "|"
+    + orbis_std["Ref_commerciale_norm"]
 )
-OR
-(
-	rsm.CDRELIE Like 'B20%'
-	Or rsm.CDRELIE Like 'B21%'
-	Or rsm.CDRELIE Like 'B22%'
-	Or rsm.CDRELIE Like 'B23%'
-	Or rsm.CDRELIE Like 'B24%'
-	Or rsm.CDRELIE In ('F024','O987','R75','Z21')
-))
-UNION
-SELECT DISTINCT sdo.KYNOIP as NIP, sdo.NMMAL as NOM, sdo.NMPMAL as PRENOM, sdo.NMPATR as NOM_PAT, TO_CHAR(sdo.DANAIS,'DD/MM/YYYY') as DDN, sdo.SXPMSI as SEXE, sdo.TYDOS as T,rsm.CDURM as URMC, rsm.UE as UH, rsm.NODA as NDA, TO_CHAR(rsm.D8EEUE,'DD/MM/YYYY') as DDE_UH, TO_CHAR(rsm.D8SOUE,'DD/MM/YYYY') as DDS_UH, TO_CHAR(sdo.DASOR,'DD/MM/YYYY') as DDS_HOSP, rsm.CDDNC9 as DP
-FROM rsm,dgn,sdo
-WHERE rsm.KYRES = dgn.KYRES 
-AND rsm.NODA = sdo.KYNODA 
-AND rsm.D8SOUE >= TO_DATE(@DATE_DEBUT,'YYYY-MM-DD HH24:MI:SS')
-AND rsm.D8SOUE < TO_DATE(@DATE_FIN,'YYYY-MM-DD HH24:MI:SS')
-AND (
-	dgn.KYCDDG Like 'B20%' 
-	OR dgn.KYCDDG Like 'B21%' 
-	OR dgn.KYCDDG Like 'B22%' 
-	OR dgn.KYCDDG Like 'B23%' 
-	OR dgn.KYCDDG Like 'B24%' 
-	OR dgn.KYCDDG In ('F024','O987','R75','Z21')
+
+# quantité codée par clé
+orbis_agg = (
+    orbis_std
+    .groupby("KEY", as_index=False)
+    .agg(
+        QTE_CODEE_ORBIS=("QTE_CODEE_ORBIS", "sum"),
+        CODE_UH_ORBIS=("CODE_UH_ORBIS", lambda x: x.dropna().astype("string").iloc[0] if x.dropna().size else pd.NA),
+        LPP=("LPP", lambda x: x.dropna().astype("string").iloc[0] if x.dropna().size else pd.NA),
+    )
 )
 
+# ============================================================
+# 2) SAG : mapping KEY -> CODE_UH (utile quand ORBIS n'a rien)
+# ============================================================
+sag = read_csv_sag_safe(PATH_SAG)
 
-Pourriez-vous m’envoyer le fichier PMSI des patients VIH venus de août à décembre 2025 sur les hôpitaux Cochin (tous les services) et Hôtel Dieu. Il s’agit des hospitalisations saisis dans Nadis.
-Merci d’indiquer comme la dernière fois les diagnostics principaux de ces hospitalisations.
+SAG_REQ = ["NIP", "Date de réalisation", "Référence produit", "Code de l'UH"]
+ensure_cols(sag, SAG_REQ, "SAG")
+
+sag_std = pd.DataFrame({
+    "NIP": sag["NIP"],
+    "Date_pose_dt": norm_date_day(sag["Date de réalisation"]),
+    "Ref_commerciale_norm": norm_ref(sag["Référence produit"]),
+    "CODE_UH_SAG": norm_str(sag["Code de l'UH"]),
+})
+sag_std["KEY"] = (
+    norm_str(sag_std["NIP"])
+    + "|"
+    + sag_std["Date_pose_dt"].dt.strftime("%Y-%m-%d")
+    + "|"
+    + sag_std["Ref_commerciale_norm"]
+)
+sag_key_to_uh = sag_std[["KEY", "CODE_UH_SAG"]].dropna(subset=["KEY"]).drop_duplicates(subset=["KEY"])
+
+# ============================================================
+# 3) SEDITRACE : DMI posés -> agrégation par (IPP + jour + ref)
+#    => quantité posée + infos pour saisie ORBIS + prix
+# ============================================================
+sedi = pd.read_excel(PATH_SEDI)
+
+SEDI_REQ = [
+    "IPP",
+    "Posé le",
+    "Réference",
+    "Nbre",
+    "LPPR",
+    "Libellé",
+    "Fournisseur",
+    "N° de Lot",
+    "DATEHEURESAISIE",
+    "Praticien",
+    "PRIX_LPPR",
+    "PxTot",
+]
+ensure_cols(sedi, SEDI_REQ, "SEDITRACE")
+
+sedi_std = pd.DataFrame({
+    "NIP": sedi["IPP"],
+    "Date_pose_dt": norm_date_day(sedi["Posé le"]),
+    "Ref_commerciale": sedi["Réference"],
+    "Ref_commerciale_norm": norm_ref(sedi["Réference"]),
+    "QTE_POSEE_SEDI": to_num(sedi["Nbre"]).fillna(0),
+    "Code_LPP": sedi["LPPR"],
+    "Libelle_DMI": sedi["Libellé"],
+    "Fournisseur": sedi["Fournisseur"],
+    "No_lot": sedi["N° de Lot"],
+    "Date_saisie_SEDITRACE": sedi["DATEHEURESAISIE"],
+    "Medecin_poseur": sedi["Praticien"],
+    "Prix_unitaire_LPPR": to_num(sedi["PRIX_LPPR"]),
+    "Prix_total": to_num(sedi["PxTot"]),
+})
+sedi_std["KEY"] = (
+    norm_str(sedi_std["NIP"])
+    + "|"
+    + sedi_std["Date_pose_dt"].dt.strftime("%Y-%m-%d")
+    + "|"
+    + sedi_std["Ref_commerciale_norm"]
+)
+
+def first_nonnull(series: pd.Series):
+    s = series.dropna()
+    if s.size == 0:
+        return pd.NA
+    return s.astype("string").iloc[0]
+
+# agrégation SEDITRACE par KEY (quantités + prix total + infos "première valeur")
+sedi_agg = (
+    sedi_std
+    .groupby("KEY", as_index=False)
+    .agg(
+        NIP=("NIP", lambda x: x.dropna().astype("string").iloc[0] if x.dropna().size else pd.NA),
+        Date_pose_dt=("Date_pose_dt", "min"),
+        Ref_commerciale=("Ref_commerciale", first_nonnull),
+        Ref_commerciale_norm=("Ref_commerciale_norm", first_nonnull),
+        QTE_POSEE_SEDI=("QTE_POSEE_SEDI", "sum"),
+        Code_LPP=("Code_LPP", first_nonnull),
+        Libelle_DMI=("Libelle_DMI", first_nonnull),
+        Fournisseur=("Fournisseur", first_nonnull),
+        No_lot=("No_lot", first_nonnull),
+        Date_saisie_SEDITRACE=("Date_saisie_SEDITRACE", lambda x: pd.to_datetime(x, errors="coerce", dayfirst=True).max()),
+        Medecin_poseur=("Medecin_poseur", first_nonnull),
+        Prix_total=("Prix_total", "sum"),  # somme des PxTot
+        Prix_unitaire_LPPR=("Prix_unitaire_LPPR", "max"),  # si plusieurs, on garde un prix unitaire non nul
+    )
+)
+
+# ============================================================
+# 4) CALCUL : non codés = posés - codés, sur la même KEY
+# ============================================================
+df = sedi_agg.merge(orbis_agg, on="KEY", how="left")
+
+df["QTE_CODEE_ORBIS"] = df["QTE_CODEE_ORBIS"].fillna(0)
+df["QTE_NON_CODEE"] = df["QTE_POSEE_SEDI"] - df["QTE_CODEE_ORBIS"]
+
+# on garde seulement les clés où il reste du non codé (>0)
+df = df[df["QTE_NON_CODEE"] > 0].copy()
+
+# enrichir code UH : ORBIS si dispo sinon SAG
+df = df.merge(sag_key_to_uh, on="KEY", how="left")
+df["CODE_UH"] = df["CODE_UH_ORBIS"]
+df.loc[df["CODE_UH"].isna(), "CODE_UH"] = df.loc[df["CODE_UH"].isna(), "CODE_UH_SAG"]
+
+# ============================================================
+# 5) VALORISATION : recette manquante
+#    - prioritaire: prix unitaire LPPR si dispo
+#    - sinon: prix unitaire = PxTot / qté posée
+# ============================================================
+df["Prix_unitaire_calc"] = df["Prix_unitaire_LPPR"]
+
+mask_unit_missing = df["Prix_unitaire_calc"].isna() | (df["Prix_unitaire_calc"] == 0)
+df.loc[mask_unit_missing, "Prix_unitaire_calc"] = (
+    df.loc[mask_unit_missing, "Prix_total"] / df.loc[mask_unit_missing, "QTE_POSEE_SEDI"].replace(0, np.nan)
+)
+
+df["Recette_manquante_estimee"] = df["Prix_unitaire_calc"] * df["QTE_NON_CODEE"]
+
+# ============================================================
+# 6) FORMAT DATES + COLONNES FINALES (10 champs + qté + € + UH)
+# ============================================================
+df["Date_pose"] = fmt_ddmmyyyy(df["Date_pose_dt"])
+df["Date_saisie_SEDITRACE"] = fmt_ddmmyyyy_hhmmss(df["Date_saisie_SEDITRACE"])
+
+# 10 champs demandés (n° série volontairement vide)
+detail = pd.DataFrame({
+    "NIP": df["NIP"],
+    "Date de pose": df["Date_pose"],
+    "Médecin poseur": df["Medecin_poseur"],
+    "Date saisie SEDITRACE": df["Date_saisie_SEDITRACE"],
+    "Nom du laboratoire fournisseur": df["Fournisseur"],
+    "Réf commerciale": df["Ref_commerciale"],
+    "Numéro de lot": df["No_lot"],
+    "Numéro de série": pd.NA,
+    "Code LPP": df["Code_LPP"],
+    "Libellé DMI": df["Libelle_DMI"],
+    # compléments pilotage
+    "CODE_UH": df["CODE_UH"],
+    "Qté posée SEDITRACE": df["QTE_POSEE_SEDI"],
+    "Qté codée ORBIS": df["QTE_CODEE_ORBIS"],
+    "Qté non codée": df["QTE_NON_CODEE"],
+    "Prix unitaire (calc)": df["Prix_unitaire_calc"],
+    "Recette manquante estimée": df["Recette_manquante_estimee"],
+    # traçabilité
+    "Clé technique (IPP|date|ref)": df["KEY"],
+})
+
+# ============================================================
+# 7) SYNTHESE par CODE_UH
+# ============================================================
+summary = (
+    detail
+    .assign(_recette=pd.to_numeric(detail["Recette manquante estimée"], errors="coerce"))
+    .groupby("CODE_UH", dropna=False)
+    .agg(
+        nb_lignes=("NIP", "size"),
+        nb_patients=("NIP", pd.Series.nunique),
+        qte_non_codee_totale=("Qté non codée", "sum"),
+        recette_manquante_totale=("_recette", "sum"),
+    )
+    .reset_index()
+    .sort_values("recette_manquante_totale", ascending=False)
+)
+
+# ============================================================
+# 8) EXPORT EXCEL + autosize
+# ============================================================
+with pd.ExcelWriter(OUT_MISSING, engine="openpyxl") as writer:
+    detail.to_excel(writer, sheet_name="DETAIL_NON_CODES", index=False)
+    summary.to_excel(writer, sheet_name="SYNTHESE_CODE_UH", index=False)
+
+    autosize_worksheet_columns(writer.book["DETAIL_NON_CODES"])
+    autosize_worksheet_columns(writer.book["SYNTHESE_CODE_UH"])
+
+print("✅ OK")
+print(f"Fichier généré : {OUT_MISSING}")
