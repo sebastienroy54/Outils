@@ -1,8 +1,1 @@
-Colonnes Liste des DMI codés.csv
-IPP du patient	Nom du patient	Prénom du patient	N° de dossier du patient	Date de l’intervention	Unité demandeuse	Unité exécutante	Unité d'anesthésie	Statut de l'intervention	Code acte porteur	Quantité de DMI posés	DMI Gratuit	Libellé du DMI du livret	Référence commerciale du DMI	Nom du fournisseur	Code du fourniseur	Date de codage du DMI	Indicateur	DMI hors marché AP-HP	N° de lot du DMI	N° de série du DMI	Echec de pose	Déstérilisation	DMI annulé le	Dénomination commune	LPP
-
-Colonnes DMI_NAS.csv
-DTEXPO	CDCSV	IDDMI	NAS	NODA	NODABB	NIP	NOMPAT	PRNPAT	CODACT	PHASACT	CDLPP	CDDMIC	NBDMI	DTEXEC	PTTC	CDREFF	CDFR	INDIC	D8IMP	CDAPP	LBAPP	D8APP	D8MOD	NASIMBA	INSIMBA	D8SIMBA	KYRSS	CDWARN	LBAPP
-
-Colonnes Extraction_SAG.csv
-Service	Libellé du service	Code de l'UH	Libellé de l'UH	NIP	Nom	Prénom	Date de réalisation	NDA	Code de l'acte	Code phase	Libellé de l'acte	UH de demande	Référence produit	Libellé produit	Référence fournisseur	Libellé forunisseur	Code LPP	Code DC	Indicateur	Quantité	Gratuit	Echec pose	Déstérilisé	N° lot / N° série	N° lot	N°série	Prix	TVA	Code ATIH	Indication
+FLAGRPI	FLAGXMLRPI	ID_SOURCE	Magasin	DATEHEURESAISIE	Posé le	IPP	NDA	Code SAP	N° de Lot	Libellé	Réference	Nbre	Motif	Fournisseur	LPPR	Praticien	Centre de coût	DLU	PRIX_LPPR	PxTot	PHT	COUT	Code Cladimed	Cpt budg Four	No Marché	T2A	INFOS	RECEP2	Libellé	N° Intervention	LCLADIMED
