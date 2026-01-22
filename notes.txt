@@ -1,8 +1,344 @@
-def read_csv_sag_safe(path):
+import pandas as pd
+import numpy as np
+from pathlib import Path
+from openpyxl.utils import get_column_letter
+
+# =========================
+# PARAMÈTRES
+# =========================
+PATH_ORBIS = Path(r"C:\Users\4251352\Documents\DMI\Liste des DMI codés.csv")
+PATH_SIMPA = Path(r"C:\Users\4251352\Documents\DMI\DMI_NAS.csv")
+PATH_SAG   = Path(r"C:\Users\4251352\Documents\DMI\Extraction_SAG.csv")
+PATH_SEDI  = Path(r"C:\Users\4251352\Documents\DMI\Extraction DMI SEDITRACE 2025 CCH.xlsx")
+
+OUT_BASE_DIM = Path(r"C:\Users\4251352\Documents\DMI\BASE_DIM.xlsx")
+OUT_MISSING  = Path(r"C:\Users\4251352\Documents\DMI\DMI_SEDITRACE_absents_DIM.xlsx")
+
+# =========================
+# HELPERS (lecture)
+# =========================
+def read_csv_auto(path: Path) -> pd.DataFrame:
+    encodings = ["utf-8", "cp1252", "latin1"]
+    seps = [None, ";", ",", "\t", "|"]
+    last_err = None
+    for enc in encodings:
+        for sep in seps:
+            try:
+                if sep is None:
+                    return pd.read_csv(path, sep=None, engine="python", encoding=enc)
+                return pd.read_csv(path, sep=sep, engine="python", encoding=enc)
+            except Exception as e:
+                last_err = e
+    raise RuntimeError(f"Impossible de lire {path}. Dernière erreur: {last_err}")
+
+def read_csv_sag_safe(path: Path) -> pd.DataFrame:
+    # SAG est souvent “sale” (guillemets/retours ligne). On force une lecture tolérante.
     return pd.read_csv(
         path,
         sep=";",
         engine="python",
         encoding="cp1252",
-        on_bad_lines="warn"  # ou "skip" si tu veux ignorer silencieusement
+        on_bad_lines="warn"  # mets "skip" si tu ne veux pas de warnings
     )
+
+# =========================
+# HELPERS (normalisation)
+# =========================
+def norm_str(x: pd.Series) -> pd.Series:
+    return (
+        x.astype("string")
+         .str.strip()
+         .str.replace(r"\s+", " ", regex=True)
+    )
+
+def norm_ref(x: pd.Series) -> pd.Series:
+    return norm_str(x).str.upper()
+
+def norm_date_day(x: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
+    return dt.dt.normalize()
+
+def fmt_ddmmyyyy(dt_series: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(dt_series, errors="coerce", dayfirst=True).dt.normalize()
+    return dt.dt.strftime("%d/%m/%Y")
+
+def fmt_ddmmyyyy_hhmmss(dt_series: pd.Series) -> pd.Series:
+    dt = pd.to_datetime(dt_series, errors="coerce", dayfirst=True)
+    return dt.dt.strftime("%d/%m/%Y %H:%M:%S")
+
+def make_key(nip: pd.Series, date_pose: pd.Series, ref: pd.Series) -> pd.Series:
+    nip_n = norm_str(nip)
+    dt_n = norm_date_day(date_pose)
+    ref_n = norm_ref(ref)
+    return nip_n + "|" + dt_n.dt.strftime("%Y-%m-%d") + "|" + ref_n
+
+def ensure_cols(df: pd.DataFrame, required: list, label: str):
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f"{label}: colonnes manquantes: {missing}")
+
+def get_col(df: pd.DataFrame, options: list, label: str) -> pd.Series:
+    """Retourne la 1ère colonne existante parmi 'options'."""
+    for c in options:
+        if c in df.columns:
+            return df[c]
+    raise KeyError(f"{label}: aucune des colonnes {options} n'existe dans le fichier.")
+
+def normalize_code_uh_from_orbis(x: pd.Series) -> pd.Series:
+    """
+    ORBIS: ex '021X683' -> '683'
+    Règle: si 'X' présent, on garde ce qu'il y a après le dernier X.
+    """
+    s = norm_str(x)
+    # split sur 'X' et prend dernier morceau
+    return s.str.split("X").str[-1].str.strip()
+
+# =========================
+# HELPERS (Excel autosize)
+# =========================
+def autosize_worksheet_columns(ws, min_width=10, max_width=60):
+    for col_idx, col_cells in enumerate(ws.columns, start=1):
+        max_len = 0
+        for cell in col_cells:
+            if cell.value is None:
+                continue
+            max_len = max(max_len, len(str(cell.value)))
+        width = max(min_width, min(max_width, max_len + 2))
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+# =========================
+# 1) ORBIS -> standard
+# =========================
+orbis = read_csv_auto(PATH_ORBIS)
+
+# Colonnes ORBIS attendues (avec alias tolérants sur lot/série)
+ORBI_REQ_BASE = [
+    "IPP du patient",
+    "Date de l’intervention",
+    "Référence commerciale du DMI",
+    "LPP",
+    "Libellé du DMI du livret",
+    "Nom du fournisseur",
+    "Unité demandeuse",
+    "Date de codage du DMI",
+]
+ensure_cols(orbis, ORBI_REQ_BASE, "ORBIS")
+
+orbis_lot = get_col(orbis, ["N° de lot du DMI", "Numéro de lot du DMI", "N° de lot du DMI "], "ORBIS")
+orbis_serie = get_col(orbis, ["N° de série du DMI", "Numéro de série du DMI", "N° de série du DMI "], "ORBIS")
+
+orbis_std = pd.DataFrame({
+    "NIP": orbis["IPP du patient"],
+    "Date_pose": orbis["Date de l’intervention"],
+    "Ref_commerciale": orbis["Référence commerciale du DMI"],
+    "Code_LPP": orbis["LPP"],
+    "Libelle_DMI": orbis["Libellé du DMI du livret"],
+    "Fournisseur": orbis["Nom du fournisseur"],
+    "No_lot": orbis_lot,
+    "No_serie": orbis_serie,
+    "Date_saisie": orbis["Date de codage du DMI"],
+    # Code UH standardisé: "021X683" -> "683"
+    "CODE_UH": normalize_code_uh_from_orbis(orbis["Unité demandeuse"]),
+    "SOURCE": "ORBIS",
+})
+
+orbis_std["Date_pose_dt"] = norm_date_day(orbis_std["Date_pose"])
+orbis_std["KEY"] = make_key(orbis_std["NIP"], orbis_std["Date_pose_dt"], orbis_std["Ref_commerciale"])
+
+# =========================
+# 2) SAG -> standard
+# =========================
+sag = read_csv_sag_safe(PATH_SAG)
+
+SAG_REQ = [
+    "NIP",
+    "Date de réalisation",
+    "Référence produit",
+    "Code LPP",
+    "Libellé produit",
+    "Libellé forunisseur",  # orthographe de ton export
+    "N° lot",
+    "N°série",
+    "Code de l'UH",
+]
+ensure_cols(sag, SAG_REQ, "SAG")
+
+sag_std = pd.DataFrame({
+    "NIP": sag["NIP"],
+    "Date_pose": sag["Date de réalisation"],
+    "Ref_commerciale": sag["Référence produit"],
+    "Code_LPP": sag["Code LPP"],
+    "Libelle_DMI": sag["Libellé produit"],
+    "Fournisseur": sag["Libellé forunisseur"],
+    "No_lot": sag["N° lot"],
+    "No_serie": sag["N°série"],
+    "Date_saisie": pd.NA,
+    "CODE_UH": norm_str(sag["Code de l'UH"]),  # ex "683"
+    "SOURCE": "SAG",
+})
+
+sag_std["Date_pose_dt"] = norm_date_day(sag_std["Date_pose"])
+sag_std["KEY"] = make_key(sag_std["NIP"], sag_std["Date_pose_dt"], sag_std["Ref_commerciale"])
+
+# table KEY->CODE_UH pour enrichir les manquants (SEDITRACE)
+sag_key_to_uh = sag_std[["KEY", "CODE_UH"]].dropna(subset=["KEY"]).drop_duplicates(subset=["KEY"])
+
+# =========================
+# 3) SIMPA -> standard (minimal)
+# =========================
+simpa = read_csv_auto(PATH_SIMPA)
+SIMPA_REQ = ["NIP", "DTEXEC", "CDREFF", "CDLPP"]
+ensure_cols(simpa, SIMPA_REQ, "SIMPA")
+
+simpa_std = pd.DataFrame({
+    "NIP": simpa["NIP"],
+    "Date_pose": simpa["DTEXEC"],
+    "Ref_commerciale": simpa["CDREFF"],
+    "Code_LPP": simpa["CDLPP"],
+    "Libelle_DMI": pd.NA,
+    "Fournisseur": pd.NA,
+    "No_lot": pd.NA,
+    "No_serie": pd.NA,
+    "Date_saisie": pd.NA,
+    "CODE_UH": pd.NA,  # pas dispo
+    "SOURCE": "SIMPA",
+})
+
+simpa_std["Date_pose_dt"] = norm_date_day(simpa_std["Date_pose"])
+simpa_std["KEY"] = make_key(simpa_std["NIP"], simpa_std["Date_pose_dt"], simpa_std["Ref_commerciale"])
+
+# =========================
+# 4) BASE_DIM avec priorité ORBIS > SAG > SIMPA
+# =========================
+all_dim = pd.concat([orbis_std, sag_std, simpa_std], ignore_index=True)
+all_dim = all_dim.dropna(subset=["KEY"])  # enlève clés invalides
+
+priority_map = {"ORBIS": 1, "SAG": 2, "SIMPA": 3}
+all_dim["PRIO"] = all_dim["SOURCE"].map(priority_map).astype("Int64")
+
+all_dim_sorted = all_dim.sort_values(["KEY", "PRIO"], ascending=[True, True])
+base_dim = all_dim_sorted.drop_duplicates(subset=["KEY"], keep="first").copy()
+
+# Traçabilité : sources présentes
+sources_present = (
+    all_dim.groupby("KEY")["SOURCE"]
+           .apply(lambda s: "|".join(sorted(set(s.dropna().astype(str)))))
+           .rename("Sources_presentes")
+)
+
+base_dim = base_dim.merge(sources_present, on="KEY", how="left")
+base_dim = base_dim.rename(columns={"SOURCE": "Source_retenue"}).drop(columns=["PRIO"])
+
+# Dates au format dd/mm/yyyy pour export
+base_dim["Date_pose"] = fmt_ddmmyyyy(base_dim["Date_pose_dt"])
+# (optionnel) tu peux garder aussi la date brute si tu veux, mais on la retire pour lisibilité
+base_dim = base_dim.drop(columns=["Date_pose_dt"], errors="ignore")
+
+# Export BASE_DIM.xlsx + autosize
+with pd.ExcelWriter(OUT_BASE_DIM, engine="openpyxl") as writer:
+    base_dim.to_excel(writer, sheet_name="BASE_DIM", index=False)
+    ws = writer.book["BASE_DIM"]
+    autosize_worksheet_columns(ws)
+
+# =========================
+# 5) SEDITRACE -> anti-join (présent SEDI, absent DIM)
+# =========================
+sedi = pd.read_excel(PATH_SEDI)
+
+SEDI_REQ = [
+    "IPP",
+    "Posé le",
+    "Réference",
+    "DATEHEURESAISIE",
+    "Fournisseur",
+    "N° de Lot",
+    "LPPR",
+    "Libellé",
+    "Praticien",
+    "Nbre",
+    "PxTot",
+    "PRIX_LPPR",
+]
+ensure_cols(sedi, SEDI_REQ, "SEDITRACE")
+
+sedi_std = pd.DataFrame({
+    "NIP": sedi["IPP"],
+    "Date_pose": sedi["Posé le"],
+    "Ref_commerciale": sedi["Réference"],
+    "Date_saisie_SEDITRACE": sedi["DATEHEURESAISIE"],
+    "Medecin_poseur": sedi["Praticien"],
+    "Fournisseur": sedi["Fournisseur"],
+    "No_lot": sedi["N° de Lot"],
+    "No_serie": pd.NA,  # volontairement vide
+    "Code_LPP": sedi["LPPR"],
+    "Libelle_DMI": sedi["Libellé"],
+    "Quantite": sedi["Nbre"],
+    "Prix_unitaire_LPPR": sedi["PRIX_LPPR"],
+    "Prix_total": sedi["PxTot"],
+})
+
+sedi_std["Date_pose_dt"] = norm_date_day(sedi_std["Date_pose"])
+sedi_std["KEY"] = make_key(sedi_std["NIP"], sedi_std["Date_pose_dt"], sedi_std["Ref_commerciale"])
+
+# Anti-join
+dim_keys = set(base_dim["KEY"].dropna().unique())
+missing = sedi_std[~sedi_std["KEY"].isin(dim_keys)].copy()
+
+# Enrichissement CODE_UH depuis SAG via la KEY
+missing = missing.merge(sag_key_to_uh, on="KEY", how="left")
+
+# Format dates affichage
+missing["Date_pose"] = fmt_ddmmyyyy(missing["Date_pose_dt"])
+missing["Date_saisie_SEDITRACE"] = fmt_ddmmyyyy_hhmmss(missing["Date_saisie_SEDITRACE"])
+
+# Colonnes finales (détail) – avec CODE_UH
+missing_detail = missing[[
+    "NIP",
+    "Date_pose",
+    "Medecin_poseur",
+    "Date_saisie_SEDITRACE",
+    "Fournisseur",
+    "Ref_commerciale",
+    "No_lot",
+    "No_serie",
+    "Code_LPP",
+    "Libelle_DMI",
+    "CODE_UH",
+    "Quantite",
+    "Prix_unitaire_LPPR",
+    "Prix_total",
+]].copy()
+
+# Numérisation pour agrégats financiers
+missing_detail["Prix_total_num"] = pd.to_numeric(missing_detail["Prix_total"], errors="coerce")
+missing_detail["Quantite_num"] = pd.to_numeric(missing_detail["Quantite"], errors="coerce")
+
+# =========================
+# 6) Synthèse par CODE_UH
+# =========================
+uh_summary = (
+    missing_detail
+    .groupby("CODE_UH", dropna=False)
+    .agg(
+        nb_dmi_manquants=("NIP", "size"),
+        nb_patients=("NIP", pd.Series.nunique),
+        quantite_totale=("Quantite_num", "sum"),
+        recette_manquante_estimee=("Prix_total_num", "sum"),
+    )
+    .reset_index()
+    .sort_values("recette_manquante_estimee", ascending=False)
+)
+
+# =========================
+# 7) Export final + autosize
+# =========================
+with pd.ExcelWriter(OUT_MISSING, engine="openpyxl") as writer:
+    missing_detail.to_excel(writer, sheet_name="DETAIL_DMI_MANQUANTS", index=False)
+    uh_summary.to_excel(writer, sheet_name="SYNTHESE_CODE_UH", index=False)
+
+    autosize_worksheet_columns(writer.book["DETAIL_DMI_MANQUANTS"])
+    autosize_worksheet_columns(writer.book["SYNTHESE_CODE_UH"])
+
+print("✅ OK")
+print(f"- BASE_DIM: {OUT_BASE_DIM}")
+print(f"- DMI manquants + synthèse: {OUT_MISSING}")
