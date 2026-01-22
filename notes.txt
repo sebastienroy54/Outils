@@ -1,7 +1,8 @@
-Traceback (most recent call last):
-  File "c:\Users\4251352\projets\groupage_DMI.py", line 102, in <module>
-    sag = read_csv_auto(PATH_SAG)
-          ^^^^^^^^^^^^^^^^^^^^^^^
-  File "c:\Users\4251352\projets\groupage_DMI.py", line 32, in read_csv_auto
-    raise RuntimeError(f"Impossible de lire {path}. Dernière erreur: {last_err}")
-RuntimeError: Impossible de lire C:\Users\4251352\Documents\DMI\Extraction_SAG.csv. Dernière erreur: '|' expected after '"'
+def read_csv_sag_safe(path):
+    return pd.read_csv(
+        path,
+        sep=";",
+        engine="python",
+        encoding="cp1252",
+        on_bad_lines="warn"  # ou "skip" si tu veux ignorer silencieusement
+    )
