@@ -101,7 +101,6 @@ def set_excel_date_format(ws, header_row=1, formats=None):
     if not formats:
         return
 
-    # map header -> column index
     header_map = {}
     for cell in ws[header_row]:
         header_map[str(cell.value)] = cell.column
@@ -114,7 +113,7 @@ def set_excel_date_format(ws, header_row=1, formats=None):
             ws.cell(row=r, column=col_idx).number_format = fmt
 
 # ============================================================
-# 1) ORBIS : construire l'ensemble des clés "codées"
+# 1) ORBIS : set des clés codées (IPP + jour + ref)
 # ============================================================
 orbis = read_csv_auto(PATH_ORBIS)
 
@@ -131,14 +130,11 @@ orbis_key = make_key(
     date_pose_dt=orbis_date_dt,
     ref=orbis["Référence commerciale du DMI"]
 )
-
-# Set de clés ORBIS codées (on enlève NA)
 orbis_keys = set(orbis_key.dropna().unique())
 
 # ============================================================
-# 2) SEDITRACE : construire les lignes + clé et filtrer "non codés ORBIS"
+# 2) SEDITRACE : construire les lignes + filtrer "non codés ORBIS"
 # ============================================================
-# dtype=str pour éviter les .0
 sedi = pd.read_excel(PATH_SEDI, dtype=str)
 
 SEDI_REQ = [
@@ -162,10 +158,9 @@ sedi_dt_saisie = pd.to_datetime(sedi["DATEHEURESAISIE"], errors="coerce", dayfir
 
 sedi_std = pd.DataFrame({
     "NIP": clean_id_like(sedi["IPP"]),
-    "Date_pose_dt": sedi_dt_pose,                 # datetime (jour)
-    "Date_saisie_dt": sedi_dt_saisie,             # datetime (jour+heure)
+    "Date_pose_dt": sedi_dt_pose,
+    "Date_saisie_dt": sedi_dt_saisie,
     "Ref_commerciale": sedi["Réference"],
-    "Ref_commerciale_norm": norm_ref(sedi["Réference"]),
     "Quantite": to_num(sedi["Nbre"]),
     "Code_LPP": clean_id_like(sedi["LPPR"]),
     "Libelle_DMI": sedi["Libellé"],
@@ -175,21 +170,20 @@ sedi_std = pd.DataFrame({
     "Prix_unitaire_LPPR": to_num(sedi["PRIX_LPPR"]),
     "Prix_total": to_num(sedi["PxTot"]),
 })
-
 sedi_std["KEY"] = make_key(sedi_std["NIP"], sedi_std["Date_pose_dt"], sedi_std["Ref_commerciale"])
 
-# Non codés ORBIS = clés SEDITRACE absentes du set ORBIS
+# non codés ORBIS
 non_codes = sedi_std[~sedi_std["KEY"].isin(orbis_keys)].copy()
+non_codes["No_serie"] = pd.NA  # volontairement vide
 
-# Numéro de série volontairement vide
-non_codes["No_serie"] = pd.NA
-
-# Colonnes détail (avec vraies dates Excel)
+# ============================================================
+# 3) DETAIL : on garde des vraies dates (Excel format FR) + FILTRE PxTot > 0
+# ============================================================
 detail = pd.DataFrame({
     "NIP": non_codes["NIP"],
-    "Date de pose": non_codes["Date_pose_dt"],            # datetime -> format Excel FR appliqué
+    "Date de pose": non_codes["Date_pose_dt"],             # date
     "Médecin poseur": non_codes["Medecin_poseur"],
-    "Date saisie SEDITRACE": non_codes["Date_saisie_dt"], # datetime -> format Excel FR appliqué
+    "Date saisie SEDITRACE": non_codes["Date_saisie_dt"],  # datetime
     "Nom du laboratoire fournisseur": non_codes["Fournisseur"],
     "Réf commerciale": non_codes["Ref_commerciale"],
     "Numéro de lot": non_codes["No_lot"],
@@ -202,27 +196,20 @@ detail = pd.DataFrame({
     "Clé technique (IPP|date|ref)": non_codes["KEY"],
 })
 
-# ============================================================
-# 3) Synthèse par Libellé (normalisé)
-# ============================================================
-synthese = (
-    detail
-    .assign(_nbre=pd.to_numeric(detail["Nbre"], errors="coerce"),
-            _pxtot=pd.to_numeric(detail["PxTot"], errors="coerce"))
-    .groupby("Libellé DMI", dropna=False)
-    .agg(
-        nb_lignes=("NIP", "size"),
-        nb_patients=("NIP", pd.Series.nunique),
-        nbre_total=("_nbre", "sum"),
-        manque_a_gagner_estime=("__pxtot", "sum")  # placeholder, remplacé juste après
-    )
-)
+# >>> FILTRE IMPORTANT : supprimer TOUTES les lignes sans € (PxTot <= 0 ou vide)
+detail["_PxTot_num"] = pd.to_numeric(detail["PxTot"], errors="coerce")
+detail = detail[detail["_PxTot_num"] > 0].copy()
+detail = detail.drop(columns=["_PxTot_num"])
 
-# Fix: pandas n'accepte pas de nom de colonne avec "__pxtot" non existant, on le fait proprement :
+# ============================================================
+# 4) SYNTHESE par Libellé (uniquement sur detail filtré) + TOTAL
+# ============================================================
+tmp = detail.copy()
+tmp["_nbre"] = pd.to_numeric(tmp["Nbre"], errors="coerce")
+tmp["_pxtot"] = pd.to_numeric(tmp["PxTot"], errors="coerce")
+
 synthese = (
-    detail
-    .assign(_nbre=pd.to_numeric(detail["Nbre"], errors="coerce"),
-            _pxtot=pd.to_numeric(detail["PxTot"], errors="coerce"))
+    tmp
     .groupby("Libellé DMI", dropna=False)
     .agg(
         nb_lignes=("NIP", "size"),
@@ -234,8 +221,18 @@ synthese = (
     .sort_values("manque_a_gagner_estime", ascending=False)
 )
 
+total_row = pd.DataFrame([{
+    "Libellé DMI": "TOTAL",
+    "nb_lignes": int(synthese["nb_lignes"].sum()),
+    "nb_patients": int(tmp["NIP"].nunique()),
+    "nbre_total": float(synthese["nbre_total"].sum()),
+    "manque_a_gagner_estime": float(synthese["manque_a_gagner_estime"].sum()),
+}])
+
+synthese = pd.concat([synthese, total_row], ignore_index=True)
+
 # ============================================================
-# 4) Export Excel + autosize + formats FR
+# 5) Export Excel + autosize + format dates FR
 # ============================================================
 with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
     detail.to_excel(writer, sheet_name="DETAIL_NON_CODES", index=False)
@@ -244,11 +241,9 @@ with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
     ws_detail = writer.book["DETAIL_NON_CODES"]
     ws_syn = writer.book["SYNTHESE_LIBELLE"]
 
-    # Autosize
     autosize_worksheet_columns(ws_detail)
     autosize_worksheet_columns(ws_syn)
 
-    # Forcer format FR des dates dans Excel
     set_excel_date_format(ws_detail, formats={
         "Date de pose": "DD/MM/YYYY",
         "Date saisie SEDITRACE": "DD/MM/YYYY HH:MM:SS",
