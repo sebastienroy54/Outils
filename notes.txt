@@ -1,34 +1,6 @@
-import smtplib
-from email.message import EmailMessage
-from pathlib import Path
-
-def send_mail(mail_from, recipients, subject, body, attachments=None, cc=None):
-    if attachments is None:
-        attachments = []
-    if cc is None:
-        cc = []
-
-    msg = EmailMessage()
-    msg["From"] = mail_from
-    msg["To"] = ", ".join(recipients)
-    if cc:
-        msg["Cc"] = ", ".join(cc)
-    msg["Subject"] = subject
-    msg["Reply-To"] = mail_from
-
-    msg.set_content(body)
-
-    for f in attachments:
-        p = Path(f)
-        msg.add_attachment(
-            p.read_bytes(),
-            maintype="application",
-            subtype="octet-stream",
-            filename=p.name
-        )
-
-    # IMPORTANT : les CC doivent être inclus dans la liste SMTP
-    all_recipients = recipients + cc
-
-    with smtplib.SMTP("smtp.aphp.fr", 25) as smtp:
-        smtp.sendmail(mail_from, all_recipients, msg.as_string())
+docker run --rm \
+  -v "/media/sf_python/monouhcd/app":/app \
+  -v "/media/sf_python/monouhcd/sql":/app/sql \
+  -v "/media/sf_python/monouhcd/output":/app/output \
+  -v "/media/sf_python/automatisation":/config \
+  monouhcd-image
