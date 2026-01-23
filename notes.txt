@@ -14,7 +14,10 @@ PATH_SAG   = BASE_DIR / "Extraction_SAG.csv"
 PATH_SIMPA = BASE_DIR / "DMI_NAS.csv"
 PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
 
-OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM.xlsx"
+OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM_DELTA1J.xlsx"
+
+# Tolérance de date en jours (ici +/-1)
+DATE_TOL_DAYS = 1
 
 # ============================================================
 # HELPERS lecture
@@ -72,10 +75,9 @@ def clean_id_like(x: pd.Series) -> pd.Series:
     return x.map(clean_id_like_scalar).astype("string").str.strip()
 
 def norm_ref(x: pd.Series) -> pd.Series:
-    # normalisation "sécurisée" + suppression NBSP
     return (
         x.astype("string")
-         .str.replace("\u00A0", " ", regex=False)  # NBSP -> espace
+         .str.replace("\u00A0", " ", regex=False)  # NBSP
          .str.strip()
          .str.replace(r"\s+", " ", regex=True)
          .str.upper()
@@ -131,17 +133,27 @@ def set_excel_date_format(ws, header_row=1, formats=None):
             ws.cell(row=r, column=col_idx).number_format = fmt
 
 # ============================================================
-# 1) Construire BASE_DIM_KEYS = union ORBIS + SAG + SIMPA
-#    Clé = IPP + jour + ref commerciale
+# 1) Construire BASE_DIM_KEYS (union ORBIS + SAG + SIMPA) avec tolérance +/-1j
 # ============================================================
+base_dim_keys = set()
+
+def add_keys_with_delta(keys_series: pd.Series, dates_dt: pd.Series, nip: pd.Series, ref: pd.Series):
+    # clé J
+    k0 = make_key(nip, dates_dt, ref)
+    # clé J-1 et J+1
+    if DATE_TOL_DAYS >= 1:
+        k_minus = make_key(nip, (dates_dt - pd.Timedelta(days=1)), ref)
+        k_plus  = make_key(nip, (dates_dt + pd.Timedelta(days=1)), ref)
+        return set(pd.concat([k0, k_minus, k_plus]).dropna().unique())
+    return set(k0.dropna().unique())
+
 # ORBIS
 orbis = read_csv_auto(PATH_ORBIS)
 ORBI_REQ = ["IPP du patient", "Date de l’intervention", "Référence commerciale du DMI"]
 ensure_cols(orbis, ORBI_REQ, "ORBIS")
 
 orbis_date_dt = parse_date_fr_day(orbis["Date de l’intervention"])
-orbis_key = make_key(orbis["IPP du patient"], orbis_date_dt, orbis["Référence commerciale du DMI"])
-orbis_keys = set(orbis_key.dropna().unique())
+base_dim_keys |= add_keys_with_delta(None, orbis_date_dt, orbis["IPP du patient"], orbis["Référence commerciale du DMI"])
 
 # SAG
 sag = read_csv_sag_safe(PATH_SAG)
@@ -149,8 +161,7 @@ SAG_REQ = ["NIP", "Date de réalisation", "Référence produit"]
 ensure_cols(sag, SAG_REQ, "SAG")
 
 sag_date_dt = parse_date_fr_day(sag["Date de réalisation"])
-sag_key = make_key(sag["NIP"], sag_date_dt, sag["Référence produit"])
-sag_keys = set(sag_key.dropna().unique())
+base_dim_keys |= add_keys_with_delta(None, sag_date_dt, sag["NIP"], sag["Référence produit"])
 
 # SIMPA
 simpa = read_csv_auto(PATH_SIMPA)
@@ -158,10 +169,7 @@ SIMPA_REQ = ["NIP", "DTEXEC", "CDREFF"]
 ensure_cols(simpa, SIMPA_REQ, "SIMPA")
 
 simpa_date_dt = parse_date_fr_day(simpa["DTEXEC"])
-simpa_key = make_key(simpa["NIP"], simpa_date_dt, simpa["CDREFF"])
-simpa_keys = set(simpa_key.dropna().unique())
-
-base_dim_keys = orbis_keys | sag_keys | simpa_keys
+base_dim_keys |= add_keys_with_delta(None, simpa_date_dt, simpa["NIP"], simpa["CDREFF"])
 
 # ============================================================
 # 2) Lire SEDITRACE en gardant les dates Excel
@@ -199,17 +207,14 @@ sedi_std = pd.DataFrame({
     "Prix_total": to_num(sedi["PxTot"].astype("string")),
 })
 
-# Exclure lignes sans champs clés
 sedi_std = sedi_std.dropna(subset=["NIP", "Date_pose_dt", "Ref_commerciale"])
-
 sedi_std["KEY"] = make_key(sedi_std["NIP"], sedi_std["Date_pose_dt"], sedi_std["Ref_commerciale"])
 
 # ============================================================
-# 3) DMI à coder = présents SEDITRACE et absents BASE_DIM (ORBIS+SAG+SIMPA)
+# 3) DMI à coder = présents SEDITRACE et absents BASE_DIM (avec delta ±1j)
 # ============================================================
 missing = sedi_std[~sedi_std["KEY"].isin(base_dim_keys)].copy()
 
-# DETAIL (10 champs + prix)
 detail = pd.DataFrame({
     "NIP": missing["NIP"],
     "Date de pose": missing["Date_pose_dt"],
@@ -227,7 +232,7 @@ detail = pd.DataFrame({
     "Clé technique (IPP|date|ref)": missing["KEY"],
 })
 
-# Filtre financier strict : garder uniquement PxTot > 0
+# Filtre financier : garder uniquement PxTot > 0
 detail["_PxTot_num"] = pd.to_numeric(detail["PxTot"], errors="coerce")
 detail = detail[detail["_PxTot_num"] > 0].copy()
 detail = detail.drop(columns=["_PxTot_num"])
@@ -263,7 +268,7 @@ total_row = pd.DataFrame([{
 synthese = pd.concat([synthese, total_row], ignore_index=True)
 
 # ============================================================
-# 5) Export Excel (dates FR + autosize)
+# 5) Export Excel
 # ============================================================
 with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
     detail.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
