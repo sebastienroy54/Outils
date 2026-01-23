@@ -1,301 +1,45 @@
-import pandas as pd
-import numpy as np
-from pathlib import Path
-import re
-from openpyxl.utils import get_column_letter
+Chargement ORBIS...
 
-# ============================================================
-# PARAMÈTRES CHEMINS
-# ============================================================
-BASE_DIR = Path(r"C:\Users\4251352\Documents\DMI")
+--- DEBUG ORBIS - Date de l’intervention ---
+Total lignes: 11525
+Dates parsées OK: 11525 (100.0%) | NaT: 0 (0.0%)
+Min date: 2025-01-01 00:00:00 | Max date: 2026-01-21 00:00:00
+Nb jours > 12: 6829 | Nb jours <=12: 4696
+Nb mois > 12 (devrait être 0): 0
+Exemples BRUT (1ers 8): ['07/01/2026  00:00', '07/01/2026  00:00', '05/11/2025  00:00', '10/03/2025  00:00', '24/10/2025  00:00', '21/11/2025  00:00', '05/05/2025  00:00', '05/05/2025  00:00']
+Exemples PARSÉS (1ers 8): ['2026-01-07', '2026-01-07', '2025-11-05', '2025-03-10', '2025-10-24', '2025-11-21', '2025-05-05', '2025-05-05']
+ORBIS: nb clés codées uniques (IPP+jour+ref): 10420
 
-PATH_ORBIS = BASE_DIR / "Liste des DMI codés.csv"
-PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
+Chargement SEDITRACE...
 
-OUT_FILE = BASE_DIR / "DMI_SEDITRACE_NON_CODES_ORBIS.xlsx"
+--- DEBUG SEDITRACE - Posé le ---
+Total lignes: 2933
+Dates parsées OK: 2933 (100.0%) | NaT: 0 (0.0%)
+Min date: 2025-01-02 00:00:00 | Max date: 2025-12-31 00:00:00
+Nb jours > 12: 1802 | Nb jours <=12: 1131
+Nb mois > 12 (devrait être 0): 0
+Exemples BRUT (1ers 8): ['2025-01-02', '2025-01-02', '2025-01-02', '2025-01-02', '2025-01-02', '2025-01-03', '2025-01-03', '2025-01-05']
+Exemples PARSÉS (1ers 8): ['2025-01-02', '2025-01-02', '2025-01-02', '2025-01-02', '2025-01-02', '2025-01-03', '2025-01-03', '2025-01-05']
 
-# ============================================================
-# HELPERS
-# ============================================================
-def read_csv_auto(path: Path) -> pd.DataFrame:
-    encodings = ["utf-8", "cp1252", "latin1"]
-    seps = [None, ";", ",", "\t", "|"]
-    last_err = None
-    for enc in encodings:
-        for sep in seps:
-            try:
-                if sep is None:
-                    return pd.read_csv(path, sep=None, engine="python", encoding=enc, dtype=str)
-                return pd.read_csv(path, sep=sep, engine="python", encoding=enc, dtype=str)
-            except Exception as e:
-                last_err = e
-    raise RuntimeError(f"Impossible de lire {path}. Dernière erreur: {last_err}")
+--- DEBUG SEDITRACE - DATEHEURESAISIE ---
+Total lignes: 2933
+Dates parsées OK: 2933 (100.0%) | NaT: 0 (0.0%)
+Min date: 2025-01-02 08:45:30 | Max date: 2026-01-08 17:10:48
+Nb jours > 12: 1824 | Nb jours <=12: 1109
+Nb mois > 12 (devrait être 0): 0
+Exemples BRUT (1ers 8): ['2025-01-02 08:45:30', '2025-01-02 17:02:01', '2025-01-02 19:17:50', '2025-01-02 16:53:04', '2025-01-02 18:47:00', '2025-01-03 13:49:05', '2025-01-03 15:25:44', '2025-01-05 11:14:19']
+Exemples PARSÉS (1ers 8): ['2025-01-02 08:45:30', '2025-01-02 17:02:01', '2025-01-02 19:17:50', '2025-01-02 16:53:04', '2025-01-02 18:47:00', '2025-01-03 13:49:05', '2025-01-03 15:25:44', '2025-01-05 11:14:19']
 
-def ensure_cols(df: pd.DataFrame, required: list, label: str):
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise KeyError(f"{label}: colonnes manquantes: {missing}")
+SEDITRACE: lignes exclues (IPP/date/ref manquants): 0 | restantes: 2933
 
-def clean_id_like_scalar(v):
-    """Nettoie un identifiant lu comme float (123.0) ou scientifique (1.23E+05) -> string propre."""
-    if v is None or (isinstance(v, float) and np.isnan(v)):
-        return pd.NA
-    s = str(v).strip()
-    if s in {"", "nan", "NaN", "None"}:
-        return pd.NA
-    s = re.sub(r"^(\d+)\.0$", r"\1", s)
-    if re.match(r"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$", s):
-        try:
-            f = float(s)
-            if np.isfinite(f) and abs(f - round(f)) < 1e-9:
-                return str(int(round(f)))
-            return str(f).rstrip("0").rstrip(".")
-        except Exception:
-            return s
-    return s
+SEDITRACE: nb lignes candidates non codées (avant filtre €): 742
+DETAIL: lignes supprimées car PxTot<=0 ou vide: 129 | restantes: 613
 
-def clean_id_like(x: pd.Series) -> pd.Series:
-    return x.map(clean_id_like_scalar).astype("string").str.strip()
-
-def norm_ref(x: pd.Series) -> pd.Series:
-    return (
-        x.astype("string")
-         .str.strip()
-         .str.replace(r"\s+", " ", regex=True)
-         .str.upper()
-    )
-
-def to_num(s: pd.Series) -> pd.Series:
-    x = s.astype("string").str.strip().str.replace(",", ".", regex=False)
-    return pd.to_numeric(x, errors="coerce")
-
-# --- Conversion dates robuste côté ORBIS (CSV texte)
-def parse_date_fr_day(series: pd.Series) -> pd.Series:
-    s = series.astype("string").str.strip()
-
-    dt = pd.to_datetime(s, format="%d/%m/%Y %H:%M:%S", errors="coerce")
-    dt2 = pd.to_datetime(s, format="%d/%m/%Y %H:%M", errors="coerce")
-    dt3 = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
-    dt4 = pd.to_datetime(s, format="%d-%m-%Y %H:%M:%S", errors="coerce")
-    dt5 = pd.to_datetime(s, format="%d-%m-%Y", errors="coerce")
-
-    fallback = pd.to_datetime(s, errors="coerce", dayfirst=True)
-
-    out = dt.fillna(dt2).fillna(dt3).fillna(dt4).fillna(dt5).fillna(fallback)
-    return out.dt.normalize()
-
-def make_key(nip: pd.Series, date_pose_dt: pd.Series, ref: pd.Series) -> pd.Series:
-    nip_n = clean_id_like(nip)
-    ref_n = norm_ref(ref)
-    return nip_n + "|" + date_pose_dt.dt.strftime("%Y-%m-%d") + "|" + ref_n
-
-# --- Excel formatting
-def autosize_worksheet_columns(ws, min_width=10, max_width=60):
-    for col_idx, col_cells in enumerate(ws.columns, start=1):
-        max_len = 0
-        for cell in col_cells:
-            if cell.value is None:
-                continue
-            max_len = max(max_len, len(str(cell.value)))
-        width = max(min_width, min(max_width, max_len + 2))
-        ws.column_dimensions[get_column_letter(col_idx)].width = width
-
-def set_excel_date_format(ws, header_row=1, formats=None):
-    if not formats:
-        return
-    header_map = {}
-    for cell in ws[header_row]:
-        header_map[str(cell.value)] = cell.column
-    for col_name, fmt in formats.items():
-        if col_name not in header_map:
-            continue
-        col_idx = header_map[col_name]
-        for r in range(header_row + 1, ws.max_row + 1):
-            ws.cell(row=r, column=col_idx).number_format = fmt
-
-# ============================================================
-# DEBUG HELPERS (aucune donnée patient)
-# ============================================================
-def debug_dates(label: str, raw_series: pd.Series, dt_series: pd.Series, max_samples: int = 8):
-    total = len(raw_series)
-    nat = int(dt_series.isna().sum())
-    ok = total - nat
-    print(f"\n--- DEBUG {label} ---")
-    print(f"Total lignes: {total}")
-    print(f"Dates parsées OK: {ok} ({ok/total:.1%}) | NaT: {nat} ({nat/total:.1%})")
-
-    if ok > 0:
-        dmin = dt_series.dropna().min()
-        dmax = dt_series.dropna().max()
-        print(f"Min date: {dmin} | Max date: {dmax}")
-        days = dt_series.dropna().dt.day
-        months = dt_series.dropna().dt.month
-        print(f"Nb jours > 12: {(days > 12).sum()} | Nb jours <=12: {(days <= 12).sum()}")
-        print(f"Nb mois > 12 (devrait être 0): {(months > 12).sum()}")
-
-    # Exemples bruts + interprétés (sans IPP)
-    raw_nonnull = raw_series.dropna().astype(str).head(max_samples).tolist()
-    parsed_nonnull = dt_series.dropna().astype(str).head(max_samples).tolist()
-    print(f"Exemples BRUT (1ers {len(raw_nonnull)}): {raw_nonnull}")
-    print(f"Exemples PARSÉS (1ers {len(parsed_nonnull)}): {parsed_nonnull}")
-
-# ============================================================
-# 1) ORBIS : set des clés codées (IPP + jour + ref)
-# ============================================================
-print("Chargement ORBIS...")
-orbis = read_csv_auto(PATH_ORBIS)
-
-ORBI_REQ = ["IPP du patient", "Date de l’intervention", "Référence commerciale du DMI"]
-ensure_cols(orbis, ORBI_REQ, "ORBIS")
-
-orbis_date_dt = parse_date_fr_day(orbis["Date de l’intervention"])
-debug_dates("ORBIS - Date de l’intervention", orbis["Date de l’intervention"], orbis_date_dt)
-
-orbis_key = make_key(
-    nip=orbis["IPP du patient"],
-    date_pose_dt=orbis_date_dt,
-    ref=orbis["Référence commerciale du DMI"]
-)
-
-# Important : on retire les lignes où la date n'est pas parsée
-orbis_keys = set(orbis_key.dropna().unique())
-print(f"ORBIS: nb clés codées uniques (IPP+jour+ref): {len(orbis_keys)}")
-
-# ============================================================
-# 2) SEDITRACE : lire en gardant les dates Excel natifs
-#    -> converters seulement sur IPP/LPPR pour éviter les .0
-# ============================================================
-print("\nChargement SEDITRACE...")
-sedi = pd.read_excel(
-    PATH_SEDI,
-    converters={
-        "IPP": lambda v: clean_id_like_scalar(v),
-        "LPPR": lambda v: clean_id_like_scalar(v),
-        # Optionnel: si tu veux conserver "Réference" strictement en texte
-        "Réference": lambda v: pd.NA if v is None else str(v),
-    },
-)
-
-SEDI_REQ = [
-    "IPP", "Posé le", "Réference", "Nbre", "LPPR", "Libellé", "Fournisseur",
-    "N° de Lot", "DATEHEURESAISIE", "Praticien", "PRIX_LPPR", "PxTot"
-]
-ensure_cols(sedi, SEDI_REQ, "SEDITRACE")
-
-# Ici, comme c'est Excel "Date", c'est souvent déjà datetime.
-# On convertit quand même de façon sûre:
-sedi_dt_pose = pd.to_datetime(sedi["Posé le"], errors="coerce", dayfirst=True).dt.normalize()
-sedi_dt_saisie = pd.to_datetime(sedi["DATEHEURESAISIE"], errors="coerce", dayfirst=True)
-
-debug_dates("SEDITRACE - Posé le", sedi["Posé le"], sedi_dt_pose)
-debug_dates("SEDITRACE - DATEHEURESAISIE", sedi["DATEHEURESAISIE"], sedi_dt_saisie)
-
-sedi_std = pd.DataFrame({
-    "NIP": clean_id_like(sedi["IPP"].astype("string")),
-    "Date_pose_dt": sedi_dt_pose,
-    "Date_saisie_dt": sedi_dt_saisie,
-    "Ref_commerciale": sedi["Réference"].astype("string"),
-    "Quantite": to_num(sedi["Nbre"].astype("string")),
-    "Code_LPP": clean_id_like(sedi["LPPR"].astype("string")),
-    "Libelle_DMI": sedi["Libellé"].astype("string"),
-    "Fournisseur": sedi["Fournisseur"].astype("string"),
-    "No_lot": sedi["N° de Lot"].astype("string"),
-    "Medecin_poseur": sedi["Praticien"].astype("string"),
-    "Prix_unitaire_LPPR": to_num(sedi["PRIX_LPPR"].astype("string")),
-    "Prix_total": to_num(sedi["PxTot"].astype("string")),
-})
-
-# Exclure lignes sans date pose / IPP / ref
-before = len(sedi_std)
-sedi_std = sedi_std.dropna(subset=["NIP", "Date_pose_dt", "Ref_commerciale"])
-after = len(sedi_std)
-print(f"\nSEDITRACE: lignes exclues (IPP/date/ref manquants): {before-after} | restantes: {after}")
-
-sedi_std["KEY"] = make_key(sedi_std["NIP"], sedi_std["Date_pose_dt"], sedi_std["Ref_commerciale"])
-
-# Non codés ORBIS = clés SEDITRACE absentes ORBIS
-non_codes = sedi_std[~sedi_std["KEY"].isin(orbis_keys)].copy()
-
-print(f"\nSEDITRACE: nb lignes candidates non codées (avant filtre €): {len(non_codes)}")
-
-# ============================================================
-# 3) DETAIL + FILTRE PxTot > 0
-# ============================================================
-detail = pd.DataFrame({
-    "NIP": non_codes["NIP"],
-    "Date de pose": non_codes["Date_pose_dt"],             # vraie date Excel
-    "Médecin poseur": non_codes["Medecin_poseur"],
-    "Date saisie SEDITRACE": non_codes["Date_saisie_dt"],  # vraie datetime Excel
-    "Nom du laboratoire fournisseur": non_codes["Fournisseur"],
-    "Réf commerciale": non_codes["Ref_commerciale"],
-    "Numéro de lot": non_codes["No_lot"],
-    "Numéro de série": pd.NA,  # volontairement vide
-    "Code LPP": non_codes["Code_LPP"],
-    "Libellé DMI": non_codes["Libelle_DMI"],
-    "Nbre": non_codes["Quantite"],
-    "PRIX_LPPR": non_codes["Prix_unitaire_LPPR"],
-    "PxTot": non_codes["Prix_total"],
-    "Clé technique (IPP|date|ref)": non_codes["KEY"],
-})
-
-# Filtre financier strict : garder uniquement PxTot > 0
-detail["_PxTot_num"] = pd.to_numeric(detail["PxTot"], errors="coerce")
-before = len(detail)
-detail = detail[detail["_PxTot_num"] > 0].copy()
-detail = detail.drop(columns=["_PxTot_num"])
-after = len(detail)
-print(f"DETAIL: lignes supprimées car PxTot<=0 ou vide: {before-after} | restantes: {after}")
-
-# DEBUG final dates dans le DETAIL (pas d'IPP affiché)
-debug_dates("DETAIL - Date de pose", detail["Date de pose"], pd.to_datetime(detail["Date de pose"], errors="coerce"))
-
-# ============================================================
-# 4) SYNTHESE par Libellé (sur detail filtré) + TOTAL
-# ============================================================
-tmp = detail.copy()
-tmp["_nbre"] = pd.to_numeric(tmp["Nbre"], errors="coerce")
-tmp["_pxtot"] = pd.to_numeric(tmp["PxTot"], errors="coerce")
-
-synthese = (
-    tmp
-    .groupby("Libellé DMI", dropna=False)
-    .agg(
-        nb_lignes=("NIP", "size"),
-        nb_patients=("NIP", pd.Series.nunique),
-        nbre_total=("_nbre", "sum"),
-        manque_a_gagner_estime=("_pxtot", "sum"),
-    )
-    .reset_index()
-    .sort_values("manque_a_gagner_estime", ascending=False)
-)
-
-total_row = pd.DataFrame([{
-    "Libellé DMI": "TOTAL",
-    "nb_lignes": int(synthese["nb_lignes"].sum()),
-    "nb_patients": int(tmp["NIP"].nunique()),
-    "nbre_total": float(synthese["nbre_total"].sum()),
-    "manque_a_gagner_estime": float(synthese["manque_a_gagner_estime"].sum()),
-}])
-
-synthese = pd.concat([synthese, total_row], ignore_index=True)
-
-# ============================================================
-# 5) Export Excel + autosize + format dates FR
-# ============================================================
-with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
-    detail.to_excel(writer, sheet_name="DETAIL_NON_CODES", index=False)
-    synthese.to_excel(writer, sheet_name="SYNTHESE_LIBELLE", index=False)
-
-    ws_detail = writer.book["DETAIL_NON_CODES"]
-    ws_syn = writer.book["SYNTHESE_LIBELLE"]
-
-    autosize_worksheet_columns(ws_detail)
-    autosize_worksheet_columns(ws_syn)
-
-    set_excel_date_format(ws_detail, formats={
-        "Date de pose": "DD/MM/YYYY",
-        "Date saisie SEDITRACE": "DD/MM/YYYY HH:MM:SS",
-    })
-
-print("\n✅ OK")
-print(f"Fichier généré : {OUT_FILE}")
+--- DEBUG DETAIL - Date de pose ---
+Total lignes: 613
+Dates parsées OK: 613 (100.0%) | NaT: 0 (0.0%)
+Min date: 2025-01-02 00:00:00 | Max date: 2025-12-30 00:00:00
+Nb jours > 12: 389 | Nb jours <=12: 224
+Nb mois > 12 (devrait être 0): 0
+Exemples BRUT (1ers 8): ['2025-01-17', '2025-01-23', '2025-02-04', '2025-02-04', '2025-02-04', '2025-02-04', '2025-02-11', '2025-02-12']
+Exemples PARSÉS (1ers 8): ['2025-01-17', '2025-01-23', '2025-02-04', '2025-02-04', '2025-02-04', '2025-02-04', '2025-02-11', '2025-02-12']
