@@ -1,6 +1,84 @@
-docker run --rm \
-  -v "/media/sf_python/monouhcd/app":/app \
-  -v "/media/sf_python/monouhcd/sql":/app/sql \
-  -v "/media/sf_python/monouhcd/output":/app/output \
-  -v "/media/sf_python/automatisation":/config \
-  monouhcd-image
+# MONO UHCD – Batch Oracle automatisé
+
+## Objectif
+Ce projet permet d’automatiser l’extraction des séjours **MONO UHCD (> 0 jour)**  
+pour les sites **CCH** et **HTD**, à partir des bases Oracle SIMPA.
+
+Le traitement :
+1. Exécute des requêtes Oracle via SQL*Plus
+2. Génère des fichiers Excel
+3. Applique un découpage par période (semaine / mois / année)
+4. Envoie automatiquement les fichiers par mail
+5. S’exécute chaque semaine via une tâche cron
+
+---
+
+## Environnement technique
+- **OS hôte** : Debian 12
+- **Docker** : 28.x
+- **Python** : 3.7.17
+- **Oracle Instant Client** : 10.2.0.5
+- **Accès Oracle** : SQL*Plus uniquement (pas de driver Python)
+- **Connexion Oracle** : EZCONNECT
+- **SMTP** : smtp.aphp.fr (port 25, sans authentification)
+
+---
+
+## Arborescence du projet
+monouhcd/
+├── app/ # scripts Python
+│ ├── main.py
+│ ├── oracle_runner.py
+│ ├── txt_to_excel.py
+│ ├── code_decoupage.py
+│ └── mailer.py
+├── sql/ # requêtes SQL*Plus
+│ ├── MONO_UHCD_CCH.sql
+│ └── MONO_UHCD_HTD.sql
+├── output/ # fichiers générés (Excel finaux)
+├── Dockerfile
+├── requirements.txt
+├── basic-10.2.0.5.0-linux-x64.zip
+└── sqlplus-10.2.0.5.0-linux-x64.zip
+
+
+Configuration mails (hors image Docker) :
+/home/python/automatisation/mail_monouhcd.json
+
+---
+
+## Fonctionnement global
+
+Pour chaque site (CCH et HTD) :
+1. Connexion Oracle via EZCONNECT
+2. Exécution du fichier SQL correspondant (`MONO_UHCD_<SITE>.sql`)
+3. Spool d’un fichier `.txt`
+4. Conversion en Excel
+5. Découpage en feuilles :
+   - `SEMAINE_<SITE>`
+   - `MOIS_<SITE>`
+   - `ANNEE_<SITE>`
+6. Suppression des doublons entre périodes (par IPP)
+7. Envoi par mail du fichier Excel final
+
+Chaque site génère **un mail distinct** avec ses propres destinataires.
+
+---
+
+## Oracle – points critiques
+
+### Connexion
+- Connexion via EZCONNECT :
+user/password@//host:port/service
+
+### Paramètres NLS (OBLIGATOIRES)
+Les requêtes SQL doivent impérativement contenir :
+```sql
+ALTER SESSION SET NLS_DATE_LANGUAGE = 'FRENCH';
+ALTER SESSION SET NLS_DATE_FORMAT = 'DD/MM/YYYY';
+
+Sans cela, des erreurs du type :
+
+ORA-01843: not a valid month
+
+peuvent apparaître, même sur des requêtes pourtant fonctionnelles en client Oracle classique.
