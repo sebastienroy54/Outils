@@ -15,9 +15,10 @@ PATH_SIMPA = BASE_DIR / "DMI_NAS.csv"
 PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
 
 OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM_DELTA2J.xlsx"
+BASE_DIM_FILE = BASE_DIR / "BASE_DIM.xlsx"
 
 # Tolérance de date en jours (ici +/-2)
-DATE_TOL_DAYS = 2
+DATE_TOL_DAYS = 2  # ±2 jours
 
 # ============================================================
 # HELPERS lecture
@@ -133,11 +134,10 @@ def set_excel_date_format(ws, header_row=1, formats=None):
             ws.cell(row=r, column=col_idx).number_format = fmt
 
 # ============================================================
-# 1) Construire BASE_DIM_KEYS (union ORBIS + SAG + SIMPA) avec tolérance +/-1j
+# 1) Construire BASE_DIM_KEYS (union ORBIS + SAG + SIMPA) avec tolérance ±2j
+#    + Construire et enregistrer BASE_DIM.xlsx
 # ============================================================
 base_dim_keys = set()
-
-DATE_TOL_DAYS = 2  # ±2 jours
 
 def add_keys_with_delta(dates_dt: pd.Series, nip: pd.Series, ref: pd.Series):
     keys = []
@@ -146,7 +146,7 @@ def add_keys_with_delta(dates_dt: pd.Series, nip: pd.Series, ref: pd.Series):
         keys.append(make_key(nip, shifted_dates, ref))
     return set(pd.concat(keys).dropna().unique())
 
-# ORBIS
+# -------- ORBIS
 orbis = read_csv_auto(PATH_ORBIS)
 ORBI_REQ = ["IPP du patient", "Date de l’intervention", "Référence commerciale du DMI"]
 ensure_cols(orbis, ORBI_REQ, "ORBIS")
@@ -154,7 +154,17 @@ ensure_cols(orbis, ORBI_REQ, "ORBIS")
 orbis_date_dt = parse_date_fr_day(orbis["Date de l’intervention"])
 base_dim_keys |= add_keys_with_delta(orbis_date_dt, orbis["IPP du patient"], orbis["Référence commerciale du DMI"])
 
-# SAG
+base_orbis = pd.DataFrame({
+    "NIP": clean_id_like(orbis["IPP du patient"]),
+    "Date_pose": orbis_date_dt,
+    "Réf commerciale": norm_ref(orbis["Référence commerciale du DMI"]),
+    "Source": "ORBIS",
+})
+base_orbis["Clé technique (IPP|date|ref)"] = (
+    base_orbis["NIP"] + "|" + base_orbis["Date_pose"].dt.strftime("%Y-%m-%d") + "|" + base_orbis["Réf commerciale"]
+)
+
+# -------- SAG
 sag = read_csv_sag_safe(PATH_SAG)
 SAG_REQ = ["NIP", "Date de réalisation", "Référence produit"]
 ensure_cols(sag, SAG_REQ, "SAG")
@@ -162,13 +172,56 @@ ensure_cols(sag, SAG_REQ, "SAG")
 sag_date_dt = parse_date_fr_day(sag["Date de réalisation"])
 base_dim_keys |= add_keys_with_delta(sag_date_dt, sag["NIP"], sag["Référence produit"])
 
-# SIMPA
+base_sag = pd.DataFrame({
+    "NIP": clean_id_like(sag["NIP"]),
+    "Date_pose": sag_date_dt,
+    "Réf commerciale": norm_ref(sag["Référence produit"]),
+    "Source": "SAG",
+})
+base_sag["Clé technique (IPP|date|ref)"] = (
+    base_sag["NIP"] + "|" + base_sag["Date_pose"].dt.strftime("%Y-%m-%d") + "|" + base_sag["Réf commerciale"]
+)
+
+# -------- SIMPA
 simpa = read_csv_auto(PATH_SIMPA)
 SIMPA_REQ = ["NIP", "DTEXEC", "CDREFF"]
 ensure_cols(simpa, SIMPA_REQ, "SIMPA")
 
 simpa_date_dt = parse_date_fr_day(simpa["DTEXEC"])
 base_dim_keys |= add_keys_with_delta(simpa_date_dt, simpa["NIP"], simpa["CDREFF"])
+
+base_simpa = pd.DataFrame({
+    "NIP": clean_id_like(simpa["NIP"]),
+    "Date_pose": simpa_date_dt,
+    "Réf commerciale": norm_ref(simpa["CDREFF"]),
+    "Source": "SIMPA",
+})
+base_simpa["Clé technique (IPP|date|ref)"] = (
+    base_simpa["NIP"] + "|" + base_simpa["Date_pose"].dt.strftime("%Y-%m-%d") + "|" + base_simpa["Réf commerciale"]
+)
+
+# -------- BASE_DIM (union)
+base_dim = pd.concat([base_orbis, base_sag, base_simpa], ignore_index=True)
+base_dim = base_dim.dropna(subset=["NIP", "Date_pose", "Réf commerciale"])
+base_dim = base_dim.drop_duplicates(subset=["Clé technique (IPP|date|ref)", "Source"]).copy()
+
+# Enregistrer BASE_DIM.xlsx
+with pd.ExcelWriter(BASE_DIM_FILE, engine="openpyxl") as writer:
+    base_dim.to_excel(writer, sheet_name="BASE_DIM", index=False)
+    base_orbis.to_excel(writer, sheet_name="ORBIS", index=False)
+    base_sag.to_excel(writer, sheet_name="SAG", index=False)
+    base_simpa.to_excel(writer, sheet_name="SIMPA", index=False)
+
+    autosize_worksheet_columns(writer.book["BASE_DIM"])
+    autosize_worksheet_columns(writer.book["ORBIS"])
+    autosize_worksheet_columns(writer.book["SAG"])
+    autosize_worksheet_columns(writer.book["SIMPA"])
+
+    # format date dans BASE_DIM
+    set_excel_date_format(writer.book["BASE_DIM"], formats={"Date_pose": "DD/MM/YYYY"})
+    set_excel_date_format(writer.book["ORBIS"], formats={"Date_pose": "DD/MM/YYYY"})
+    set_excel_date_format(writer.book["SAG"], formats={"Date_pose": "DD/MM/YYYY"})
+    set_excel_date_format(writer.book["SIMPA"], formats={"Date_pose": "DD/MM/YYYY"})
 
 # ============================================================
 # 2) Lire SEDITRACE en gardant les dates Excel
@@ -204,17 +257,17 @@ sedi_std = pd.DataFrame({
     "Medecin_poseur": sedi["Praticien"].astype("string"),
     "Prix_unitaire_LPPR": to_num(sedi["PRIX_LPPR"].astype("string")),
     "Prix_total": to_num(sedi["PxTot"].astype("string")),
+    "Motif": sedi["Motif"].astype("string").str.strip().str.upper(),
 })
 
-sedi_std["Motif"] =(sedi["Motif"].astype("string").str.strip().str.upper())
 MOTIFS_EXCLUS = {"ECHEC DE POSE", "ANNULATION"}
-sedi_std = sedi_std[~sedi_std["Motif"].isin(MOTIFS_EXCLUS).copy()]
+sedi_std = sedi_std[~sedi_std["Motif"].isin(MOTIFS_EXCLUS)].copy()
 
 sedi_std = sedi_std.dropna(subset=["NIP", "Date_pose_dt", "Ref_commerciale"])
 sedi_std["KEY"] = make_key(sedi_std["NIP"], sedi_std["Date_pose_dt"], sedi_std["Ref_commerciale"])
 
 # ============================================================
-# 3) DMI à coder = présents SEDITRACE et absents BASE_DIM (avec delta ±1j)
+# 3) DMI à coder = présents SEDITRACE et absents BASE_DIM (avec delta ±2j)
 # ============================================================
 missing = sedi_std[~sedi_std["KEY"].isin(base_dim_keys)].copy()
 
@@ -232,7 +285,7 @@ detail = pd.DataFrame({
     "Nbre": missing["Quantite"],
     "PRIX_LPPR": missing["Prix_unitaire_LPPR"],
     "PxTot": missing["Prix_total"],
-    #"Clé technique (IPP|date|ref)": missing["KEY"],
+    # "Clé technique (IPP|date|ref)": missing["KEY"],
 })
 
 # Filtre financier : garder uniquement PxTot > 0
@@ -271,7 +324,7 @@ total_row = pd.DataFrame([{
 synthese = pd.concat([synthese, total_row], ignore_index=True)
 
 # ============================================================
-# 5) Export Excel
+# 5) Export Excel (résultats)
 # ============================================================
 with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
     detail.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
@@ -289,4 +342,5 @@ with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
     })
 
 print("✅ OK")
-print(f"Fichier généré : {OUT_FILE}")
+print(f"Fichier BASE_DIM généré : {BASE_DIM_FILE}")
+print(f"Fichier résultats généré : {OUT_FILE}")
