@@ -1,355 +1,66 @@
-import pandas as pd
-import numpy as np
-from pathlib import Path
-import re
-from openpyxl.utils import get_column_letter
+# Portail Outils – Streamlit
 
-# ============================================================
-# PARAMÈTRES CHEMINS
-# ============================================================
-BASE_DIR = Path(r"C:\Users\4251352\Documents\DMI")
+## Objectif
+Ce projet est un **portail d’outils internes** développé en **Streamlit**.  
+Il centralise plusieurs outils métier nécessitant ou non une connexion Oracle.
 
-PATH_ORBIS = BASE_DIR / "Liste des DMI codés.csv"
-PATH_SAG   = BASE_DIR / "Extraction_SAG.csv"
-PATH_SIMPA = BASE_DIR / "DMI_NAS.csv"
-PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
+Le portail permet :
+- l’accès à différents outils depuis une interface unique
+- la gestion d’une connexion Oracle partagée par session utilisateur
+- l’exécution de requêtes SQL via SQL*Plus
+- la génération et le téléchargement de fichiers (CSV / Excel)
 
-OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM_DELTA2J.xlsx"
-BASE_DIM_FILE = BASE_DIR / "BASE_DIM.xlsx"
+---
 
-# Tolérance de date en jours (ici +/-2)
-DATE_TOL_DAYS = 2  # ±2 jours
+## Environnement technique
 
-# ============================================================
-# HELPERS lecture
-# ============================================================
-def read_csv_auto(path: Path) -> pd.DataFrame:
-    encodings = ["utf-8", "cp1252", "latin1"]
-    seps = [None, ";", ",", "\t", "|"]
-    last_err = None
-    for enc in encodings:
-        for sep in seps:
-            try:
-                if sep is None:
-                    return pd.read_csv(path, sep=None, engine="python", encoding=enc, dtype=str)
-                return pd.read_csv(path, sep=sep, engine="python", encoding=enc, dtype=str)
-            except Exception as e:
-                last_err = e
-    raise RuntimeError(f"Impossible de lire {path}. Dernière erreur: {last_err}")
+- **OS hôte** : Debian 12
+- **Docker** : 28.x
+- **Python** : 3.7
+- **Framework UI** : Streamlit
+- **Accès Oracle** : SQL*Plus (Oracle Instant Client 10.2)
+- **Connexion Oracle** : EZCONNECT
+- **Reverse proxy** : aucun (accès direct par port)
 
-def read_csv_sag_safe(path: Path) -> pd.DataFrame:
-    return pd.read_csv(
-        path,
-        sep=";",
-        engine="python",
-        encoding="cp1252",
-        dtype=str,
-        on_bad_lines="warn"
-    )
+---
 
-def ensure_cols(df: pd.DataFrame, required: list, label: str):
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise KeyError(f"{label}: colonnes manquantes: {missing}")
+## Déploiement
 
-# ============================================================
-# HELPERS normalisation
-# ============================================================
-def clean_id_like_scalar(v):
-    if v is None or (isinstance(v, float) and np.isnan(v)):
-        return pd.NA
-    s = str(v).strip()
-    if s in {"", "nan", "NaN", "None"}:
-        return pd.NA
-    s = re.sub(r"^(\d+)\.0$", r"\1", s)
-    if re.match(r"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$", s):
-        try:
-            f = float(s)
-            if np.isfinite(f) and abs(f - round(f)) < 1e-9:
-                return str(int(round(f)))
-            return str(f).rstrip("0").rstrip(".")
-        except Exception:
-            return s
-    return s
+Le portail est exécuté dans un conteneur Docker avec :
+- exposition directe d’un port TCP
+- montage du code en volume pour permettre les modifications sans rebuild
 
-def clean_id_like(x: pd.Series) -> pd.Series:
-    return x.map(clean_id_like_scalar).astype("string").str.strip()
+L’application Streamlit écoute sur :
+0.0.0.0:8501
 
-def norm_ref(x: pd.Series) -> pd.Series:
-    return (
-        x.astype("string")
-         .str.replace("\u00A0", " ", regex=False)  # NBSP
-         .str.strip()
-         .str.replace(r"\s+", " ", regex=True)
-         .str.upper()
-    )
+yaml
+Copier le code
 
-def to_num(s: pd.Series) -> pd.Series:
-    x = s.astype("string").str.strip().str.replace(",", ".", regex=False)
-    return pd.to_numeric(x, errors="coerce")
+L’accès se fait via :
+http://<hostname>:<port>
 
-def parse_date_fr_day(series: pd.Series) -> pd.Series:
-    s = series.astype("string").str.strip()
+yaml
+Copier le code
 
-    dt = pd.to_datetime(s, format="%d/%m/%Y %H:%M:%S", errors="coerce")
-    dt2 = pd.to_datetime(s, format="%d/%m/%Y %H:%M", errors="coerce")
-    dt3 = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
-    dt4 = pd.to_datetime(s, format="%d-%m-%Y %H:%M:%S", errors="coerce")
-    dt5 = pd.to_datetime(s, format="%d-%m-%Y", errors="coerce")
+Exemple :
+http://g12-dim-p001.cch.aphp.fr:18501
 
-    fallback = pd.to_datetime(s, errors="coerce", dayfirst=True)
+yaml
+Copier le code
 
-    out = dt.fillna(dt2).fillna(dt3).fillna(dt4).fillna(dt5).fillna(fallback)
-    return out.dt.normalize()
+---
 
-def make_key(nip: pd.Series, date_pose_dt: pd.Series, ref: pd.Series) -> pd.Series:
-    nip_n = clean_id_like(nip)
-    ref_n = norm_ref(ref)
-    return nip_n + "|" + date_pose_dt.dt.strftime("%Y-%m-%d") + "|" + ref_n
+## Arborescence
 
-# ============================================================
-# Excel formatting
-# ============================================================
-def autosize_worksheet_columns(ws, min_width=10, max_width=60):
-    for col_idx, col_cells in enumerate(ws.columns, start=1):
-        max_len = 0
-        for cell in col_cells:
-            if cell.value is None:
-                continue
-            max_len = max(max_len, len(str(cell.value)))
-        width = max(min_width, min(max_width, max_len + 2))
-        ws.column_dimensions[get_column_letter(col_idx)].width = width
-
-def set_excel_date_format(ws, header_row=1, formats=None):
-    if not formats:
-        return
-    header_map = {}
-    for cell in ws[header_row]:
-        header_map[str(cell.value)] = cell.column
-    for col_name, fmt in formats.items():
-        if col_name not in header_map:
-            continue
-        col_idx = header_map[col_name]
-        for r in range(header_row + 1, ws.max_row + 1):
-            ws.cell(row=r, column=col_idx).number_format = fmt
-
-# ============================================================
-# 1) Construire BASE_DIM_KEYS (union ORBIS + SAG + SIMPA) avec tolérance ±2j
-#    + Construire et enregistrer BASE_DIM.xlsx (avec LPP + libellé si dispo)
-# ============================================================
-base_dim_keys = set()
-
-def add_keys_with_delta(dates_dt: pd.Series, nip: pd.Series, ref: pd.Series):
-    keys = []
-    for d in range(-DATE_TOL_DAYS, DATE_TOL_DAYS + 1):
-        shifted_dates = dates_dt + pd.Timedelta(days=d)
-        keys.append(make_key(nip, shifted_dates, ref))
-    return set(pd.concat(keys).dropna().unique())
-
-def col_if_exists(df: pd.DataFrame, col: str) -> pd.Series:
-    if col in df.columns:
-        return df[col]
-    return pd.Series([pd.NA] * len(df), index=df.index, dtype="string")
-
-# -------- ORBIS
-orbis = read_csv_auto(PATH_ORBIS)
-ORBI_REQ = ["IPP du patient", "Date de l’intervention", "Référence commerciale du DMI"]
-ensure_cols(orbis, ORBI_REQ, "ORBIS")
-
-orbis_date_dt = parse_date_fr_day(orbis["Date de l’intervention"])
-base_dim_keys |= add_keys_with_delta(orbis_date_dt, orbis["IPP du patient"], orbis["Référence commerciale du DMI"])
-
-base_orbis = pd.DataFrame({
-    "NIP": clean_id_like(orbis["IPP du patient"]),
-    "Date_pose": orbis_date_dt,
-    "Réf commerciale": norm_ref(orbis["Référence commerciale du DMI"]),
-    "Code LPP": clean_id_like(col_if_exists(orbis, "LPP")),
-    "Libellé DMI": col_if_exists(orbis, "Libellé du DMI du livret").astype("string"),
-    "Source": "ORBIS",
-})
-base_orbis["Clé technique (IPP|date|ref)"] = (
-    base_orbis["NIP"] + "|" + base_orbis["Date_pose"].dt.strftime("%Y-%m-%d") + "|" + base_orbis["Réf commerciale"]
-)
-
-# -------- SAG
-sag = read_csv_sag_safe(PATH_SAG)
-SAG_REQ = ["NIP", "Date de réalisation", "Référence produit"]
-ensure_cols(sag, SAG_REQ, "SAG")
-
-sag_date_dt = parse_date_fr_day(sag["Date de réalisation"])
-base_dim_keys |= add_keys_with_delta(sag_date_dt, sag["NIP"], sag["Référence produit"])
-
-base_sag = pd.DataFrame({
-    "NIP": clean_id_like(sag["NIP"]),
-    "Date_pose": sag_date_dt,
-    "Réf commerciale": norm_ref(sag["Référence produit"]),
-    "Code LPP": clean_id_like(col_if_exists(sag, "Code LPP")),
-    "Libellé DMI": col_if_exists(sag, "Libellé produit").astype("string"),
-    "Source": "SAG",
-})
-base_sag["Clé technique (IPP|date|ref)"] = (
-    base_sag["NIP"] + "|" + base_sag["Date_pose"].dt.strftime("%Y-%m-%d") + "|" + base_sag["Réf commerciale"]
-)
-
-# -------- SIMPA
-simpa = read_csv_auto(PATH_SIMPA)
-SIMPA_REQ = ["NIP", "DTEXEC", "CDREFF"]
-ensure_cols(simpa, SIMPA_REQ, "SIMPA")
-
-simpa_date_dt = parse_date_fr_day(simpa["DTEXEC"])
-base_dim_keys |= add_keys_with_delta(simpa_date_dt, simpa["NIP"], simpa["CDREFF"])
-
-base_simpa = pd.DataFrame({
-    "NIP": clean_id_like(simpa["NIP"]),
-    "Date_pose": simpa_date_dt,
-    "Réf commerciale": norm_ref(simpa["CDREFF"]),
-    "Code LPP": clean_id_like(col_if_exists(simpa, "CDLPP")),
-    "Libellé DMI": col_if_exists(simpa, "LBAPP").astype("string"),  # meilleur champ dispo côté SIMPA
-    "Source": "SIMPA",
-})
-base_simpa["Clé technique (IPP|date|ref)"] = (
-    base_simpa["NIP"] + "|" + base_simpa["Date_pose"].dt.strftime("%Y-%m-%d") + "|" + base_simpa["Réf commerciale"]
-)
-
-# -------- BASE_DIM (union)
-base_dim = pd.concat([base_orbis, base_sag, base_simpa], ignore_index=True)
-base_dim = base_dim.dropna(subset=["NIP", "Date_pose", "Réf commerciale"])
-base_dim = base_dim.drop_duplicates(subset=["Clé technique (IPP|date|ref)", "Source"]).copy()
-
-# Enregistrer BASE_DIM.xlsx
-with pd.ExcelWriter(BASE_DIM_FILE, engine="openpyxl") as writer:
-    base_dim.to_excel(writer, sheet_name="BASE_DIM", index=False)
-    base_orbis.to_excel(writer, sheet_name="ORBIS", index=False)
-    base_sag.to_excel(writer, sheet_name="SAG", index=False)
-    base_simpa.to_excel(writer, sheet_name="SIMPA", index=False)
-
-    autosize_worksheet_columns(writer.book["BASE_DIM"])
-    autosize_worksheet_columns(writer.book["ORBIS"])
-    autosize_worksheet_columns(writer.book["SAG"])
-    autosize_worksheet_columns(writer.book["SIMPA"])
-
-    set_excel_date_format(writer.book["BASE_DIM"], formats={"Date_pose": "DD/MM/YYYY"})
-    set_excel_date_format(writer.book["ORBIS"], formats={"Date_pose": "DD/MM/YYYY"})
-    set_excel_date_format(writer.book["SAG"], formats={"Date_pose": "DD/MM/YYYY"})
-    set_excel_date_format(writer.book["SIMPA"], formats={"Date_pose": "DD/MM/YYYY"})
-
-# ============================================================
-# 2) Lire SEDITRACE en gardant les dates Excel
-# ============================================================
-sedi = pd.read_excel(
-    PATH_SEDI,
-    converters={
-        "IPP": lambda v: clean_id_like_scalar(v),
-        "LPPR": lambda v: clean_id_like_scalar(v),
-        "Réference": lambda v: pd.NA if v is None else str(v),
-    },
-)
-
-SEDI_REQ = [
-    "IPP", "Posé le", "Réference", "Nbre", "LPPR", "Libellé", "Fournisseur",
-    "N° de Lot", "DATEHEURESAISIE", "Praticien", "PRIX_LPPR", "PxTot", "Motif"
-]
-ensure_cols(sedi, SEDI_REQ, "SEDITRACE")
-
-sedi_dt_pose = pd.to_datetime(sedi["Posé le"], errors="coerce", dayfirst=True).dt.normalize()
-sedi_dt_saisie = pd.to_datetime(sedi["DATEHEURESAISIE"], errors="coerce", dayfirst=True)
-
-sedi_std = pd.DataFrame({
-    "NIP": clean_id_like(sedi["IPP"].astype("string")),
-    "Date_pose_dt": sedi_dt_pose,
-    "Date_saisie_dt": sedi_dt_saisie,
-    "Ref_commerciale": sedi["Réference"].astype("string"),
-    "Quantite": to_num(sedi["Nbre"].astype("string")),
-    "Code_LPP": clean_id_like(sedi["LPPR"].astype("string")),
-    "Libelle_DMI": sedi["Libellé"].astype("string"),
-    "Fournisseur": sedi["Fournisseur"].astype("string"),
-    "No_lot": sedi["N° de Lot"].astype("string"),
-    "Medecin_poseur": sedi["Praticien"].astype("string"),
-    "Prix_unitaire_LPPR": to_num(sedi["PRIX_LPPR"].astype("string")),
-    "Prix_total": to_num(sedi["PxTot"].astype("string")),
-    "Motif": sedi["Motif"].astype("string").str.strip().str.upper(),
-})
-
-MOTIFS_EXCLUS = {"ECHEC DE POSE", "ANNULATION"}
-sedi_std = sedi_std[~sedi_std["Motif"].isin(MOTIFS_EXCLUS)].copy()
-
-sedi_std = sedi_std.dropna(subset=["NIP", "Date_pose_dt", "Ref_commerciale"])
-sedi_std["KEY"] = make_key(sedi_std["NIP"], sedi_std["Date_pose_dt"], sedi_std["Ref_commerciale"])
-
-# ============================================================
-# 3) DMI à coder = présents SEDITRACE et absents BASE_DIM (avec delta ±2j)
-# ============================================================
-missing = sedi_std[~sedi_std["KEY"].isin(base_dim_keys)].copy()
-
-detail = pd.DataFrame({
-    "NIP": missing["NIP"],
-    "Date de pose": missing["Date_pose_dt"],
-    "Médecin poseur": missing["Medecin_poseur"],
-    "Date saisie SEDITRACE": missing["Date_saisie_dt"],
-    "Nom du laboratoire fournisseur": missing["Fournisseur"],
-    "Réf commerciale": missing["Ref_commerciale"],
-    "Numéro de lot": missing["No_lot"],
-    "Numéro de série": pd.NA,  # volontairement vide
-    "Code LPP": missing["Code_LPP"],
-    "Libellé DMI": missing["Libelle_DMI"],
-    "Nbre": missing["Quantite"],
-    "PRIX_LPPR": missing["Prix_unitaire_LPPR"],
-    "PxTot": missing["Prix_total"],
-})
-
-# Filtre financier : garder uniquement PxTot > 0
-detail["_PxTot_num"] = pd.to_numeric(detail["PxTot"], errors="coerce")
-detail = detail[detail["_PxTot_num"] > 0].copy()
-detail = detail.drop(columns=["_PxTot_num"])
-
-# ============================================================
-# 4) Synthèse par Libellé + TOTAL
-# ============================================================
-tmp = detail.copy()
-tmp["_nbre"] = pd.to_numeric(tmp["Nbre"], errors="coerce")
-tmp["_pxtot"] = pd.to_numeric(tmp["PxTot"], errors="coerce")
-
-synthese = (
-    tmp
-    .groupby("Libellé DMI", dropna=False)
-    .agg(
-        nb_lignes=("NIP", "size"),
-        nb_patients=("NIP", pd.Series.nunique),
-        nbre_total=("_nbre", "sum"),
-        manque_a_gagner_estime=("_pxtot", "sum"),
-    )
-    .reset_index()
-    .sort_values("manque_a_gagner_estime", ascending=False)
-)
-
-total_row = pd.DataFrame([{
-    "Libellé DMI": "TOTAL",
-    "nb_lignes": int(synthese["nb_lignes"].sum()),
-    "nb_patients": int(tmp["NIP"].nunique()),
-    "nbre_total": float(synthese["nbre_total"].sum()),
-    "manque_a_gagner_estime": float(synthese["manque_a_gagner_estime"].sum()),
-}])
-
-synthese = pd.concat([synthese, total_row], ignore_index=True)
-
-# ============================================================
-# 5) Export Excel (résultats)
-# ============================================================
-with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
-    detail.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
-    synthese.to_excel(writer, sheet_name="SYNTHESE_LIBELLE", index=False)
-
-    ws_detail = writer.book["DETAIL_A_CODER"]
-    ws_syn = writer.book["SYNTHESE_LIBELLE"]
-
-    autosize_worksheet_columns(ws_detail)
-    autosize_worksheet_columns(ws_syn)
-
-    set_excel_date_format(ws_detail, formats={
-        "Date de pose": "DD/MM/YYYY",
-        "Date saisie SEDITRACE": "DD/MM/YYYY HH:MM:SS",
-    })
-
-print("✅ OK")
-print(f"Fichier BASE_DIM généré : {BASE_DIM_FILE}")
-print(f"Fichier résultats généré : {OUT_FILE}")
+```text
+Portail_outils/
+├── app.py                  # point d’entrée Streamlit
+├── outils/                 # outils métiers
+│   ├── RUM_TIM.py
+│   ├── doublons.py
+│   └── autres outils
+├── SQL/                    # requêtes SQL*Plus
+├── data/                   # fichiers temporaires (csv, xlsx)
+├── Dockerfile
+├── docker-compose.yml
+└── requirements.txt
