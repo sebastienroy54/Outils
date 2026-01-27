@@ -135,7 +135,7 @@ def set_excel_date_format(ws, header_row=1, formats=None):
 
 # ============================================================
 # 1) Construire BASE_DIM_KEYS (union ORBIS + SAG + SIMPA) avec tolérance ±2j
-#    + Construire et enregistrer BASE_DIM.xlsx
+#    + Construire et enregistrer BASE_DIM.xlsx (avec LPP + libellé si dispo)
 # ============================================================
 base_dim_keys = set()
 
@@ -145,6 +145,11 @@ def add_keys_with_delta(dates_dt: pd.Series, nip: pd.Series, ref: pd.Series):
         shifted_dates = dates_dt + pd.Timedelta(days=d)
         keys.append(make_key(nip, shifted_dates, ref))
     return set(pd.concat(keys).dropna().unique())
+
+def col_if_exists(df: pd.DataFrame, col: str) -> pd.Series:
+    if col in df.columns:
+        return df[col]
+    return pd.Series([pd.NA] * len(df), index=df.index, dtype="string")
 
 # -------- ORBIS
 orbis = read_csv_auto(PATH_ORBIS)
@@ -158,6 +163,8 @@ base_orbis = pd.DataFrame({
     "NIP": clean_id_like(orbis["IPP du patient"]),
     "Date_pose": orbis_date_dt,
     "Réf commerciale": norm_ref(orbis["Référence commerciale du DMI"]),
+    "Code LPP": clean_id_like(col_if_exists(orbis, "LPP")),
+    "Libellé DMI": col_if_exists(orbis, "Libellé du DMI du livret").astype("string"),
     "Source": "ORBIS",
 })
 base_orbis["Clé technique (IPP|date|ref)"] = (
@@ -176,6 +183,8 @@ base_sag = pd.DataFrame({
     "NIP": clean_id_like(sag["NIP"]),
     "Date_pose": sag_date_dt,
     "Réf commerciale": norm_ref(sag["Référence produit"]),
+    "Code LPP": clean_id_like(col_if_exists(sag, "Code LPP")),
+    "Libellé DMI": col_if_exists(sag, "Libellé produit").astype("string"),
     "Source": "SAG",
 })
 base_sag["Clé technique (IPP|date|ref)"] = (
@@ -194,6 +203,8 @@ base_simpa = pd.DataFrame({
     "NIP": clean_id_like(simpa["NIP"]),
     "Date_pose": simpa_date_dt,
     "Réf commerciale": norm_ref(simpa["CDREFF"]),
+    "Code LPP": clean_id_like(col_if_exists(simpa, "CDLPP")),
+    "Libellé DMI": col_if_exists(simpa, "LBAPP").astype("string"),  # meilleur champ dispo côté SIMPA
     "Source": "SIMPA",
 })
 base_simpa["Clé technique (IPP|date|ref)"] = (
@@ -217,7 +228,6 @@ with pd.ExcelWriter(BASE_DIM_FILE, engine="openpyxl") as writer:
     autosize_worksheet_columns(writer.book["SAG"])
     autosize_worksheet_columns(writer.book["SIMPA"])
 
-    # format date dans BASE_DIM
     set_excel_date_format(writer.book["BASE_DIM"], formats={"Date_pose": "DD/MM/YYYY"})
     set_excel_date_format(writer.book["ORBIS"], formats={"Date_pose": "DD/MM/YYYY"})
     set_excel_date_format(writer.book["SAG"], formats={"Date_pose": "DD/MM/YYYY"})
@@ -285,7 +295,6 @@ detail = pd.DataFrame({
     "Nbre": missing["Quantite"],
     "PRIX_LPPR": missing["Prix_unitaire_LPPR"],
     "PxTot": missing["Prix_total"],
-    # "Clé technique (IPP|date|ref)": missing["KEY"],
 })
 
 # Filtre financier : garder uniquement PxTot > 0
