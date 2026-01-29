@@ -1,86 +1,206 @@
 #!/usr/bin/env python3
 """
-Compare le FORMAT des lignes de deux CSV (séparateur ;)
-sans comparer les valeurs exactes
+Profilage statistique de 2 CSV (séparateur ;) par colonne :
+- % EMPTY / NUM / DATE / TEXT
+- comparaison des pourcentages entre les deux fichiers
+- met en évidence les colonnes "suspectes" (écarts au-dessus d'un seuil)
+
+Ne compare pas les valeurs exactes (adapté quand des champs peuvent être vides selon le patient).
 """
 
+from __future__ import annotations
 import csv
 import re
-import itertools
-import sys
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
+# =========================
+# FICHIERS À COMPARER
+# =========================
 FILE_1 = "SX273302.csv"
 FILE_2 = "SX272586.csv"
-MAX_DIFFS = 50
+DELIM = ";"
+
+# Seuils (en points de pourcentage) pour flagger une colonne
+THRESH_PCT = 5.0          # ex: si %EMPTY diffère de plus de 5 points -> suspect
+THRESH_TEXT_PCT = 5.0     # idem pour TEXT
+THRESH_NUM_PCT = 5.0
+THRESH_DATE_PCT = 2.0     # souvent les dates sont plus rares => seuil plus petit
+
+# Limite d'affichage
+TOP_N = 30
+
+# Regex dates usuelles (ajuste si besoin)
+DATE_PATTERNS = [
+    re.compile(r"^\d{4}-\d{2}-\d{2}$"),      # YYYY-MM-DD
+    re.compile(r"^\d{2}/\d{2}/\d{4}$"),      # DD/MM/YYYY
+    re.compile(r"^\d{4}/\d{2}/\d{2}$"),      # YYYY/MM/DD
+    re.compile(r"^\d{2}-\d{2}-\d{4}$"),      # DD-MM-YYYY
+]
+
+# Numériques : accepte virgule décimale, signe, etc.
+NUM_RE = re.compile(r"^[+-]?\d+(?:[.,]\d+)?$")
+
+TYPES = ("EMPTY", "NUM", "DATE", "TEXT")
 
 
-DATE_RE = re.compile(r"""
-    ^
-    (\d{4}-\d{2}-\d{2})     # YYYY-MM-DD
-    |
-    (\d{2}/\d{2}/\d{4})    # DD/MM/YYYY
-    $
-""", re.VERBOSE)
-
-
-def cell_type(value: str) -> str:
-    if value is None or value == "":
+def cell_type(s: str) -> str:
+    if s is None:
         return "EMPTY"
-    if DATE_RE.match(value):
-        return "DATE"
-    try:
-        float(value.replace(",", "."))
+    s2 = s.strip()
+    if s2 == "":
+        return "EMPTY"
+    for dp in DATE_PATTERNS:
+        if dp.match(s2):
+            return "DATE"
+    if NUM_RE.match(s2):
         return "NUM"
-    except ValueError:
-        return "TEXT"
+    return "TEXT"
 
 
-def read_csv(path):
+@dataclass
+class ColProfile:
+    counts: Counter
+    total: int
+
+    def pct(self, t: str) -> float:
+        if self.total == 0:
+            return 0.0
+        return 100.0 * self.counts.get(t, 0) / self.total
+
+
+def read_header_and_profiles(path: str, delim: str = ";") -> Tuple[List[str], Dict[int, ColProfile], int]:
+    """
+    Retourne:
+      - header (liste des noms de colonnes)
+      - profils par index de colonne (0-based)
+      - nb de lignes de données (hors header)
+    """
+    profiles: Dict[int, Counter] = defaultdict(Counter)
+    data_rows = 0
+
     with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
-        return list(csv.reader(f, delimiter=";"))
+        reader = csv.reader(f, delimiter=delim)
+        header = next(reader, None)
+        if header is None:
+            return [], {}, 0
+
+        ncols = len(header)
+
+        for row in reader:
+            data_rows += 1
+            # si ligne plus courte/longue, on pad/tronque pour profiler proprement
+            if len(row) < ncols:
+                row = row + [""] * (ncols - len(row))
+            elif len(row) > ncols:
+                row = row[:ncols]
+
+            for j, val in enumerate(row):
+                profiles[j][cell_type(val)] += 1
+
+    col_profiles = {j: ColProfile(counts=profiles[j], total=sum(profiles[j].values())) for j in range(len(header))}
+    return header, col_profiles, data_rows
 
 
-def compare_format(f1, f2, max_diffs=50):
-    rows1 = read_csv(f1)
-    rows2 = read_csv(f2)
+def diff_pp(a: float, b: float) -> float:
+    """différence en points de pourcentage"""
+    return abs(a - b)
 
-    diffs = 0
 
-    for line_no, (r1, r2) in enumerate(
-        itertools.zip_longest(rows1, rows2, fillvalue=None), start=1
-    ):
-        if r1 is None or r2 is None:
-            print(f"\n[Ligne {line_no}] Présente dans un fichier mais pas l'autre")
-            diffs += 1
-            continue
+def main() -> None:
+    h1, p1, n1 = read_header_and_profiles(FILE_1, DELIM)
+    h2, p2, n2 = read_header_and_profiles(FILE_2, DELIM)
 
-        if len(r1) != len(r2):
-            print(f"\n[Ligne {line_no}] Nombre de colonnes différent")
-            print(f"  {f1}: {len(r1)} colonnes")
-            print(f"  {f2}: {len(r2)} colonnes")
-            diffs += 1
-            continue
+    if not h1 or not h2:
+        print("❌ Impossible de lire l'en-tête d'un des fichiers.")
+        return
 
-        for col_no, (c1, c2) in enumerate(zip(r1, r2), start=1):
-            t1 = cell_type(c1)
-            t2 = cell_type(c2)
+    print(f"Fichier 1: {FILE_1} | colonnes: {len(h1)} | lignes data: {n1}")
+    print(f"Fichier 2: {FILE_2} | colonnes: {len(h2)} | lignes data: {n2}")
 
-            if t1 != t2:
-                diffs += 1
-                if diffs > max_diffs:
-                    continue
+    if h1 != h2:
+        print("\n⚠️ En-têtes différents : la comparaison statistique se fait par POSITION (colonne #).")
+        # on continue quand même
 
-                print(f"\n[Ligne {line_no}, Colonne {col_no}] FORMAT DIFFÉRENT")
-                print(f"  {f1}: {t1}")
-                print(f"  {f2}: {t2}")
+    ncols = min(len(h1), len(h2))
 
-    if diffs == 0:
-        print("✅ Formats compatibles sur toutes les lignes.")
-        return 0
+    # Score de divergence par colonne (somme des écarts sur les 4 types)
+    col_scores = []
+    details = []
 
-    print(f"\n❌ {diffs} différence(s) de format détectée(s).")
-    return 1
+    for j in range(ncols):
+        name1 = h1[j] if j < len(h1) else f"COL_{j+1}"
+        name2 = h2[j] if j < len(h2) else f"COL_{j+1}"
+
+        prof1 = p1.get(j, ColProfile(Counter(), 0))
+        prof2 = p2.get(j, ColProfile(Counter(), 0))
+
+        pct1 = {t: prof1.pct(t) for t in TYPES}
+        pct2 = {t: prof2.pct(t) for t in TYPES}
+
+        d_empty = diff_pp(pct1["EMPTY"], pct2["EMPTY"])
+        d_num   = diff_pp(pct1["NUM"], pct2["NUM"])
+        d_date  = diff_pp(pct1["DATE"], pct2["DATE"])
+        d_text  = diff_pp(pct1["TEXT"], pct2["TEXT"])
+
+        score = d_empty + d_num + d_date + d_text  # 0..200
+        col_scores.append((score, j))
+
+        # flag "suspect" selon seuils par type
+        suspect = (
+            d_empty >= THRESH_PCT or
+            d_num   >= THRESH_NUM_PCT or
+            d_date  >= THRESH_DATE_PCT or
+            d_text  >= THRESH_TEXT_PCT
+        )
+
+        details.append({
+            "col": j + 1,
+            "name1": name1,
+            "name2": name2,
+            "score": score,
+            "suspect": suspect,
+            "pct1": pct1,
+            "pct2": pct2,
+            "diffs": {"EMPTY": d_empty, "NUM": d_num, "DATE": d_date, "TEXT": d_text},
+        })
+
+    # Résumé global
+    suspects = [d for d in details if d["suspect"]]
+    print(f"\nColonnes suspectes (écarts au-dessus des seuils): {len(suspects)} / {ncols}")
+
+    # Top colonnes les plus divergentes
+    col_scores.sort(reverse=True, key=lambda x: x[0])
+    top = col_scores[:TOP_N]
+
+    print(f"\nTop {min(TOP_N, ncols)} colonnes les plus divergentes (par score total d'écarts):")
+    for score, j in top:
+        d = details[j]
+        mark = "⚠️" if d["suspect"] else "  "
+        # Affichage compact (points de pourcentage)
+        diffs = d["diffs"]
+        print(
+            f"{mark} Col {d['col']:>4} | score={d['score']:.1f} | "
+            f"ΔEMPTY={diffs['EMPTY']:.1f}pp ΔNUM={diffs['NUM']:.1f}pp "
+            f"ΔDATE={diffs['DATE']:.1f}pp ΔTEXT={diffs['TEXT']:.1f}pp | "
+            f"{d['name1']}"
+        )
+
+    # Détail des colonnes suspectes
+    if suspects:
+        print("\nDétail des colonnes suspectes (pourcentages par type):")
+        for d in sorted(suspects, key=lambda x: x["score"], reverse=True)[:TOP_N]:
+            print(f"\nCol {d['col']} | {d['name1']}")
+            print(f"  {FILE_1}: " +
+                  " ".join([f"{t}={d['pct1'][t]:5.1f}%" for t in TYPES]))
+            print(f"  {FILE_2}: " +
+                  " ".join([f"{t}={d['pct2'][t]:5.1f}%" for t in TYPES]))
+            print("  Écarts : " +
+                  " ".join([f"{t}={d['diffs'][t]:.1f}pp" for t in TYPES]))
+
+    print("\n✅ Terminé. (Ajuste les seuils THRESH_* en haut du script si besoin.)")
 
 
 if __name__ == "__main__":
-    sys.exit(compare_format(FILE_1, FILE_2, MAX_DIFFS))
+    main()
