@@ -4,16 +4,20 @@ Compare deux fichiers CSV (séparateur ;) au caractère près.
 - Compare ligne par ligne
 - Compare champ par champ
 - Indique la ligne, la colonne et la première position différente
-Usage :
-  python compare_csv.py fichier1.csv fichier2.csv
-Options :
-  --max N        limite le nombre de différences affichées (défaut: 50)
 """
 
 import csv
-import argparse
 import itertools
 import sys
+
+# =========================
+# FICHIERS À COMPARER
+# =========================
+FILE_1 = "SX273302.csv"
+FILE_2 = "SX272586.csv"
+
+MAX_DIFFS = 50  # limite d'affichage
+
 
 def first_diff_pos(a: str, b: str):
     """Retourne l'index du premier caractère différent (0-based) ou None"""
@@ -25,6 +29,7 @@ def first_diff_pos(a: str, b: str):
         return n
     return None
 
+
 def visible(s: str) -> str:
     """Rend visibles les caractères invisibles"""
     return (
@@ -33,10 +38,12 @@ def visible(s: str) -> str:
          .replace("\n", "\\n")
     )
 
+
 def read_csv(path: str):
     with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
         reader = csv.reader(f, delimiter=";")
         return list(reader)
+
 
 def compare_csv(f1: str, f2: str, max_diffs: int = 50) -> int:
     rows1 = read_csv(f1)
@@ -45,7 +52,9 @@ def compare_csv(f1: str, f2: str, max_diffs: int = 50) -> int:
     diffs = 0
     exit_code = 0
 
-    for row_idx, (r1, r2) in enumerate(itertools.zip_longest(rows1, rows2, fillvalue=None), start=1):
+    for row_idx, (r1, r2) in enumerate(
+        itertools.zip_longest(rows1, rows2, fillvalue=None), start=1
+    ):
 
         if r1 is None or r2 is None:
             exit_code = 1
@@ -55,7 +64,9 @@ def compare_csv(f1: str, f2: str, max_diffs: int = 50) -> int:
             print(f"  {f2}: {r2 if r2 is not None else '<EOF>'}")
             continue
 
-        for col_idx, (c1, c2) in enumerate(itertools.zip_longest(r1, r2, fillvalue=None), start=1):
+        for col_idx, (c1, c2) in enumerate(
+            itertools.zip_longest(r1, r2, fillvalue=None), start=1
+        ):
 
             if c1 == c2:
                 continue
@@ -76,7 +87,7 @@ def compare_csv(f1: str, f2: str, max_diffs: int = 50) -> int:
                     print("   " + " " * pos + "^")
 
     if diffs == 0:
-        print("✅ Aucun écart détecté (CSV strictement identiques au caractère près).")
+        print("✅ Aucun écart détecté (CSV strictement identiques).")
     elif diffs > max_diffs:
         print(f"\n⚠️ {diffs} différences détectées (affichage limité à {max_diffs}).")
     else:
@@ -84,14 +95,6 @@ def compare_csv(f1: str, f2: str, max_diffs: int = 50) -> int:
 
     return exit_code
 
-def main():
-    parser = argparse.ArgumentParser(description="Comparaison stricte de deux CSV (séparateur ;) au caractère près.")
-    parser.add_argument("file1", help="Premier fichier CSV")
-    parser.add_argument("file2", help="Deuxième fichier CSV")
-    parser.add_argument("--max", type=int, default=50, help="Nombre max de différences affichées")
-    args = parser.parse_args()
-
-    sys.exit(compare_csv(args.file1, args.file2, args.max))
 
 if __name__ == "__main__":
-    main()
+    sys.exit(compare_csv(FILE_1, FILE_2, MAX_DIFFS))
