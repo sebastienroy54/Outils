@@ -1,77 +1,86 @@
 #!/usr/bin/env python3
 """
-Compare uniquement la première ligne (en-tête) de deux CSV
-au caractère près (séparateur ;)
+Compare le FORMAT des lignes de deux CSV (séparateur ;)
+sans comparer les valeurs exactes
 """
 
 import csv
+import re
+import itertools
 import sys
 
-# =========================
-# FICHIERS À COMPARER
-# =========================
 FILE_1 = "SX273302.csv"
 FILE_2 = "SX272586.csv"
+MAX_DIFFS = 50
 
 
-def first_diff_pos(a: str, b: str):
-    n = min(len(a), len(b))
-    for i in range(n):
-        if a[i] != b[i]:
-            return i
-    if len(a) != len(b):
-        return n
-    return None
+DATE_RE = re.compile(r"""
+    ^
+    (\d{4}-\d{2}-\d{2})     # YYYY-MM-DD
+    |
+    (\d{2}/\d{2}/\d{4})    # DD/MM/YYYY
+    $
+""", re.VERBOSE)
 
 
-def visible(s: str) -> str:
-    return (
-        s.replace("\t", "\\t")
-         .replace("\r", "\\r")
-         .replace("\n", "\\n")
-    )
+def cell_type(value: str) -> str:
+    if value is None or value == "":
+        return "EMPTY"
+    if DATE_RE.match(value):
+        return "DATE"
+    try:
+        float(value.replace(",", "."))
+        return "NUM"
+    except ValueError:
+        return "TEXT"
 
 
-def read_header(path: str):
+def read_csv(path):
     with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
-        reader = csv.reader(f, delimiter=";")
-        return next(reader, None)
+        return list(csv.reader(f, delimiter=";"))
 
 
-def compare_headers(f1: str, f2: str) -> int:
-    h1 = read_header(f1)
-    h2 = read_header(f2)
+def compare_format(f1, f2, max_diffs=50):
+    rows1 = read_csv(f1)
+    rows2 = read_csv(f2)
 
-    if h1 is None or h2 is None:
-        print("❌ Impossible de lire l'en-tête d'un des fichiers")
-        return 1
+    diffs = 0
 
-    if h1 == h2:
-        print("✅ En-têtes strictement identiques (colonnes et ordre).")
-        return 0
-
-    print("❌ Différences détectées dans l'en-tête")
-
-    max_len = max(len(h1), len(h2))
-    for idx in range(max_len):
-        c1 = h1[idx] if idx < len(h1) else None
-        c2 = h2[idx] if idx < len(h2) else None
-
-        if c1 == c2:
+    for line_no, (r1, r2) in enumerate(
+        itertools.zip_longest(rows1, rows2, fillvalue=None), start=1
+    ):
+        if r1 is None or r2 is None:
+            print(f"\n[Ligne {line_no}] Présente dans un fichier mais pas l'autre")
+            diffs += 1
             continue
 
-        print(f"\nColonne {idx + 1}")
-        print(f"  {f1}: '{visible(c1) if c1 is not None else '<ABSENTE>'}'")
-        print(f"  {f2}: '{visible(c2) if c2 is not None else '<ABSENTE>'}'")
+        if len(r1) != len(r2):
+            print(f"\n[Ligne {line_no}] Nombre de colonnes différent")
+            print(f"  {f1}: {len(r1)} colonnes")
+            print(f"  {f2}: {len(r2)} colonnes")
+            diffs += 1
+            continue
 
-        if c1 is not None and c2 is not None:
-            pos = first_diff_pos(c1, c2)
-            if pos is not None:
-                print(f"  Première différence caractère : position {pos} (colonne {pos+1})")
-                print("   " + " " * pos + "^")
+        for col_no, (c1, c2) in enumerate(zip(r1, r2), start=1):
+            t1 = cell_type(c1)
+            t2 = cell_type(c2)
 
+            if t1 != t2:
+                diffs += 1
+                if diffs > max_diffs:
+                    continue
+
+                print(f"\n[Ligne {line_no}, Colonne {col_no}] FORMAT DIFFÉRENT")
+                print(f"  {f1}: {t1}")
+                print(f"  {f2}: {t2}")
+
+    if diffs == 0:
+        print("✅ Formats compatibles sur toutes les lignes.")
+        return 0
+
+    print(f"\n❌ {diffs} différence(s) de format détectée(s).")
     return 1
 
 
 if __name__ == "__main__":
-    sys.exit(compare_headers(FILE_1, FILE_2))
+    sys.exit(compare_format(FILE_1, FILE_2, MAX_DIFFS))
