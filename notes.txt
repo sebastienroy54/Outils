@@ -1,206 +1,187 @@
-#!/usr/bin/env python3
-"""
-Profilage statistique de 2 CSV (séparateur ;) par colonne :
-- % EMPTY / NUM / DATE / TEXT
-- comparaison des pourcentages entre les deux fichiers
-- met en évidence les colonnes "suspectes" (écarts au-dessus d'un seuil)
+Colonnes suspectes (écarts au-dessus des seuils): 114 / 2059
 
-Ne compare pas les valeurs exactes (adapté quand des champs peuvent être vides selon le patient).
-"""
+Top 30 colonnes les plus divergentes (par score total d'écarts):
+⚠️ Col   63 | score=41.2 | ΔEMPTY=20.6pp ΔNUM=20.6pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb seances
+⚠️ Col   64 | score=41.2 | ΔEMPTY=20.6pp ΔNUM=20.6pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb HJO
+⚠️ Col   34 | score=38.6 | ΔEMPTY=19.3pp ΔNUM=19.3pp ΔDATE=0.0pp ΔTEXT=0.0pp | Transf. prov G
+⚠️ Col  373 | score=38.6 | ΔEMPTY=19.3pp ΔNUM=19.3pp ΔDATE=0.0pp ΔTEXT=0.0pp | Hop prov
+⚠️ Col   80 | score=28.7 | ΔEMPTY=14.4pp ΔNUM=14.4pp ΔDATE=0.0pp ΔTEXT=0.0pp | NbJ_ZBasse
+⚠️ Col   81 | score=28.7 | ΔEMPTY=14.4pp ΔNUM=14.4pp ΔDATE=0.0pp ΔTEXT=0.0pp | NbJ_ZHaute
+⚠️ Col   82 | score=28.7 | ΔEMPTY=14.4pp ΔNUM=14.4pp ΔDATE=0.0pp ΔTEXT=0.0pp | PRR_SPM
+⚠️ Col  411 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=10.0pp | ACTE CSARR (O/N) 3
+⚠️ Col  412 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=10.0pp | CSARR/CDARR 3
+⚠️ Col  413 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=10.0pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb acte 3
+⚠️ Col  414 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=10.0pp ΔDATE=0.0pp ΔTEXT=0.0pp | Code inter 3
+⚠️ Col  420 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=0.0pp ΔDATE=10.0pp ΔTEXT=0.0pp | Date Real 3
+⚠️ Col  421 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=10.0pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb reel 3
+⚠️ Col  422 | score=20.0 | ΔEMPTY=10.0pp ΔNUM=10.0pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb intervenants 3
+⚠️ Col  394 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=9.8pp | ACTE CSARR (O/N) 2
+⚠️ Col  395 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=9.8pp | CSARR/CDARR 2
+⚠️ Col  396 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=9.8pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb acte 2
+⚠️ Col  397 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=9.8pp ΔDATE=0.0pp ΔTEXT=0.0pp | Code inter 2
+⚠️ Col  403 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=0.0pp ΔDATE=9.8pp ΔTEXT=0.0pp | Date Real 2
+⚠️ Col  404 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=9.8pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb reel 2
+⚠️ Col  405 | score=19.7 | ΔEMPTY=9.8pp ΔNUM=9.8pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb intervenants 2
+⚠️ Col  428 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=9.7pp | ACTE CSARR (O/N) 4
+⚠️ Col  429 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=9.7pp | CSARR/CDARR 4
+⚠️ Col  430 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=9.7pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb acte 4
+⚠️ Col  431 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=9.7pp ΔDATE=0.0pp ΔTEXT=0.0pp | Code inter 4
+⚠️ Col  437 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=0.0pp ΔDATE=9.7pp ΔTEXT=0.0pp | Date Real 4
+⚠️ Col  438 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=9.7pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb reel 4
+⚠️ Col  439 | score=19.4 | ΔEMPTY=9.7pp ΔNUM=9.7pp ΔDATE=0.0pp ΔTEXT=0.0pp | Nb intervenants 4
+⚠️ Col  445 | score=18.5 | ΔEMPTY=9.3pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=9.3pp | ACTE CSARR (O/N) 5
+⚠️ Col  446 | score=18.5 | ΔEMPTY=9.3pp ΔNUM=0.0pp ΔDATE=0.0pp ΔTEXT=9.3pp | CSARR/CDARR 5
 
-from __future__ import annotations
-import csv
-import re
-from collections import Counter, defaultdict
-from dataclasses import dataclass
-from typing import Dict, List, Tuple
+Détail des colonnes suspectes (pourcentages par type):
 
-# =========================
-# FICHIERS À COMPARER
-# =========================
-FILE_1 = "SX273302.csv"
-FILE_2 = "SX272586.csv"
-DELIM = ";"
+Col 63 | Nb seances
+  SX273302.csv: EMPTY= 79.4% NUM= 20.6% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=100.0% NUM=  0.0% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=20.6pp NUM=20.6pp DATE=0.0pp TEXT=0.0pp
 
-# Seuils (en points de pourcentage) pour flagger une colonne
-THRESH_PCT = 5.0          # ex: si %EMPTY diffère de plus de 5 points -> suspect
-THRESH_TEXT_PCT = 5.0     # idem pour TEXT
-THRESH_NUM_PCT = 5.0
-THRESH_DATE_PCT = 2.0     # souvent les dates sont plus rares => seuil plus petit
+Col 64 | Nb HJO
+  SX273302.csv: EMPTY= 79.4% NUM= 20.6% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=100.0% NUM=  0.0% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=20.6pp NUM=20.6pp DATE=0.0pp TEXT=0.0pp
 
-# Limite d'affichage
-TOP_N = 30
+Col 34 | Transf. prov G
+  SX273302.csv: EMPTY= 25.3% NUM= 74.7% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=  6.0% NUM= 94.0% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=19.3pp NUM=19.3pp DATE=0.0pp TEXT=0.0pp
 
-# Regex dates usuelles (ajuste si besoin)
-DATE_PATTERNS = [
-    re.compile(r"^\d{4}-\d{2}-\d{2}$"),      # YYYY-MM-DD
-    re.compile(r"^\d{2}/\d{2}/\d{4}$"),      # DD/MM/YYYY
-    re.compile(r"^\d{4}/\d{2}/\d{2}$"),      # YYYY/MM/DD
-    re.compile(r"^\d{2}-\d{2}-\d{4}$"),      # DD-MM-YYYY
-]
+Col 373 | Hop prov
+  SX273302.csv: EMPTY= 25.3% NUM= 74.7% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=  6.0% NUM= 94.0% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=19.3pp NUM=19.3pp DATE=0.0pp TEXT=0.0pp
 
-# Numériques : accepte virgule décimale, signe, etc.
-NUM_RE = re.compile(r"^[+-]?\d+(?:[.,]\d+)?$")
+Col 80 | NbJ_ZBasse
+  SX273302.csv: EMPTY= 20.8% NUM= 79.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=  6.4% NUM= 93.6% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=14.4pp NUM=14.4pp DATE=0.0pp TEXT=0.0pp
 
-TYPES = ("EMPTY", "NUM", "DATE", "TEXT")
+Col 81 | NbJ_ZHaute
+  SX273302.csv: EMPTY= 20.8% NUM= 79.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=  6.4% NUM= 93.6% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=14.4pp NUM=14.4pp DATE=0.0pp TEXT=0.0pp
 
+Col 82 | PRR_SPM
+  SX273302.csv: EMPTY= 20.8% NUM= 79.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY=  6.4% NUM= 93.6% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=14.4pp NUM=14.4pp DATE=0.0pp TEXT=0.0pp
 
-def cell_type(s: str) -> str:
-    if s is None:
-        return "EMPTY"
-    s2 = s.strip()
-    if s2 == "":
-        return "EMPTY"
-    for dp in DATE_PATTERNS:
-        if dp.match(s2):
-            return "DATE"
-    if NUM_RE.match(s2):
-        return "NUM"
-    return "TEXT"
+Col 411 | ACTE CSARR (O/N) 3
+  SX273302.csv: EMPTY= 28.7% NUM=  0.0% DATE=  0.0% TEXT= 71.3%
+  SX272586.csv: EMPTY= 38.7% NUM=  0.0% DATE=  0.0% TEXT= 61.3%
+  Écarts : EMPTY=10.0pp NUM=0.0pp DATE=0.0pp TEXT=10.0pp
 
+Col 412 | CSARR/CDARR 3
+  SX273302.csv: EMPTY= 28.7% NUM=  0.0% DATE=  0.0% TEXT= 71.3%
+  SX272586.csv: EMPTY= 38.7% NUM=  0.0% DATE=  0.0% TEXT= 61.3%
+  Écarts : EMPTY=10.0pp NUM=0.0pp DATE=0.0pp TEXT=10.0pp
 
-@dataclass
-class ColProfile:
-    counts: Counter
-    total: int
+Col 413 | Nb acte 3
+  SX273302.csv: EMPTY= 28.7% NUM= 71.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 38.7% NUM= 61.3% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=10.0pp NUM=10.0pp DATE=0.0pp TEXT=0.0pp
 
-    def pct(self, t: str) -> float:
-        if self.total == 0:
-            return 0.0
-        return 100.0 * self.counts.get(t, 0) / self.total
+Col 414 | Code inter 3
+  SX273302.csv: EMPTY= 28.7% NUM= 71.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 38.7% NUM= 61.3% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=10.0pp NUM=10.0pp DATE=0.0pp TEXT=0.0pp
 
+Col 420 | Date Real 3
+  SX273302.csv: EMPTY= 28.7% NUM=  0.0% DATE= 71.3% TEXT=  0.0%
+  SX272586.csv: EMPTY= 38.7% NUM=  0.0% DATE= 61.3% TEXT=  0.0%
+  Écarts : EMPTY=10.0pp NUM=0.0pp DATE=10.0pp TEXT=0.0pp
 
-def read_header_and_profiles(path: str, delim: str = ";") -> Tuple[List[str], Dict[int, ColProfile], int]:
-    """
-    Retourne:
-      - header (liste des noms de colonnes)
-      - profils par index de colonne (0-based)
-      - nb de lignes de données (hors header)
-    """
-    profiles: Dict[int, Counter] = defaultdict(Counter)
-    data_rows = 0
+Col 421 | Nb reel 3
+  SX273302.csv: EMPTY= 28.7% NUM= 71.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 38.7% NUM= 61.3% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=10.0pp NUM=10.0pp DATE=0.0pp TEXT=0.0pp
 
-    with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
-        reader = csv.reader(f, delimiter=delim)
-        header = next(reader, None)
-        if header is None:
-            return [], {}, 0
+Col 422 | Nb intervenants 3
+  SX273302.csv: EMPTY= 28.7% NUM= 71.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 38.7% NUM= 61.3% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=10.0pp NUM=10.0pp DATE=0.0pp TEXT=0.0pp
 
-        ncols = len(header)
+Col 394 | ACTE CSARR (O/N) 2
+  SX273302.csv: EMPTY= 24.7% NUM=  0.0% DATE=  0.0% TEXT= 75.3%
+  SX272586.csv: EMPTY= 34.6% NUM=  0.0% DATE=  0.0% TEXT= 65.4%
+  Écarts : EMPTY=9.8pp NUM=0.0pp DATE=0.0pp TEXT=9.8pp
 
-        for row in reader:
-            data_rows += 1
-            # si ligne plus courte/longue, on pad/tronque pour profiler proprement
-            if len(row) < ncols:
-                row = row + [""] * (ncols - len(row))
-            elif len(row) > ncols:
-                row = row[:ncols]
+Col 395 | CSARR/CDARR 2
+  SX273302.csv: EMPTY= 24.7% NUM=  0.0% DATE=  0.0% TEXT= 75.3%
+  SX272586.csv: EMPTY= 34.6% NUM=  0.0% DATE=  0.0% TEXT= 65.4%
+  Écarts : EMPTY=9.8pp NUM=0.0pp DATE=0.0pp TEXT=9.8pp
 
-            for j, val in enumerate(row):
-                profiles[j][cell_type(val)] += 1
+Col 396 | Nb acte 2
+  SX273302.csv: EMPTY= 24.7% NUM= 75.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 34.6% NUM= 65.4% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.8pp NUM=9.8pp DATE=0.0pp TEXT=0.0pp
 
-    col_profiles = {j: ColProfile(counts=profiles[j], total=sum(profiles[j].values())) for j in range(len(header))}
-    return header, col_profiles, data_rows
+Col 397 | Code inter 2
+  SX273302.csv: EMPTY= 24.7% NUM= 75.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 34.6% NUM= 65.4% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.8pp NUM=9.8pp DATE=0.0pp TEXT=0.0pp
 
+Col 403 | Date Real 2
+  SX273302.csv: EMPTY= 24.7% NUM=  0.0% DATE= 75.3% TEXT=  0.0%
+  SX272586.csv: EMPTY= 34.6% NUM=  0.0% DATE= 65.4% TEXT=  0.0%
+  Écarts : EMPTY=9.8pp NUM=0.0pp DATE=9.8pp TEXT=0.0pp
 
-def diff_pp(a: float, b: float) -> float:
-    """différence en points de pourcentage"""
-    return abs(a - b)
+Col 404 | Nb reel 2
+  SX273302.csv: EMPTY= 24.7% NUM= 75.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 34.6% NUM= 65.4% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.8pp NUM=9.8pp DATE=0.0pp TEXT=0.0pp
 
+Col 405 | Nb intervenants 2
+  SX273302.csv: EMPTY= 24.7% NUM= 75.3% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 34.6% NUM= 65.4% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.8pp NUM=9.8pp DATE=0.0pp TEXT=0.0pp
 
-def main() -> None:
-    h1, p1, n1 = read_header_and_profiles(FILE_1, DELIM)
-    h2, p2, n2 = read_header_and_profiles(FILE_2, DELIM)
+Col 428 | ACTE CSARR (O/N) 4
+  SX273302.csv: EMPTY= 33.8% NUM=  0.0% DATE=  0.0% TEXT= 66.2%
+  SX272586.csv: EMPTY= 43.5% NUM=  0.0% DATE=  0.0% TEXT= 56.5%
+  Écarts : EMPTY=9.7pp NUM=0.0pp DATE=0.0pp TEXT=9.7pp
 
-    if not h1 or not h2:
-        print("❌ Impossible de lire l'en-tête d'un des fichiers.")
-        return
+Col 429 | CSARR/CDARR 4
+  SX273302.csv: EMPTY= 33.8% NUM=  0.0% DATE=  0.0% TEXT= 66.2%
+  SX272586.csv: EMPTY= 43.5% NUM=  0.0% DATE=  0.0% TEXT= 56.5%
+  Écarts : EMPTY=9.7pp NUM=0.0pp DATE=0.0pp TEXT=9.7pp
 
-    print(f"Fichier 1: {FILE_1} | colonnes: {len(h1)} | lignes data: {n1}")
-    print(f"Fichier 2: {FILE_2} | colonnes: {len(h2)} | lignes data: {n2}")
+Col 430 | Nb acte 4
+  SX273302.csv: EMPTY= 33.8% NUM= 66.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 43.5% NUM= 56.5% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.7pp NUM=9.7pp DATE=0.0pp TEXT=0.0pp
 
-    if h1 != h2:
-        print("\n⚠️ En-têtes différents : la comparaison statistique se fait par POSITION (colonne #).")
-        # on continue quand même
+Col 431 | Code inter 4
+  SX273302.csv: EMPTY= 33.8% NUM= 66.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 43.5% NUM= 56.5% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.7pp NUM=9.7pp DATE=0.0pp TEXT=0.0pp
 
-    ncols = min(len(h1), len(h2))
+Col 437 | Date Real 4
+  SX273302.csv: EMPTY= 33.8% NUM=  0.0% DATE= 66.2% TEXT=  0.0%
+  SX272586.csv: EMPTY= 43.5% NUM=  0.0% DATE= 56.5% TEXT=  0.0%
+  Écarts : EMPTY=9.7pp NUM=0.0pp DATE=9.7pp TEXT=0.0pp
 
-    # Score de divergence par colonne (somme des écarts sur les 4 types)
-    col_scores = []
-    details = []
+Col 438 | Nb reel 4
+  SX273302.csv: EMPTY= 33.8% NUM= 66.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 43.5% NUM= 56.5% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.7pp NUM=9.7pp DATE=0.0pp TEXT=0.0pp
 
-    for j in range(ncols):
-        name1 = h1[j] if j < len(h1) else f"COL_{j+1}"
-        name2 = h2[j] if j < len(h2) else f"COL_{j+1}"
+Col 439 | Nb intervenants 4
+  SX273302.csv: EMPTY= 33.8% NUM= 66.2% DATE=  0.0% TEXT=  0.0%
+  SX272586.csv: EMPTY= 43.5% NUM= 56.5% DATE=  0.0% TEXT=  0.0%
+  Écarts : EMPTY=9.7pp NUM=9.7pp DATE=0.0pp TEXT=0.0pp
 
-        prof1 = p1.get(j, ColProfile(Counter(), 0))
-        prof2 = p2.get(j, ColProfile(Counter(), 0))
+Col 445 | ACTE CSARR (O/N) 5
+  SX273302.csv: EMPTY= 39.5% NUM=  0.0% DATE=  0.0% TEXT= 60.5%
+  SX272586.csv: EMPTY= 48.8% NUM=  0.0% DATE=  0.0% TEXT= 51.2%
+  Écarts : EMPTY=9.3pp NUM=0.0pp DATE=0.0pp TEXT=9.3pp
 
-        pct1 = {t: prof1.pct(t) for t in TYPES}
-        pct2 = {t: prof2.pct(t) for t in TYPES}
+Col 446 | CSARR/CDARR 5
+  SX273302.csv: EMPTY= 39.5% NUM=  0.0% DATE=  0.0% TEXT= 60.5%
+  SX272586.csv: EMPTY= 48.8% NUM=  0.0% DATE=  0.0% TEXT= 51.2%
+  Écarts : EMPTY=9.3pp NUM=0.0pp DATE=0.0pp TEXT=9.3pp
 
-        d_empty = diff_pp(pct1["EMPTY"], pct2["EMPTY"])
-        d_num   = diff_pp(pct1["NUM"], pct2["NUM"])
-        d_date  = diff_pp(pct1["DATE"], pct2["DATE"])
-        d_text  = diff_pp(pct1["TEXT"], pct2["TEXT"])
-
-        score = d_empty + d_num + d_date + d_text  # 0..200
-        col_scores.append((score, j))
-
-        # flag "suspect" selon seuils par type
-        suspect = (
-            d_empty >= THRESH_PCT or
-            d_num   >= THRESH_NUM_PCT or
-            d_date  >= THRESH_DATE_PCT or
-            d_text  >= THRESH_TEXT_PCT
-        )
-
-        details.append({
-            "col": j + 1,
-            "name1": name1,
-            "name2": name2,
-            "score": score,
-            "suspect": suspect,
-            "pct1": pct1,
-            "pct2": pct2,
-            "diffs": {"EMPTY": d_empty, "NUM": d_num, "DATE": d_date, "TEXT": d_text},
-        })
-
-    # Résumé global
-    suspects = [d for d in details if d["suspect"]]
-    print(f"\nColonnes suspectes (écarts au-dessus des seuils): {len(suspects)} / {ncols}")
-
-    # Top colonnes les plus divergentes
-    col_scores.sort(reverse=True, key=lambda x: x[0])
-    top = col_scores[:TOP_N]
-
-    print(f"\nTop {min(TOP_N, ncols)} colonnes les plus divergentes (par score total d'écarts):")
-    for score, j in top:
-        d = details[j]
-        mark = "⚠️" if d["suspect"] else "  "
-        # Affichage compact (points de pourcentage)
-        diffs = d["diffs"]
-        print(
-            f"{mark} Col {d['col']:>4} | score={d['score']:.1f} | "
-            f"ΔEMPTY={diffs['EMPTY']:.1f}pp ΔNUM={diffs['NUM']:.1f}pp "
-            f"ΔDATE={diffs['DATE']:.1f}pp ΔTEXT={diffs['TEXT']:.1f}pp | "
-            f"{d['name1']}"
-        )
-
-    # Détail des colonnes suspectes
-    if suspects:
-        print("\nDétail des colonnes suspectes (pourcentages par type):")
-        for d in sorted(suspects, key=lambda x: x["score"], reverse=True)[:TOP_N]:
-            print(f"\nCol {d['col']} | {d['name1']}")
-            print(f"  {FILE_1}: " +
-                  " ".join([f"{t}={d['pct1'][t]:5.1f}%" for t in TYPES]))
-            print(f"  {FILE_2}: " +
-                  " ".join([f"{t}={d['pct2'][t]:5.1f}%" for t in TYPES]))
-            print("  Écarts : " +
-                  " ".join([f"{t}={d['diffs'][t]:.1f}pp" for t in TYPES]))
-
-    print("\n✅ Terminé. (Ajuste les seuils THRESH_* en haut du script si besoin.)")
-
-
-if __name__ == "__main__":
-    main()
+✅ Terminé. (Ajuste les seuils THRESH_* en haut du script si besoin.)
