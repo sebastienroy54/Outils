@@ -10,13 +10,14 @@ from openpyxl.utils import get_column_letter
 # ============================================================
 BASE_DIR = Path(r"C:\Users\4251352\Documents\DMI")
 
-PATH_ORBIS = BASE_DIR / "Liste des DMI codés.csv"
+PATH_ORBIS = BASE_DIR / "Liste des DMI codés_2.csv"
 PATH_SAG   = BASE_DIR / "Extraction_SAG.csv"
-PATH_SIMPA = BASE_DIR / "DMI_NAS.csv"
-PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
+PATH_SIMPA = BASE_DIR / "DMI_NAS_2.csv"
+#PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
+PATH_SEDI  = BASE_DIR / "FICHCOMP 2026.xlsx"
 
-OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM_DELTA2J.xlsx"
-BASE_DIM_FILE = BASE_DIR / "BASE_DIM.xlsx"
+OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM_DELTA2J_janvier_26.xlsx"
+BASE_DIM_FILE = BASE_DIR / "BASE_DIM_janvier_26.xlsx"
 
 DATE_TOL_DAYS = 2  # ±2 jours
 
