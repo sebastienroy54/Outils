@@ -389,10 +389,17 @@ detail = pd.DataFrame({
     "PxTot": missing["Prix_total"],
 })
 
+detail["_nbre_num"] = pd.to_numeric(detail["Nbre"], errors="coerce")
+detail["_prix_lppr_num"] = pd.to_numeric(detail["PRIX_LPPR"], errors="coerce")
+
+detail["Manque à gagner (LPPR)"] = detail["_nbre_num"] * detail["_prix_lppr_num"]
+
 # Filtre financier : garder uniquement PxTot > 0
-detail["_PxTot_num"] = pd.to_numeric(detail["PxTot"], errors="coerce")
-detail = detail[detail["_PxTot_num"] > 0].copy()
-detail = detail.drop(columns=["_PxTot_num"])
+# detail["_PxTot_num"] = pd.to_numeric(detail["PxTot"], errors="coerce")
+# detail = detail[detail["_PxTot_num"] > 0].copy()
+# detail = detail.drop(columns=["_PxTot_num"])
+
+detail = detail[detail["_prix_lppr_num"] > 0].copy()
 
 # ============================================================
 # 3bis) Ajout SERVICE via Médecin poseur
@@ -404,7 +411,8 @@ detail["Service (via médecin)"] = detail["Médecin poseur"].map(map_service_fro
 # ============================================================
 tmp = detail.copy()
 tmp["_nbre"] = pd.to_numeric(tmp["Nbre"], errors="coerce")
-tmp["_pxtot"] = pd.to_numeric(tmp["PxTot"], errors="coerce")
+#tmp["_pxtot"] = pd.to_numeric(tmp["PxTot"], errors="coerce")
+tmp["_mag_lppr"] = pd.to_numeric(tmp["Manque à gagner (LPPR)"], errors="coerce")
 
 synthese = (
     tmp
@@ -413,7 +421,8 @@ synthese = (
         nb_lignes=("NIP", "size"),
         nb_patients=("NIP", pd.Series.nunique),
         nbre_total=("_nbre", "sum"),
-        manque_a_gagner_estime=("_pxtot", "sum"),
+        #manque_a_gagner_estime=("_pxtot", "sum"),
+        manque_a_gagner_estime=("_mag_lppr", "sum"),
     )
     .reset_index()
     .sort_values("manque_a_gagner_estime", ascending=False)
