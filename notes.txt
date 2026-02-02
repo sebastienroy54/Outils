@@ -199,9 +199,18 @@ def autosize_worksheet_columns(ws, min_width=10, max_width=60):
 def set_excel_date_format(ws, header_row=1, formats=None):
     if not formats:
         return
-    header_map = {}
-    for cell in ws[header_row]:
-        header_map[str(cell.value)] = cell.column
+    header_map = {str(cell.value): cell.column for cell in ws[header_row]}
+    for col_name, fmt in formats.items():
+        if col_name not in header_map:
+            continue
+        col_idx = header_map[col_name]
+        for r in range(header_row + 1, ws.max_row + 1):
+            ws.cell(row=r, column=col_idx).number_format = fmt
+
+def set_excel_number_format(ws, header_row=1, formats=None):
+    if not formats:
+        return
+    header_map = {str(cell.value): cell.column for cell in ws[header_row]}
     for col_name, fmt in formats.items():
         if col_name not in header_map:
             continue
@@ -334,7 +343,7 @@ sedi_std = pd.DataFrame({
     "Numéro de lot": sedi["N° de Lot"].astype("string"),
     "Médecin poseur": sedi["Praticien"].astype("string"),
     "PRIX_LPPR": to_num(sedi["PRIX_LPPR"].astype("string")),
-    "PxTot": to_num(sedi["PxTot"].astype("string")),
+    # PxTot lu mais on ne l'utilise plus pour les exports ni le calcul
     "Motif": sedi["Motif"].astype("string").str.strip().str.upper(),
 })
 
@@ -342,7 +351,9 @@ MOTIFS_EXCLUS = {"ECHEC DE POSE", "ANNULATION"}
 sedi_std = sedi_std[~sedi_std["Motif"].isin(MOTIFS_EXCLUS)].copy()
 
 sedi_std = sedi_std.dropna(subset=["NIP", "Date de pose", "Réf commerciale"])
-sedi_std["Clé technique (IPP|date|ref)"] = make_key(sedi_std["NIP"], sedi_std["Date de pose"], sedi_std["Réf commerciale"])
+sedi_std["Clé technique (IPP|date|ref)"] = make_key(
+    sedi_std["NIP"], sedi_std["Date de pose"], sedi_std["Réf commerciale"]
+)
 
 # ============================================================
 # 3) DMI à coder = présents SEDITRACE et absents BASE_DIM
@@ -362,16 +373,15 @@ detail = pd.DataFrame({
     "Libellé DMI": missing["Libellé DMI"],
     "Nbre": missing["Quantité"],
     "PRIX_LPPR": missing["PRIX_LPPR"],
-    "PxTot": missing["PxTot"],
 })
 
-# ---- Calcul "manque à gagner" LPPR (sans colonnes techniques exportées)
+# ---- Calcul technique (pour filtre + synthèses), NON exporté dans DETAIL
 nbre_num = pd.to_numeric(detail["Nbre"], errors="coerce").fillna(0)
 prix_lppr_num = pd.to_numeric(detail["PRIX_LPPR"], errors="coerce").fillna(0)
-detail["Manque à gagner (LPPR)"] = nbre_num * prix_lppr_num
+detail["_mag_lppr"] = nbre_num * prix_lppr_num
 
-# ---- Filtre financier basé LPPR (remplace PxTot)
-detail = detail[detail["Manque à gagner (LPPR)"] > 0].copy()
+# ---- Filtre financier : exclure tout ce qui vaut 0€ (prix LPPR = 0 ou quantité = 0)
+detail = detail[detail["_mag_lppr"] > 0].copy()
 
 # ============================================================
 # 3bis) Ajout SERVICE via Médecin poseur
@@ -391,10 +401,10 @@ synthese = (
         nb_lignes=("NIP", "size"),
         nb_patients=("NIP", pd.Series.nunique),
         nbre_total=("_nbre", "sum"),
-        manque_a_gagner_estime=("Manque à gagner (LPPR)", "sum"),
+        mag_lppr=("_mag_lppr", "sum"),
     )
     .reset_index()
-    .sort_values("manque_a_gagner_estime", ascending=False)
+    .sort_values("mag_lppr", ascending=False)
 )
 
 total_row = pd.DataFrame([{
@@ -402,19 +412,18 @@ total_row = pd.DataFrame([{
     "nb_lignes": int(synthese["nb_lignes"].sum()),
     "nb_patients": int(tmp["NIP"].nunique()),
     "nbre_total": float(synthese["nbre_total"].sum()),
-    "manque_a_gagner_estime": float(synthese["manque_a_gagner_estime"].sum()),
+    "mag_lppr": float(synthese["mag_lppr"].sum()),
 }])
 
 synthese = pd.concat([synthese, total_row], ignore_index=True)
-
-# Renommer colonne synthèse en nom propre
-synthese = synthese.rename(columns={"manque_a_gagner_estime": "Manque à gagner estimé (LPPR)"})
+synthese = synthese.rename(columns={"mag_lppr": "Manque à gagner estimé (LPPR)"})
 
 # ============================================================
 # 4bis) Synthèse par SERVICE + % (sur LPPR)
+# - % au format Excel 0,00%
+# - suppression de la colonne "% manque à gagner"
 # ============================================================
 svc = detail.copy()
-svc["_mag_lppr"] = pd.to_numeric(svc["Manque à gagner (LPPR)"], errors="coerce")
 
 synthese_service = (
     svc
@@ -422,24 +431,19 @@ synthese_service = (
     .agg(
         nb_lignes=("NIP", "size"),
         nb_patients=("NIP", pd.Series.nunique),
-        manque_a_gagner_estime=("_mag_lppr", "sum"),
+        mag_lppr=("_mag_lppr", "sum"),
     )
     .reset_index()
     .sort_values("nb_lignes", ascending=False)
 )
 
 total_lignes = synthese_service["nb_lignes"].sum()
-total_euros = synthese_service["manque_a_gagner_estime"].sum()
+total_euros = synthese_service["mag_lppr"].sum()
 
+# Ratio (0..1) pour format Excel en %
 synthese_service["% DMI manquants (lignes)"] = np.where(
     total_lignes > 0,
-    (synthese_service["nb_lignes"] / total_lignes) * 100,
-    0.0
-)
-
-synthese_service["% manque à gagner"] = np.where(
-    total_euros > 0,
-    (synthese_service["manque_a_gagner_estime"] / total_euros) * 100,
+    (synthese_service["nb_lignes"] / total_lignes),
     0.0
 )
 
@@ -447,36 +451,36 @@ total_row_service = pd.DataFrame([{
     "Service (via médecin)": "TOTAL",
     "nb_lignes": int(total_lignes),
     "nb_patients": int(svc["NIP"].nunique()),
-    "manque_a_gagner_estime": float(total_euros),
-    "% DMI manquants (lignes)": 100.0 if total_lignes > 0 else 0.0,
-    "% manque à gagner": 100.0 if total_euros > 0 else 0.0,
+    "mag_lppr": float(total_euros),
+    "% DMI manquants (lignes)": 1.0 if total_lignes > 0 else 0.0,
 }])
 
 synthese_service = pd.concat([synthese_service, total_row_service], ignore_index=True)
-synthese_service = synthese_service.rename(columns={"manque_a_gagner_estime": "Manque à gagner estimé (LPPR)"})
-
-# ============================================================
-# 4ter) Feuille référentiel médecins (noms propres)
-# ============================================================
-referentiel_med = pd.DataFrame(
-    [{"Médecin (clé)": k, "Service": v} for k, v in sorted(MEDECIN_TO_SERVICE_RAW.items(), key=lambda x: x[0].lower())]
-)
+synthese_service = synthese_service.rename(columns={"mag_lppr": "Manque à gagner estimé (LPPR)"})
 
 # ============================================================
 # 5) Export Excel (résultats)
+# - pas de feuille référentiel
+# - DETAIL sans PxTot ni Manque à gagner
 # ============================================================
+detail_export = detail.drop(columns=["_mag_lppr"], errors="ignore")
+
 with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
-    detail.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
+    detail_export.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
     synthese.to_excel(writer, sheet_name="SYNTHESE_LIBELLE", index=False)
     synthese_service.to_excel(writer, sheet_name="SYNTHESE_SERVICE", index=False)
-    referentiel_med.to_excel(writer, sheet_name="REFERENTIEL_MEDECINS", index=False)
 
-    for sh in ["DETAIL_A_CODER", "SYNTHESE_LIBELLE", "SYNTHESE_SERVICE", "REFERENTIEL_MEDECINS"]:
+    for sh in ["DETAIL_A_CODER", "SYNTHESE_LIBELLE", "SYNTHESE_SERVICE"]:
         autosize_worksheet_columns(writer.book[sh])
 
     set_excel_date_format(writer.book["DETAIL_A_CODER"], formats={
         "Date de pose": "DD/MM/YYYY",
         "Date saisie SEDITRACE": "DD/MM/YYYY HH:MM:SS",
+    })
+
+    # % en xx,xx%
+    set_excel_number_format(writer.book["SYNTHESE_SERVICE"], formats={
+        "% DMI manquants (lignes)": "0,00%",
     })
 
 print("✅ OK")
