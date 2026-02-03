@@ -1,3 +1,3 @@
-print("LIGNES (detail):", len(detail))
-print("PATIENTS UNIQUES (detail):", detail["NIP"].astype("string").str.strip().dropna().nunique())
-print("SOMME des patients par libellé:", detail.groupby("Libellé DMI")["NIP"].nunique().sum())
+LIGNES (detail): 92
+PATIENTS UNIQUES (detail): 52
+SOMME des patients par libellé: 77
