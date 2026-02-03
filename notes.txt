@@ -1,1 +1,5 @@
+Je suis allé un peu vite c’est plus compliqué que ça le montant de remboursement est égal à : prix LPP HT – ((prix LPP HT – prix d’achat HT)/2)
+Grossièrement le prix LPP est un plafond de prix pour les fournisseurs et pour le remboursement (TFR : tarif forfaitaire de responsabilité), si on négocie bien les prix d’achat le bénéfice engendré est partagé entre l’hôpital et la sécu à hauteur de 50% (ETI : écart tarifaire indemnisable pour les DM ou EMI : écart Médicament indemnisable pour les médicaments)
+
+Pb : on vient de réaliser que beaucoup de prix d’achat ne descendent pas dans Seditrace … le plus simple est donc de prendre uniquement la somme des prix LPP HT même si cette valeur surévalue le remboursement réel.
 
