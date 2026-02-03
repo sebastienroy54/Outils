@@ -1,5 +1,28 @@
-# Sécu : si un type n’existe pas dans le mois, la colonne peut manquer
-if "Manque à gagner estimé (LPP) – EN SUS" not in synthese_financiere.columns:
-    synthese_financiere["Manque à gagner estimé (LPP) – EN SUS"] = 0.0
-if "Manque à gagner estimé (LPP) – INTRA-GHS" not in synthese_financiere.columns:
-    synthese_financiere["Manque à gagner estimé (LPP) – INTRA-GHS"] = 0.0
+with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
+    detail_export.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
+
+    # ✅ feuille 2 = synthese_financiere (pas synthese)
+    synthese_financiere.to_excel(writer, sheet_name="SYNTHESE_FINANCIERE", index=False)
+
+    # (si tu veux garder ta synthèse par libellé, sinon tu peux la supprimer)
+    synthese.to_excel(writer, sheet_name="SYNTHESE_LIBELLE", index=False)
+
+    synthese_service.to_excel(writer, sheet_name="SYNTHESE_SERVICE", index=False)
+
+    for sh in ["DETAIL_A_CODER", "SYNTHESE_FINANCIERE", "SYNTHESE_LIBELLE", "SYNTHESE_SERVICE"]:
+        autosize_worksheet_columns(writer.book[sh])
+
+    set_excel_date_format(writer.book["DETAIL_A_CODER"], formats={
+        "Date de pose": "DD/MM/YYYY",
+        "Date saisie SEDITRACE": "DD/MM/YYYY HH:MM:SS",
+    })
+
+    # ✅ format % feuille 2
+    set_excel_number_format(writer.book["SYNTHESE_FINANCIERE"], formats={
+        "% du total LPP (EN SUS)": "0.00%",
+    })
+
+    # ✅ format % feuille 3
+    set_excel_number_format(writer.book["SYNTHESE_SERVICE"], formats={
+        "% DMI manquants (lignes)": "0.00%",
+    })
