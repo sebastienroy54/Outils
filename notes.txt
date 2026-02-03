@@ -1,3 +1,413 @@
+c:\Users\4251352\projets\groupage_DMI.py:177: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  fallback = pd.to_datetime(s, errors="coerce", dayfirst=True)
+Traceback (most recent call last):
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\indexes\base.py", line 3812, in get_loc
+    return self._engine.get_loc(casted_key)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pandas/_libs/index.pyx", line 167, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/index.pyx", line 196, in pandas._libs.index.IndexEngine.get_loc
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7088, in pandas._libs.hashtable.PyObjectHashTable.get_item
+  File "pandas/_libs/hashtable_class_helper.pxi", line 7096, in pandas._libs.hashtable.PyObjectHashTable.get_item
+KeyError: 'Manque à gagner estimé (LPP) – INTRA-GHS'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "c:\Users\4251352\projets\groupage_DMI.py", line 458, in <module>
+    "Manque à gagner estimé (LPP) – INTRA-GHS": synthese_financiere["Manque à gagner estimé (LPP) – INTRA-GHS"].sum(),
+                                                ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\frame.py", line 4113, in __getitem__
+    indexer = self.columns.get_loc(key)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\core\indexes\base.py", line 3819, in get_loc
+    raise KeyError(key) from err
+KeyError: 'Manque à gagner estimé (LPP) – INTRA-GHS'
+
+import pandas as pd
+import numpy as np
+from pathlib import Path
+import re
+import unicodedata
+from openpyxl.utils import get_column_letter
+
+# ============================================================
+# PARAMÈTRES CHEMINS
+# ============================================================
+BASE_DIR = Path(r"C:\Users\4251352\Documents\DMI")
+
+PATH_ORBIS = BASE_DIR / "Liste des DMI codés_2.csv"
+PATH_SAG   = BASE_DIR / "Extraction_SAG_2.csv"
+PATH_SIMPA = BASE_DIR / "DMI_NAS_2.csv"
+#PATH_SEDI  = BASE_DIR / "Extraction DMI SEDITRACE 2025 CCH.xlsx"
+PATH_SEDI  = BASE_DIR / "FICHCOMP 2026.xlsx"
+
+OUT_FILE = BASE_DIR / "DMI_SEDITRACE_ABSENTS_BASE_DIM_DELTA2J_janvier_26.xlsx"
+BASE_DIM_FILE = BASE_DIR / "BASE_DIM_janvier_26.xlsx"
+
+DATE_TOL_DAYS = 2  # ±2 jours
+
+# ============================================================
+# REFERENTIEL MEDECINS -> SERVICE/SPECIALITE
+# ============================================================
+MEDECIN_TO_SERVICE_RAW = {
+    "addi": "ortho",
+    "alifano": "chir tho",
+    "allouch": "cardio",
+    "anract": "uro",
+    "barret": "endo",
+    "barry de longchamps": "uro",  # on matchera "barry"
+    "belle": "endo",
+    "bobbio": "chir tho",
+    "boustany": "uro",
+    "brami": "cardio",
+    "carpentier": "endo",
+    "coriat": "endo",
+    "dayma": "uro",
+    "fischer": "cardio",
+    "fournel": "chir tho",
+    "gaultier": "cardio",
+    "gatsis": "cardio",
+    "giraud": "chir tho",
+    "jock": "uro",
+    "joumaa": "chir tho",
+    "lardinois": "chir dig",
+    "leconte": "chir dig",
+    "lefebvre": "chir tho",
+    "lorut": "chir tho",
+    "maalouf": "ortho",
+    "marchese": "chir dig",
+    "ohanessian": "cardio",
+    "ouaknine": "ortho",
+    "peyromaure": "uro",
+    "pham": "cardio",
+    "philibert": "cardio",
+    "picard": "cardio",
+    "priam": "uro",
+    "prietto": "chir tho",
+    "roux": "uro",
+    "saighi": "uro",
+    "sapetti": "uro",
+    "seret": "cardio",
+    "tzedakis": "chir dig",
+    "varenne": "cardio",
+    "vienney": "uro",
+}
+
+def strip_accents(s: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+
+def normalize_medecin(s: str) -> str:
+    if s is None or (isinstance(s, float) and np.isnan(s)):
+        return ""
+    txt = str(s).strip()
+    txt = strip_accents(txt).lower()
+    txt = re.sub(r"\b(dr|pr|prof|professeur|docteur|mme|mr|m\.)\b\.?", " ", txt, flags=re.IGNORECASE)
+    txt = re.sub(r"[^a-z\s\-']", " ", txt)
+    txt = txt.replace("-", " ").replace("'", " ")
+    txt = re.sub(r"\s+", " ", txt).strip()
+    return txt
+
+MEDECIN_MATCH_LIST = []
+for k, v in MEDECIN_TO_SERVICE_RAW.items():
+    kk = normalize_medecin(k)
+    token = kk.split(" ")[0] if kk else ""
+    if token:
+        MEDECIN_MATCH_LIST.append((token, v))
+MEDECIN_MATCH_LIST = sorted(set(MEDECIN_MATCH_LIST), key=lambda x: len(x[0]), reverse=True)
+
+def map_service_from_medecin(med: str) -> str:
+    nm = normalize_medecin(med)
+    if not nm:
+        return "inconnu"
+    for token, service in MEDECIN_MATCH_LIST:
+        if token and token in nm:
+            return service
+    return "inconnu"
+
+# ============================================================
+# HELPERS lecture
+# ============================================================
+def read_csv_auto(path: Path) -> pd.DataFrame:
+    encodings = ["utf-8", "cp1252", "latin1"]
+    seps = [None, ";", ",", "\t", "|"]
+    last_err = None
+    for enc in encodings:
+        for sep in seps:
+            try:
+                if sep is None:
+                    return pd.read_csv(path, sep=None, engine="python", encoding=enc, dtype=str)
+                return pd.read_csv(path, sep=sep, engine="python", encoding=enc, dtype=str)
+            except Exception as e:
+                last_err = e
+    raise RuntimeError(f"Impossible de lire {path}. Dernière erreur: {last_err}")
+
+def read_csv_sag_safe(path: Path) -> pd.DataFrame:
+    return pd.read_csv(
+        path,
+        sep=";",
+        engine="python",
+        encoding="cp1252",
+        dtype=str,
+        on_bad_lines="warn"
+    )
+
+def ensure_cols(df: pd.DataFrame, required: list, label: str):
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        raise KeyError(f"{label}: colonnes manquantes: {missing}")
+
+# ============================================================
+# HELPERS normalisation
+# ============================================================
+def clean_id_like_scalar(v):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return pd.NA
+    s = str(v).strip()
+    if s in {"", "nan", "NaN", "None"}:
+        return pd.NA
+    s = re.sub(r"^(\d+)\.0$", r"\1", s)
+    if re.match(r"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$", s):
+        try:
+            f = float(s)
+            if np.isfinite(f) and abs(f - round(f)) < 1e-9:
+                return str(int(round(f)))
+            return str(f).rstrip("0").rstrip(".")
+        except Exception:
+            return s
+    return s
+
+def clean_id_like(x: pd.Series) -> pd.Series:
+    return x.map(clean_id_like_scalar).astype("string").str.strip()
+
+def norm_ref(x: pd.Series) -> pd.Series:
+    return (
+        x.astype("string")
+         .str.replace("\u00A0", " ", regex=False)
+         .str.strip()
+         .str.replace(r"\s+", " ", regex=True)
+         .str.upper()
+    )
+
+def to_num(s: pd.Series) -> pd.Series:
+    x = s.astype("string").str.strip().str.replace(",", ".", regex=False)
+    return pd.to_numeric(x, errors="coerce")
+
+def parse_date_fr_day(series: pd.Series) -> pd.Series:
+    s = series.astype("string").str.strip()
+    dt  = pd.to_datetime(s, format="%d/%m/%Y %H:%M:%S", errors="coerce")
+    dt2 = pd.to_datetime(s, format="%d/%m/%Y %H:%M", errors="coerce")
+    dt3 = pd.to_datetime(s, format="%d/%m/%Y", errors="coerce")
+    dt4 = pd.to_datetime(s, format="%d-%m-%Y %H:%M:%S", errors="coerce")
+    dt5 = pd.to_datetime(s, format="%d-%m-%Y", errors="coerce")
+    fallback = pd.to_datetime(s, errors="coerce", dayfirst=True)
+    out = dt.fillna(dt2).fillna(dt3).fillna(dt4).fillna(dt5).fillna(fallback)
+    return out.dt.normalize()
+
+def make_key(nip: pd.Series, date_pose_dt: pd.Series, ref: pd.Series) -> pd.Series:
+    nip_n = clean_id_like(nip)
+    ref_n = norm_ref(ref)
+    return nip_n + "|" + date_pose_dt.dt.strftime("%Y-%m-%d") + "|" + ref_n
+
+# ============================================================
+# Excel formatting
+# ============================================================
+def autosize_worksheet_columns(ws, min_width=10, max_width=60):
+    for col_idx, col_cells in enumerate(ws.columns, start=1):
+        max_len = 0
+        for cell in col_cells:
+            if cell.value is None:
+                continue
+            max_len = max(max_len, len(str(cell.value)))
+        width = max(min_width, min(max_width, max_len + 2))
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+def set_excel_date_format(ws, header_row=1, formats=None):
+    if not formats:
+        return
+    header_map = {str(cell.value): cell.column for cell in ws[header_row]}
+    for col_name, fmt in formats.items():
+        if col_name not in header_map:
+            continue
+        col_idx = header_map[col_name]
+        for r in range(header_row + 1, ws.max_row + 1):
+            ws.cell(row=r, column=col_idx).number_format = fmt
+
+def set_excel_number_format(ws, header_row=1, formats=None):
+    if not formats:
+        return
+    header_map = {str(cell.value): cell.column for cell in ws[header_row]}
+    for col_name, fmt in formats.items():
+        if col_name not in header_map:
+            continue
+        col_idx = header_map[col_name]
+        for r in range(header_row + 1, ws.max_row + 1):
+            ws.cell(row=r, column=col_idx).number_format = fmt
+
+# ============================================================
+# 1) Construire BASE_DIM_KEYS + enregistrer BASE_DIM.xlsx
+# ============================================================
+base_dim_keys = set()
+
+def add_keys_with_delta(dates_dt: pd.Series, nip: pd.Series, ref: pd.Series):
+    keys = []
+    for d in range(-DATE_TOL_DAYS, DATE_TOL_DAYS + 1):
+        shifted_dates = dates_dt + pd.Timedelta(days=d)
+        keys.append(make_key(nip, shifted_dates, ref))
+    return set(pd.concat(keys).dropna().unique())
+
+def col_if_exists(df: pd.DataFrame, col: str) -> pd.Series:
+    if col in df.columns:
+        return df[col]
+    return pd.Series([pd.NA] * len(df), index=df.index, dtype="string")
+
+# -------- ORBIS
+orbis = read_csv_auto(PATH_ORBIS)
+ORBI_REQ = ["IPP du patient", "Date de l’intervention", "Référence commerciale du DMI"]
+ensure_cols(orbis, ORBI_REQ, "ORBIS")
+
+orbis_date_dt = parse_date_fr_day(orbis["Date de l’intervention"])
+base_dim_keys |= add_keys_with_delta(orbis_date_dt, orbis["IPP du patient"], orbis["Référence commerciale du DMI"])
+
+base_orbis = pd.DataFrame({
+    "NIP": clean_id_like(orbis["IPP du patient"]),
+    "Date de pose": orbis_date_dt,
+    "Réf commerciale": norm_ref(orbis["Référence commerciale du DMI"]),
+    "Code LPP": clean_id_like(col_if_exists(orbis, "LPP")),
+    "Libellé DMI": col_if_exists(orbis, "Libellé du DMI du livret").astype("string"),
+    "Source": "ORBIS",
+})
+base_orbis["Clé technique (IPP|date|ref)"] = (
+    base_orbis["NIP"] + "|" + base_orbis["Date de pose"].dt.strftime("%Y-%m-%d") + "|" + base_orbis["Réf commerciale"]
+)
+
+# -------- SAG
+sag = read_csv_sag_safe(PATH_SAG)
+SAG_REQ = ["NIP", "Date de réalisation", "Référence produit"]
+ensure_cols(sag, SAG_REQ, "SAG")
+
+sag_date_dt = parse_date_fr_day(sag["Date de réalisation"])
+base_dim_keys |= add_keys_with_delta(sag_date_dt, sag["NIP"], sag["Référence produit"])
+
+base_sag = pd.DataFrame({
+    "NIP": clean_id_like(sag["NIP"]),
+    "Date de pose": sag_date_dt,
+    "Réf commerciale": norm_ref(sag["Référence produit"]),
+    "Code LPP": clean_id_like(col_if_exists(sag, "Code LPP")),
+    "Libellé DMI": col_if_exists(sag, "Libellé produit").astype("string"),
+    "Source": "SAG",
+})
+base_sag["Clé technique (IPP|date|ref)"] = (
+    base_sag["NIP"] + "|" + base_sag["Date de pose"].dt.strftime("%Y-%m-%d") + "|" + base_sag["Réf commerciale"]
+)
+
+# -------- SIMPA
+simpa = read_csv_auto(PATH_SIMPA)
+SIMPA_REQ = ["NIP", "DTEXEC", "CDREFF"]
+ensure_cols(simpa, SIMPA_REQ, "SIMPA")
+
+simpa_date_dt = parse_date_fr_day(simpa["DTEXEC"])
+base_dim_keys |= add_keys_with_delta(simpa_date_dt, simpa["NIP"], simpa["CDREFF"])
+
+base_simpa = pd.DataFrame({
+    "NIP": clean_id_like(simpa["NIP"]),
+    "Date de pose": simpa_date_dt,
+    "Réf commerciale": norm_ref(simpa["CDREFF"]),
+    "Code LPP": clean_id_like(col_if_exists(simpa, "CDLPP")),
+    "Libellé DMI": col_if_exists(simpa, "LBAPP").astype("string"),
+    "Source": "SIMPA",
+})
+base_simpa["Clé technique (IPP|date|ref)"] = (
+    base_simpa["NIP"] + "|" + base_simpa["Date de pose"].dt.strftime("%Y-%m-%d") + "|" + base_simpa["Réf commerciale"]
+)
+
+# -------- BASE_DIM (union)
+base_dim = pd.concat([base_orbis, base_sag, base_simpa], ignore_index=True)
+base_dim = base_dim.dropna(subset=["NIP", "Date de pose", "Réf commerciale"])
+base_dim = base_dim.drop_duplicates(subset=["Clé technique (IPP|date|ref)", "Source"]).copy()
+
+with pd.ExcelWriter(BASE_DIM_FILE, engine="openpyxl") as writer:
+    base_dim.to_excel(writer, sheet_name="BASE_DIM", index=False)
+    base_orbis.to_excel(writer, sheet_name="ORBIS", index=False)
+    base_sag.to_excel(writer, sheet_name="SAG", index=False)
+    base_simpa.to_excel(writer, sheet_name="SIMPA", index=False)
+
+    for sh in ["BASE_DIM", "ORBIS", "SAG", "SIMPA"]:
+        autosize_worksheet_columns(writer.book[sh])
+        set_excel_date_format(writer.book[sh], formats={"Date de pose": "DD/MM/YYYY"})
+
+# ============================================================
+# 2) Lire SEDITRACE
+# ============================================================
+sedi = pd.read_excel(
+    PATH_SEDI,
+    converters={
+        "IPP": lambda v: clean_id_like_scalar(v),
+        "LPPR": lambda v: clean_id_like_scalar(v),
+        "Réference": lambda v: pd.NA if v is None else str(v),
+    },
+)
+
+SEDI_REQ = [
+    "IPP", "Posé le", "Réference", "Nbre", "LPPR", "Libellé", "Fournisseur",
+    "N° de Lot", "DATEHEURESAISIE", "Praticien", "PRIX_LPPR", "PxTot", "Motif"
+]
+ensure_cols(sedi, SEDI_REQ, "SEDITRACE")
+
+sedi_dt_pose = pd.to_datetime(sedi["Posé le"], errors="coerce", dayfirst=True).dt.normalize()
+sedi_dt_saisie = pd.to_datetime(sedi["DATEHEURESAISIE"], errors="coerce", dayfirst=True)
+
+sedi_std = pd.DataFrame({
+    "NIP": clean_id_like(sedi["IPP"].astype("string")),
+    "Date de pose": sedi_dt_pose,
+    "Date saisie SEDITRACE": sedi_dt_saisie,
+    "Réf commerciale": sedi["Réference"].astype("string"),
+    "Quantité": to_num(sedi["Nbre"].astype("string")),
+    "Code LPP": clean_id_like(sedi["LPPR"].astype("string")),
+    "Libellé DMI": sedi["Libellé"].astype("string"),
+    "Nom du laboratoire fournisseur": sedi["Fournisseur"].astype("string"),
+    "Numéro de lot": sedi["N° de Lot"].astype("string"),
+    "Médecin poseur": sedi["Praticien"].astype("string"),
+    "PRIX_LPPR": to_num(sedi["PRIX_LPPR"].astype("string")),
+    "T2A": sedi["T2A"].astype("string").str.strip().str.upper(),
+    "Motif": sedi["Motif"].astype("string").str.strip().str.upper(),
+})
+
+MOTIFS_EXCLUS = {"ECHEC DE POSE", "ANNULATION", "MATERIOVIGILANCE"}
+sedi_std = sedi_std[~sedi_std["Motif"].isin(MOTIFS_EXCLUS)].copy()
+
+sedi_std = sedi_std.dropna(subset=["NIP", "Date de pose", "Réf commerciale"])
+sedi_std["Clé technique (IPP|date|ref)"] = make_key(
+    sedi_std["NIP"], sedi_std["Date de pose"], sedi_std["Réf commerciale"]
+)
+
+# ============================================================
+# 3) DMI à coder = présents SEDITRACE et absents BASE_DIM
+# ============================================================
+missing = sedi_std[~sedi_std["Clé technique (IPP|date|ref)"].isin(base_dim_keys)].copy()
+
+detail = pd.DataFrame({
+    "NIP": missing["NIP"],
+    "Date de pose": missing["Date de pose"],
+    "Médecin poseur": missing["Médecin poseur"],
+    "Service (via médecin)": missing["Médecin poseur"].map(map_service_from_medecin),
+    "Date saisie SEDITRACE": missing["Date saisie SEDITRACE"],
+    "Nom du laboratoire fournisseur": missing["Nom du laboratoire fournisseur"],
+    "Réf commerciale": missing["Réf commerciale"],
+    "Numéro de lot": missing["Numéro de lot"],
+    "Numéro de série": pd.NA,
+    "Code LPP": missing["Code LPP"],
+    "Libellé DMI": missing["Libellé DMI"],
+    "Nbre": missing["Quantité"],
+    "PRIX_LPPR": missing["PRIX_LPPR"],
+    "T2A": missing["T2A"],
+})
+
+nbre_num = pd.to_numeric(detail["Nbre"], errors="coerce").fillna(0)
+prix_lppr_num = pd.to_numeric(detail["PRIX_LPPR"], errors="coerce").fillna(0)
+detail["_mag_lppr"] = nbre_num * prix_lppr_num
+
+detail = detail[detail["_mag_lppr"] > 0].copy()
+
 # ============================================================
 # SYNTHESE_FINANCIERE — EN SUS vs INTRA-GHS
 # ============================================================
@@ -76,3 +486,109 @@ total_row = pd.DataFrame([{
 }])
 
 synthese_financiere = pd.concat([synthese_financiere, total_row], ignore_index=True)
+
+# ============================================================
+# 3bis) Ajout SERVICE via Médecin poseur
+# ============================================================
+detail["Service (via médecin)"] = detail["Médecin poseur"].map(map_service_from_medecin)
+
+# ============================================================
+# 4) Synthèse par Libellé + TOTAL (sur LPPR)
+# ============================================================
+tmp = detail.copy()
+tmp["_nbre"] = pd.to_numeric(tmp["Nbre"], errors="coerce")
+
+synthese = (
+    tmp
+    .groupby("Libellé DMI", dropna=False)
+    .agg(
+        nb_lignes=("NIP", "size"),
+        nb_patients=("NIP", pd.Series.nunique),
+        nbre_total=("_nbre", "sum"),
+        mag_lppr=("_mag_lppr", "sum"),
+    )
+    .reset_index()
+    .sort_values("mag_lppr", ascending=False)
+)
+
+total_row = pd.DataFrame([{
+    "Libellé DMI": "TOTAL",
+    "nb_lignes": int(synthese["nb_lignes"].sum()),
+    "nb_patients": int(tmp["NIP"].nunique()),
+    "nbre_total": float(synthese["nbre_total"].sum()),
+    "mag_lppr": float(synthese["mag_lppr"].sum()),
+}])
+
+synthese = pd.concat([synthese, total_row], ignore_index=True)
+synthese = synthese.rename(columns={"mag_lppr": "Manque à gagner estimé (LPPR)"})
+
+# ============================================================
+# 4bis) Synthèse par SERVICE + % (sur LPPR)
+# - % au format Excel 0,00%
+# - suppression de la colonne "% manque à gagner"
+# ============================================================
+svc = detail.copy()
+
+synthese_service = (
+    svc
+    .groupby("Service (via médecin)", dropna=False)
+    .agg(
+        nb_lignes=("NIP", "size"),
+        nb_patients=("NIP", pd.Series.nunique),
+        mag_lppr=("_mag_lppr", "sum"),
+    )
+    .reset_index()
+    .sort_values("nb_lignes", ascending=False)
+)
+
+total_lignes = synthese_service["nb_lignes"].sum()
+total_euros = synthese_service["mag_lppr"].sum()
+
+# Ratio (0..1) pour format Excel en %
+synthese_service["% DMI manquants (lignes)"] = np.where(
+    total_lignes > 0,
+    (synthese_service["nb_lignes"] / total_lignes),
+    0.0
+).astype(float)
+
+total_row_service = pd.DataFrame([{
+    "Service (via médecin)": "TOTAL",
+    "nb_lignes": int(total_lignes),
+    "nb_patients": int(svc["NIP"].nunique()),
+    "mag_lppr": float(total_euros),
+    "% DMI manquants (lignes)": 1.0 if total_lignes > 0 else 0.0,
+}])
+
+synthese_service = pd.concat([synthese_service, total_row_service], ignore_index=True)
+synthese_service = synthese_service.rename(columns={"mag_lppr": "Manque à gagner estimé (LPPR)"})
+
+# ============================================================
+# 5) Export Excel (résultats)
+# - pas de feuille référentiel
+# - DETAIL sans PxTot ni Manque à gagner
+# ============================================================
+detail_export = detail.drop(columns=["_mag_lppr"], errors="ignore")
+
+with pd.ExcelWriter(OUT_FILE, engine="openpyxl") as writer:
+    detail_export.to_excel(writer, sheet_name="DETAIL_A_CODER", index=False)
+    synthese.to_excel(writer, sheet_name="SYNTHESE_FINANCIERE", index=False)
+    synthese_service.to_excel(writer, sheet_name="SYNTHESE_SERVICE", index=False)
+
+    for sh in ["DETAIL_A_CODER", "SYNTHESE_LIBELLE", "SYNTHESE_SERVICE"]:
+        autosize_worksheet_columns(writer.book[sh])
+
+    set_excel_date_format(writer.book["DETAIL_A_CODER"], formats={
+        "Date de pose": "DD/MM/YYYY",
+        "Date saisie SEDITRACE": "DD/MM/YYYY HH:MM:SS",
+    })
+
+    set_excel_number_format(writer.book["SYNTHESE_FINANCIERE"], formats={"% du total LOO (EN SUS)": "0.00%"})
+
+    # % en xx,xx%
+    set_excel_number_format(writer.book["SYNTHESE_SERVICE"], formats={
+        "% DMI manquants (lignes)": "0.00%",
+    })
+
+print("✅ OK")
+print(f"Fichier BASE_DIM généré : {BASE_DIM_FILE}")
+print(f"Fichier résultats généré : {OUT_FILE}")
