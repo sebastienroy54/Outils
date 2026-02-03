@@ -1,8 +1,19 @@
+total_row = pd.DataFrame([{
+    "Libellé DMI": "TOTAL",
+    "Nb DMI": synthese_financiere["Nb DMI"].sum(),
+    "Nb Patients": int(
+        synthese_financiere["Nb Patients"].sum()
+    ),
+    "Manque à gagner estimé (LPP) – EN SUS": synthese_financiere["Manque à gagner estimé (LPP) – EN SUS"].sum(),
+    "Manque à gagner estimé (LPP) – INTRA-GHS": synthese_financiere["Manque à gagner estimé (LPP) – INTRA-GHS"].sum(),
+    "Manque à gagner estimé (LPP) – TOTAL": synthese_financiere["Manque à gagner estimé (LPP) – TOTAL"].sum(),
+    "% du total LPP (EN SUS)": 1.0 if total_lpp > 0 else 0.0,
+}])
+
 ordered_cols = [
     "Libellé DMI",
     "Nb DMI",
-    "Nb Patients distincts",
-    "Nb Patients (cumul libellés)",
+    "Nb Patients",
     "Manque à gagner estimé (LPP) – EN SUS",
     "Manque à gagner estimé (LPP) – INTRA-GHS",
     "Manque à gagner estimé (LPP) – TOTAL",
