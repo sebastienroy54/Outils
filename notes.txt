@@ -1,4 +1,1 @@
-Je suis allé un peu vite c’est plus compliqué que ça le montant de remboursement est égal à : prix LPP HT – ((prix LPP HT – prix d’achat HT)/2)
-
-Pb : on vient de réaliser que beaucoup de prix d’achat ne descendent pas dans Seditrace … le plus simple est donc de prendre uniquement la somme des prix LPP HT même si cette valeur surévalue le remboursement réel.
 
