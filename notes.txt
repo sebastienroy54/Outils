@@ -1,484 +1,738 @@
-code doublons :
+code exemple multi sites :
 import streamlit as st
 import pandas as pd
+import numpy as np
 import subprocess
-from io import BytesIO
-from datetime import datetime
+import time
 from pathlib import Path
-import tempfile
+from datetime import datetime
+from openpyxl import load_workbook
+from copy import copy
+import re
+from openpyxl.styles import Border, Side, Alignment, Font
+from collections import defaultdict
 
+# Valeur a modifier pour debug de code 
+DEBUG_CONNEXION = False
+
+# Chemins à paramétrer
 BASE_DIR = Path(__file__).resolve().parents[1]
-SQL_DIR = BASE_DIR / "SQL"
 DATA_DIR = BASE_DIR / "data"
+SQL_DIR = BASE_DIR / "SQL"
+PATRON_TIM_XLSX = DATA_DIR / "tableau_rum_tim.xlsx"
+PATRON_FILL_XLSX = DATA_DIR / "Tableau.xlsx"
 
-TEST_SQL = SQL_DIR / "test_connexion.sql"
-MAIN_SQL = SQL_DIR / "contigus.sql"
-CSV_PATH = DATA_DIR / "resultat.csv"
-OUTPUT_PATH = DATA_DIR / "doublons.xlsx"
+# Liste des TNS des sites pour SIMPA
+TNS_MAP = {
+    "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH",
+    "BRC": "//o-simpa-b1.brc.aphp.fr:8105/SIP1BRC",
+    "HTD": "//o-simpa-b1.htd.aphp.fr:8855/SIP1HTD"
+}
 
-def test_oracle_connection(user, password, tns_alias):
-    cmd = ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{TEST_SQL}"]
-
+def rerun():
     try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=10
-        )
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
 
-        if result.returncode != 0:
-            st.error("Connexion Oracle échouée")
-            st.code(result.stderr or result.stdout)
-            return False
+def dbg_state(label: str):
+    if not DEBUG_CONNEXION:
+        return
+    keys = ["logged_in", "oracle_connected", "page", "oracle_user", "show_exception", "last_exception_str"]
+    dbg_append(f"\n--- STATE {label} ---")
+    for k in keys:
+        dbg_append(f"{k} = {st.session_state.get(k, '(absent)')}")
 
-        return True
+def dbg_append(line: str):
+    if not DEBUG_CONNEXION:
+        return
+    st.session_state["debug_log"] = st.session_state.get("debug_log", "") + line + "\n"
 
-    except subprocess.TimeoutExpired:
-        st.error("Connexion Oracle: timeout")
-        return False
-    except Exception as e:
-        st.error(f"Connexion Oracle: erreur inattendue: {e}")
-        return False
+def dbg_show(key_suffix=""):
+    if not DEBUG_CONNEXION:
+        return
+    if st.session_state.get("debug_log"):
+        st.subheader("DEBUG connexion (persistant)")
+        st.code(st.session_state.get("debug_log", ""))
+        if st.button("Effacer debug", key=f"debug_clear_btn{key_suffix}"):
+            st.session_state["debug_log"] = ""
+            rerun()
 
-def main():
-    st.title("Détection des Doublons, Contigus et Chevauchements")
-    st.markdown(
-        "Cet outil exécute la requête SQL, analyse les séjours "
-        "et génère un fichier Excel structuré."
-    )
-
-    with st.form("connexion"):
-        st.subheader("Connexion Oracle")
-        user = st.text_input("👤 Nom d'utilisateur Oracle :", value="")
-        password = st.text_input("🔑 Mot de passe :", type="password")
-        submitted = st.form_submit_button("🚀 Lancer le traitement")
-
-    if not submitted:
+# Fonction pour afficher les détails techniques d'une erreur
+def safe_show_exception(e):
+    st.error("Une erreur est survenue. Vérifiez vos fichiers ou contactez le support.")
+    if not DEBUG_CONNEXION:
         return
 
-    if not user or not password:
-        st.error("Veuillez renseigner vos identifiants Oracle.")
-        st.stop()
-
-    tns_alias = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
-
-    try:
-        if CSV_PATH.exists():
-            CSV_PATH.unlink()
-    except Exception:
-        pass
-
-    with st.spinner("🔐 Test de connexion Oracle..."):
-        ok = test_oracle_connection(user, password, tns_alias)
-        if not ok:
-            st.error("Connexion Oracle échouée.")
-            st.stop()
-
-    with st.spinner("🧠 Exécution de la requête SQL, veuillez patienter..."):
-        result = subprocess.run(
-            ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{MAIN_SQL}"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        if result.returncode != 0:
-            st.error("Erreur lors de l'exécution SQL*Plus")
-            st.stop()
-
-    if not CSV_PATH.exists():
-        if '01017' in result.stdout:
-            st.error("Connexion échouée. Veuillez vérifier vos identifiants.")
-        else:
-            st.error(
-                f"Le fichier {CSV_PATH.name} n'existe pas après exécution SQL. "
-                "Vérifie le spool dans contigus.sql et le chemin de sortie."
-            )
-        #st.code(result.stderr or result.stdout)
-        st.stop()
-
-    st.success("✅ Requête SQL terminée et fichier CSV généré.")
-    st.divider()
-
-    with st.spinner("🔎 Analyse des séjours en cours..."):
-        try:
-            df = pd.read_csv(
-                CSV_PATH,
-                sep=";",
-                skip_blank_lines=True,
-                dtype=str,
-                encoding="latin-1"
-            )
-        except Exception as e:
-            st.error(f"Erreur lecture CSV : {e}")
-            st.stop()
-
-        try:
-            df = df.dropna(how="all")
-            df.columns = [col.strip().upper() for col in df.columns]
-
-            expected_cols = ["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"]
-            if df.shape[1] >= len(expected_cols):
-                df.columns = expected_cols + [f"COL_EXTRA_{i}" for i in range(df.shape[1] - len(expected_cols))]
-
-            df["IPP"] = df["IPP"].astype(str).str.strip()
-            df["UMA"] = df["UMA"].fillna("").astype(str).str.strip()
-            df["NDA"] = df["NDA"].astype(str).str.strip()
-            df["GHM"] = df["GHM"].fillna("").astype(str).str.strip()
-
-            df["DATE_ENTREE"] = pd.to_datetime(df["DATE_ENTREE"], dayfirst=True, errors="coerce")
-            df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"], dayfirst=True, errors="coerce")
-
-            df = df[~df["UMA"].isin(["540", "543"])]
-
-            df = df.dropna(subset=["DATE_ENTREE", "DATE_SORTIE", "UMA", "IPP"])
-            df = df.sort_values(["IPP", "DATE_ENTREE", "DATE_SORTIE"]).reset_index(drop=True)
-
-            df_base = df.drop_duplicates(
-                subset=["IPP", "NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"],
-                keep="first"
-            ).copy()
-
-            df_contigus = df.copy()
-
-        except Exception as e:
-            st.error(f"Erreur nettoyage données : {e}")
-            st.stop()
-
-    rows = []
-    try:
-        def stay_key(ipp, nda, uma, de, ds):
-            return (ipp, nda, uma, de, ds)
-
-        stay_to_ghm = {}
-        stay_to_ghm_full = {} 
-        for _, r in df_contigus.iterrows():
-            ipp = r["IPP"]
-            nda = r["NDA"]
-            uma = r["UMA"]
-            de = r["DATE_ENTREE"]
-            ds = r["DATE_SORTIE"]
-            ghm = str(r["GHM"]).strip()
-
-            k = stay_key(ipp, nda, uma, de, ds)
-            if ghm and ghm.upper() not in ("NAN", "NONE") and len(ghm) >= 5:
-                root = ghm[:5]
-                stay_to_ghm.setdefault(k, set()).add(root)
-                stay_to_ghm_full.setdefault(k, {})
-                stay_to_ghm_full[k].setdefault(root, ghm)
-
-        assigned = set()
-
-        def pair_id(k1, k2):
-            return tuple(sorted([k1, k2]))
-
-        def get_dn(g, i):
-            try:
-                return g.loc[i, "DATE_NAISSANCE"]
-            except Exception:
-                return ""
-
-        for ipp, group in df_base.groupby("IPP", sort=False):
-            g = group.reset_index(drop=True)
-            n = len(g)
-
-            for i in range(n):
-                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
-                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
-
-                j = i + 1
-                while j < n:
-                    de2 = g.loc[j, "DATE_ENTREE"]
-                    if pd.isna(de2):
-                        j += 1
-                        continue
-                    if de2 > ds1 and de2 != ds1:
-                        break
-
-                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
-                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
-
-                    if nda1 == nda2:
-                        j += 1
-                        continue
-
-                    pid = pair_id(k1, k2)
-                    if pid in assigned:
-                        j += 1
-                        continue
-
-                    rel = None
-                    if (uma1 == uma2) and (de1 == de2) and (ds1 == ds2):
-                        rel = "VRAI_DOUBLON"
-                    elif (uma1 != uma2) and (de1 == de2) and (ds1 == ds2):
-                        rel = "DOUBLON_0_NUIT"
-                    elif (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
-                        rel = "CHEVAUCHEMENT_CANDIDAT"
-                    else:
-                        rel = None
-
-                    if rel and rel != "CHEVAUCHEMENT_CANDIDAT":
-                        assigned.add(pid)
-                        rows.append({
-                            "IPP": ipp,
-                            "DATE_NAISSANCE": get_dn(g, i),
-
-                            "NDA1": nda1, "UMA1": uma1, "GHM1": "",
-                            "DATEE1": de1, "DATES1": ds1,
-
-                            "NDA2": nda2, "UMA2": uma2, "GHM2": "",
-                            "DATEE2": de2, "DATES2": ds2,
-
-                            "TYPE_RELATION": rel
-                        })
-
-                    j += 1
-
-        for ipp, group in df_base.groupby("IPP", sort=False):
-            g = group.reset_index(drop=True)
-            n = len(g)
-
-            for i in range(n):
-                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
-                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
-
-                j = i + 1
-                while j < n:
-                    de2 = g.loc[j, "DATE_ENTREE"]
-                    if pd.isna(de2):
-                        j += 1
-                        continue
-                    if de2 > ds1 and de2 != ds1:
-                        break
-
-                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
-                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
-
-                    if nda1 == nda2:
-                        j += 1
-                        continue
-
-                    pid = pair_id(k1, k2)
-                    if pid in assigned:
-                        j += 1
-                        continue
-
-                    is_contig = (ds1 == de2) or (ds2 == de1)
-                    if not is_contig or uma1 == uma2:
-                        j += 1
-                        continue
-
-                    roots1 = stay_to_ghm.get(k1, set())
-                    roots2 = stay_to_ghm.get(k2, set())
-                    common = roots1.intersection(roots2)
-
-                    if common:
-                        root = sorted(list(common))[0]
-                        ghm1 = stay_to_ghm_full.get(k1, {}).get(root, "")
-                        ghm2 = stay_to_ghm_full.get(k2, {}).get(root, "")
-
-                        assigned.add(pid)
-                        rows.append({
-                            "IPP": ipp,
-                            "DATE_NAISSANCE": get_dn(g, i),
-
-                            "NDA1": nda1, "UMA1": uma1, "GHM1": ghm1,
-                            "DATEE1": de1, "DATES1": ds1,
-
-                            "NDA2": nda2, "UMA2": uma2, "GHM2": ghm2,
-                            "DATEE2": de2, "DATES2": ds2,
-
-                            "TYPE_RELATION": "CONTIGUS"
-                        })
-
-                    j += 1
-
-        for ipp, group in df_base.groupby("IPP", sort=False):
-            g = group.reset_index(drop=True)
-            n = len(g)
-
-            for i in range(n):
-                nda1, uma1, de1, ds1 = g.loc[i, ["NDA", "UMA", "DATE_ENTREE", "DATE_SORTIE"]]
-                k1 = stay_key(ipp, nda1, uma1, de1, ds1)
-
-                j = i + 1
-                while j < n:
-                    de2 = g.loc[j, "DATE_ENTREE"]
-                    if pd.isna(de2):
-                        j += 1
-                        continue
-                    if de2 > ds1 and de2 != ds1:
-                        break
-
-                    nda2, uma2, ds2 = g.loc[j, ["NDA", "UMA", "DATE_SORTIE"]]
-                    k2 = stay_key(ipp, nda2, uma2, de2, ds2)
-
-                    if nda1 == nda2:
-                        j += 1
-                        continue
-
-                    pid = pair_id(k1, k2)
-                    if pid in assigned:
-                        j += 1
-                        continue
-
-                    if (uma1 != uma2) and (de1 < ds2) and (ds1 > de2):
-                        assigned.add(pid)
-                        rows.append({
-                            "IPP": ipp,
-                            "DATE_NAISSANCE": get_dn(g, i),
-
-                            "NDA1": nda1, "UMA1": uma1, "GHM1": "",
-                            "DATEE1": de1, "DATES1": ds1,
-
-                            "NDA2": nda2, "UMA2": uma2, "GHM2": "",
-                            "DATEE2": de2, "DATES2": ds2,
-
-                            "TYPE_RELATION": "CHEVAUCHEMENT"
-                        })
-
-                    j += 1
-
-    except Exception as e:
-        st.error(f"Erreur détection relations : {e}")
-        st.stop()
-
-    try:
-        res = pd.DataFrame(rows).drop_duplicates().reset_index(drop=True)
-        res["PAIR_ID"] = res.index + 1
-
-        def build_rows_instead_of_columns(df_rel, keep_ghm: bool):
-            left_cols = {
-                "IPP": "IPP",
-                "DATE_NAISSANCE": "DATE_NAISSANCE",
-                "NDA": "NDA1",
-                "UMA": "UMA1",
-                "DATE_ENTREE": "DATEE1",
-                "DATE_SORTIE": "DATES1",
-                "PAIR_ID": "PAIR_ID",
-            }
-            if keep_ghm:
-                left_cols["GHM"] = "GHM1"
-
-            df1 = df_rel[list(left_cols.values())].copy()
-            df1.columns = list(left_cols.keys())
-            df1["LIGNE"] = 1
-
-            right_cols = {
-                "IPP": "IPP",
-                "DATE_NAISSANCE": "DATE_NAISSANCE",
-                "NDA": "NDA2",
-                "UMA": "UMA2",
-                "DATE_ENTREE": "DATEE2",
-                "DATE_SORTIE": "DATES2",
-                "PAIR_ID": "PAIR_ID",
-            }
-            if keep_ghm:
-                right_cols["GHM"] = "GHM2"
-
-            df2 = df_rel[list(right_cols.values())].copy()
-            df2.columns = list(right_cols.keys())
-            df2["LIGNE"] = 2
-
-            out = pd.concat([df1, df2], ignore_index=True)
-
-            for c in ["DATE_ENTREE", "DATE_SORTIE"]:
-                out[c] = pd.to_datetime(out[c], errors="coerce").dt.strftime("%d/%m/%Y")
-
-            out["COMMENTAIRE"] = ""
-
-            if keep_ghm:
-                out = out[["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM",
-                           "DATE_ENTREE", "DATE_SORTIE", "COMMENTAIRE"]]
-            else:
-                out = out[["IPP", "DATE_NAISSANCE", "NDA", "UMA",
-                           "DATE_ENTREE", "DATE_SORTIE", "COMMENTAIRE"]]
-
-            out = out.sort_values(["IPP"]).reset_index(drop=True)
-            return out
-
-        with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
-            for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
-                subset = res[res["TYPE_RELATION"] == groupe].copy()
-                subset = subset.drop(columns=["TYPE_RELATION"], errors="ignore")
-
-                keep_ghm = (groupe == "CONTIGUS")
-
-                if subset.empty:
-                    if keep_ghm:
-                        df_to_write = pd.DataFrame([{
-                            "IPP": "N/A", "DATE_NAISSANCE": "N/A",
-                            "NDA": "N/A", "UMA": "N/A", "GHM": "N/A",
-                            "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A", "COMMENTAIRE": ""
-                        }])
-                    else:
-                        df_to_write = pd.DataFrame([{
-                            "IPP": "N/A", "DATE_NAISSANCE": "N/A",
-                            "NDA": "N/A", "UMA": "N/A",
-                            "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A", "COMMENTAIRE": ""
-                        }])
-                else:
-                    df_to_write = build_rows_instead_of_columns(subset, keep_ghm=keep_ghm)
-
-                df_to_write.to_excel(writer, sheet_name=groupe, index=False)
-
-                ws = writer.sheets[groupe]
-                for i, col in enumerate(df_to_write.columns):
-                    max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
-                    ws.column_dimensions[ws.cell(row=1, column=i + 1).column_letter].width = max_len
-
-    except Exception as e:
-        st.error(f"Erreur écriture Excel : {e}")
-        st.stop()
-
-    st.success("✅ Analyse terminée avec succès !")
-
-    try:
-        excel_bytes = OUTPUT_PATH.read_bytes()
-    except Exception as e:
-        st.error(f"Impossible de lire le fichier Excel généré : {e}")
-        st.stop()
-
-    st.download_button(
-        label="📥 Télécharger le fichier Excel",
-        data=excel_bytes,
-        file_name=f"doublons_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
-
-    for p in (CSV_PATH, OUTPUT_PATH):
-        try:
-            if p.exists():
-                p.unlink()
-        except Exception:
-            pass
-
-requete SQL :
-whenever sqlerror exit 1
-whenever oserror exit 2
-SET LINESIZE 32767
-SET HEADING ON
-SET COLSEP ";"
-SET PAGESIZE 0
+    st.session_state["last_exception_str"] = str(e)
+    show = st.checkbox("Afficher détails techniques", key="show_exception_checkbox")
+    if show:
+        st.code(st.session_state.get("last_exception_str", ""))
+
+# Fonction de test de connexion à SIMPA
+def run_sqlplus_and_wait(cmd, timeout=30):
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    start = time.time()
+    output = ""
+    while True:
+        if proc.poll() is not None:
+            out, _ = proc.communicate()
+            output += (out or "")
+            break
+        if time.time() - start > timeout:
+            proc.kill()
+            raise TimeoutError("Timeout lors de l'exécution sqlplus.")
+        time.sleep(0.1)
+    return output
+
+# Fonction pour construire la requête SQL pour récupérer les RUMs
+def build_sql_spool_rum(site_label, file_spool_path, mode, month, year):
+    if mode == "mois":
+        start = f"01/{int(month):02d}/{year}"
+        end_expr = f"LAST_DAY(TO_DATE('01/{int(month):02d}/{year}','DD/MM/YYYY'))"
+        where_clause = (f"D8EEUE BETWEEN TO_DATE('{start}','DD/MM/YYYY') AND {end_expr}")
+    else:
+        start = f"01/01/{year}"
+        end_expr = f"LAST_DAY(TO_DATE('01/{int(month):02d}/{year}','DD/MM/YYYY'))"
+        where_clause = (f"D8SOUE >= TO_DATE('{start}','DD/MM/YYYY') AND D8EEUE <= {end_expr}")
+    sql = f"""
+SET HEADING OFF
 SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 2000
 SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL data/resultat.csv
-SELECT DISTINCT S.KYNOIP AS IPP,
-       S.DANAIS AS DATE_NAISSANCE,
-       E.KYNODA AS NDA,
-       E.CDURM_P AS UMA,
-       R.CDGHM AS GHM,
-       TO_CHAR(E.D8EEUE, 'DD/MM/YYYY') AS DATE_ENTREE,
-       TO_CHAR(E.D8SOUE, 'DD/MM/YYYY') AS DATE_SORTIE
-FROM EPI E, SDO S, RSS R
-WHERE E.KYNODA = S.KYNODA
-  AND E.KYNODA = R.NODA(+)
-  AND E.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND E.D8EEUE <= TRUNC(SYSDATE)
-  AND E.CHPPMSI = 'CS'
-ORDER BY S.KYNOIP;
-SPOOL OFF
-EXIT;
+spool {file_spool_path}
+SELECT CDURM_P || ';' || COUNT(*)
+FROM EPI
+WHERE {where_clause}
+GROUP BY CDURM_P;
+spool off
+exit;
+"""
+    return sql
+
+# Fonction pour lire la sortie CSV de la requête SQL et la transformer en dataframe
+def read_spool_csv_to_df(spool_path):
+    p = Path(spool_path)
+    if not p.exists():
+        return pd.DataFrame(columns=["UMA", "COUNT"])
+    try:
+        df = pd.read_csv(p, sep=';', header=None, dtype=str, names=["UMA", "COUNT"], engine="python")
+        df["UMA"] = df["UMA"].astype(str).str.strip()
+        df["COUNT"] = pd.to_numeric(df["COUNT"].astype(str).str.strip().replace("", "0"), errors="coerce").fillna(0).astype(int)
+        return df
+    except Exception:
+        lines = p.read_text(encoding="utf-8", errors="ignore").splitlines()
+        rows = []
+        for line in lines:
+            if ";" in line:
+                a, b = line.split(";", 1)
+                rows.append({"UMA": a.strip(), "COUNT": int(b.strip() or 0)})
+        return pd.DataFrame(rows)
+
+# Fonction permettant d'extraire la liste des UMAs
+def extract_uma_code_by_space(uma):
+    if not isinstance(uma, str):
+        return ""
+    s = uma.strip()
+    return s.split(" ", 1)[0].strip() if s else ""
+
+# Fonction permettant d'avoir la liste des TIMs
+def split_tims(cell):
+    if not isinstance(cell, str):
+        return []
+    cell = cell.strip()
+    if cell.lower() in {"nan", "none", ""}:
+        return []
+    parts = re.split(r'[/;,|]+', cell)
+    return [p.strip() for p in parts if p.strip()]
+
+# Fonction permettant de normaliser la liste des DMUs
+def normalize_dmu(raw):
+    if not isinstance(raw, str):
+        return ""
+    s = raw.strip()
+    return s.split(" ", 1)[0].strip() if s else ""
+
+# Fonction pour construire le dictionnaire d'association des TIMs à leurs sites, UMAs et DMUs respectifs
+def build_tim_uma_dict(patron_path):
+    df = pd.read_excel(patron_path, engine="openpyxl", dtype=str)
+    df.columns = [c.strip() for c in df.columns]
+
+    for col in ["Site", "UMA", "DMU"]:
+        if col not in df.columns:
+            raise KeyError(f"Colonne manquante : {col}")
+
+    tim_ref_col = "TIM Référent" if "TIM Référent" in df.columns else None
+    relance_col = "Relance" if "Relance" in df.columns else None
+    type_col = "Type" if "Type" in df.columns else None
+
+    result = {}
+
+    for idx, row in df.iterrows():
+
+        raw_uma_full = row.get("UMA", "")
+        if not isinstance(raw_uma_full, str) or raw_uma_full.strip() == "" or raw_uma_full.startswith("Total DMU"):
+            continue
+
+        uma_code = extract_uma_code_by_space(raw_uma_full)
+        uma_type_raw = row.get(type_col, "") if type_col else ""
+        uma_type = (str(uma_type_raw).strip().upper() if isinstance(uma_type_raw, str) else "")
+        if uma_type not in {"HC", "HDJ"}:
+            uma_type = "HC"
+
+        site = str(row.get("Site", "")).strip()
+        dmu = str(row.get("DMU", "")).split(" ", 1)[0].strip()
+
+        tims = []
+        if tim_ref_col: tims += split_tims(row.get(tim_ref_col, ""))
+        if relance_col: tims += split_tims(row.get(relance_col, ""))
+
+        if not tims:
+            continue
+
+        for tim in tims:
+            result.setdefault(tim, {}).setdefault(site, {}).setdefault(dmu, []).append(
+                {"code": uma_code, "libelle": raw_uma_full, "type": uma_type}
+            )
+
+    return result
+
+# Fonction pour la fusion verticale des cases ayant le même site ou DMU par TIM
+def merge_vertical_conditionnel(ws, col_idx, df_col, start_row, group_col=None):
+    if len(df_col) == 0:
+        return
+    current_val = df_col.iloc[0]
+    current_group = group_col.iloc[0] if group_col is not None else None
+    start_idx = 0
+    for i in range(1, len(df_col)):
+        val = df_col.iloc[i]
+        group_val = group_col.iloc[i] if group_col is not None else None
+        same = (val == current_val) and (group_col is None or group_val == current_group)
+        if not same:
+            if i - 1 > start_idx:
+                ws.merge_cells(start_row=start_row + start_idx, start_column=col_idx,
+                               end_row=start_row + i - 1, end_column=col_idx)
+            start_idx = i
+            current_val = val
+            current_group = group_val
+
+    if len(df_col) - 1 > start_idx:
+        ws.merge_cells(start_row=start_row + start_idx, start_column=col_idx,
+                       end_row=start_row + len(df_col) - 1, end_column=col_idx)
+
+# Fonction permettant de tracer les bordures dans le tabkeau
+def draw_border_lines_for_tim_blocks(ws, start_row, df_sorted, first_col, last_col, site_col_idx=None):
+    thin = Side(border_style="thin", color="000000")
+    #top_border = Border(top=thin)
+    #bottom_border = Border(bottom=thin)
+
+    tim_groups = df_sorted.groupby("TIM").apply(lambda x: (x.index.min(), x.index.max()))
+    for tim, (start_idx, end_idx) in tim_groups.items():
+        top_row = start_row + start_idx
+        bottom_row = start_row + end_idx
+        for c in range(first_col, last_col + 1):
+            ws.cell(row=top_row, column=c).border = Border(
+                left=ws.cell(row=top_row, column=c).border.left,
+                right=ws.cell(row=top_row, column=c).border.right,
+                top=thin,
+                bottom=ws.cell(row=top_row, column=c).border.bottom
+            )
+            ws.cell(row=bottom_row, column=c).border = Border(
+                left=ws.cell(row=bottom_row, column=c).border.left,
+                right=ws.cell(row=bottom_row, column=c).border.right,
+                top=ws.cell(row=bottom_row, column=c).border.top,
+                bottom=thin
+            )
+
+    if site_col_idx is not None:
+        for i in range(1, len(df_sorted)):
+            if df_sorted["SITE"].iloc[i] != df_sorted["SITE"].iloc[i - 1]:
+                row = start_row + i
+                for c in range(first_col, last_col + 1):
+                    ws.cell(row=row, column=c).border = Border(
+                        left=ws.cell(row=row, column=c).border.left,
+                        right=ws.cell(row=row, column=c).border.right,
+                        top=thin,
+                        bottom=ws.cell(row=row, column=c).border.bottom
+                    )
+
+# Fonction permettant d'associer les RUMs d'UMAs d'exceptions à la bonne colonne (ex: 040X HC qui doit être codé mais qui est relancé)
+def apply_uma_exceptions(df):
+    mask_150_hc = (df["SITE"] == "HTD") & (df["UMA_HC_code"] == "150")
+    if mask_150_hc.any():
+        #debug_rows = df.loc[mask_150_hc, ["TIM", "SITE", "UMA HC", "RUM codés mois"]]
+
+        val_mois = df.loc[mask_150_hc, "RUM codés mois"].sum()
+        val_cum = df.loc[mask_150_hc, "RUM codés cumulés"].sum()
+
+        mask_cliniciens_150 = mask_150_hc & (df["TIM"] == "Cliniciens")
+        df.loc[mask_cliniciens_150, "RUM codés mois"] = val_mois
+        df.loc[mask_cliniciens_150, "RUM codés cumulés"] = val_cum
+
+        mask_other_tim_150 = mask_150_hc & (df["TIM"] != "Cliniciens")
+        df.loc[mask_other_tim_150, "RUM relancés mois"] = val_mois
+        df.loc[mask_other_tim_150, "RUM relancés cumulés"] = val_cum
+
+        df.loc[mask_other_tim_150, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+    mask_040x = (df["SITE"] == "CCH") & (df["UMA_HC_code"] == "040X")
+    if mask_040x.any():
+
+        df.loc[mask_040x, "RUM relancés mois"] = df.loc[mask_040x, "RUM codés mois"]
+        df.loc[mask_040x, "RUM relancés cumulés"] = df.loc[mask_040x, "RUM codés cumulés"]
+
+        df.loc[mask_040x, ["RUM codés mois", "RUM codés cumulés"]] = np.nan
+
+    HDJ_SPECIAL = ["561C", "591C", "591J"]
+
+    for code in HDJ_SPECIAL:
+        mask_hdj_special = (df["SITE"] == "CCH") & (df["UMA_HDJ_code"] == code)
+
+        if mask_hdj_special.any():
+
+            df.loc[mask_hdj_special, "RUM codés mois"] = df.loc[mask_hdj_special, "RUM relancés mois"]
+            df.loc[mask_hdj_special, "RUM codés cumulés"] = df.loc[mask_hdj_special, "RUM relancés cumulés"]
+
+            df.loc[mask_hdj_special, ["RUM relancés mois", "RUM relancés cumulés"]] = np.nan
+
+    return df
+
+# Fonction pour l'écriture des résultats dans le patron
+def write_copy_with_values_to_patron(df, patron_path):
+    from io import BytesIO
+    wb = load_workbook(filename=str(patron_path))
+    ws = wb.active
+
+    header_row = None
+    for r in range(1, 30):
+        values = [(ws.cell(row=r, column=c).value or "").strip().lower() for c in range(1, ws.max_column+1)]
+        if "tim" in values and "site" in values:
+            header_row = r
+            break
+    if not header_row:
+        header_row = 1
+
+    name_to_col = {str(ws.cell(row=header_row, column=c).value).strip(): c for c in range(1, ws.max_column+1)}
+
+    col_map = {
+        "TIM": name_to_col.get("TIM"),
+        "SITE": name_to_col.get("SITE"),
+        "UMA HC": name_to_col.get("UMA HC"),
+        "RUM_codes_mois": name_to_col.get("RUM codés mois"),
+        "RUM_codes_cumulés": name_to_col.get("RUM codés cumulés"),
+        "UMA HDJ": name_to_col.get("UMA HDJ"),
+        "DMU": name_to_col.get("DMU"),
+        "RUM_rel_mois": name_to_col.get("RUM relancés mois"),
+        "RUM_rel_cum": name_to_col.get("RUM relancés cumulés")
+    }
+
+    start = header_row + 1
+
+    df_sorted = df.sort_values(
+        by=["TIM", "SITE", "DMU", "UMA HC", "UMA HDJ"]
+    ).reset_index(drop=True)
+
+    for idx, row in df_sorted.iterrows():
+        excel_row = start + idx
+
+        ws.cell(row=excel_row, column=col_map["TIM"]).value = row["TIM"]
+        ws.cell(row=excel_row, column=col_map["SITE"]).value = row["SITE"]
+        ws.cell(row=excel_row, column=col_map["DMU"]).value = row["DMU"]
+
+        if row["UMA HC"]:
+            ws.cell(row=excel_row, column=col_map["UMA HC"]).value = row["UMA HC"]
+
+        if row["UMA HDJ"]:
+            ws.cell(row=excel_row, column=col_map["UMA HDJ"]).value = row["UMA HDJ"]
+
+        ws.cell(row=excel_row, column=col_map["RUM_codes_mois"]).value = (
+            int(row["RUM codés mois"]) if pd.notna(row["RUM codés mois"]) else None
+        )
+        ws.cell(row=excel_row, column=col_map["RUM_codes_cumulés"]).value = (
+            int(row["RUM codés cumulés"]) if pd.notna(row["RUM codés cumulés"]) else None
+        )
+
+        ws.cell(row=excel_row, column=col_map["RUM_rel_mois"]).value = (
+            int(row["RUM relancés mois"]) if pd.notna(row["RUM relancés mois"]) else None
+        )
+        ws.cell(row=excel_row, column=col_map["RUM_rel_cum"]).value = (
+            int(row["RUM relancés cumulés"]) if pd.notna(row["RUM relancés cumulés"]) else None
+        )
+
+    merge_vertical_conditionnel(ws, col_map["TIM"], df_sorted["TIM"], start)
+    merge_vertical_conditionnel(ws, col_map["SITE"], df_sorted["SITE"], start, group_col=df_sorted["TIM"])
+    merge_vertical_conditionnel(ws, col_map["DMU"], df_sorted["DMU"], start, group_col=df_sorted["TIM"])
+
+    draw_border_lines_for_tim_blocks(ws, start, df_sorted, 1, ws.max_column, site_col_idx=col_map["SITE"])
+
+    thin = Side(border_style="thin", color="000000")
+    for r in range(1, ws.max_row + 1):
+        for c in range(1, ws.max_column + 1):
+            cell = ws.cell(row=r, column=c)
+            cell.border = Border(left=thin, right=thin, top=cell.border.top, bottom=cell.border.bottom)
+
+    for idx in range(len(df_sorted)):
+        excel_row = start + idx
+        for c in [col_map["TIM"], col_map["SITE"], col_map["DMU"]]:
+            ws.cell(row=excel_row, column=c).alignment = Alignment(horizontal="center", vertical="center")
+
+    tim_col = col_map["TIM"]
+    if tim_col:
+        for idx in range(len(df_sorted)):
+            excel_row = start + idx
+            cell = ws.cell(row=excel_row, column=tim_col)
+            new_font = copy(cell.font)
+            new_font.bold = True
+            cell.font = new_font
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+# Fonction de la page de RUM dans laquelle on vient choisir le mois et l'année et on va faire le traitement en conséquence
+def page_rum():
+    st.title("Remplissage RUM — TIM")
+    if "oracle_connected" not in st.session_state or not st.session_state.oracle_connected:
+        st.error("Vous devez d'abord vous connecter sur la page Connexion.")
+        return
+
+    mois = st.selectbox("Choisir le mois", list(range(1, 13)), index=datetime.now().month - 1)
+    annees = list(range(2013, datetime.now().year + 1))
+    annee = st.selectbox("Choisir l'année", annees, index=len(annees)-1)
+    bouton = st.button("Lancer le traitement RUM")
+    st.markdown("**Remarque :** le script va interroger les 3 bases (CCH, BRC, HTD) et générer un tableau par TIM.")
+    if not bouton:
+        return
+
+    try:
+        progress = st.progress(0)
+        progress.progress(5)
+
+        tim_dict = build_tim_uma_dict(PATRON_TIM_XLSX)
+
+        UMA_WEIGHTS = {
+            ("130", "Clara HEBRARD"): 1/3,
+            ("130", "Maria Louisa ESTEVES"): 2/3
+        }
+
+        rows = []
+        for tim, sites in tim_dict.items():
+            for site, dmus in sites.items():
+                for dmu, umas in dmus.items():
+                    for uma in umas:
+                        rows.append({
+                            "TIM": tim,
+                            "SITE": site,
+                            "UMA HC": uma["libelle"] if uma["type"] == "HC" else "",
+                            "RUM codés mois": 0.0 if uma["type"] == "HC" else np.nan,
+                            "RUM codés cumulés": 0.0 if uma["type"] == "HC" else np.nan,
+                            "UMA HDJ": uma["libelle"] if uma["type"] == "HDJ" else "",
+                            "DMU": dmu,
+                            "RUM relancés mois": 0.0 if uma["type"] == "HDJ" else np.nan,
+                            "RUM relancés cumulés": 0.0 if uma["type"] == "HDJ" else np.nan,
+                        })
+        df_patron = pd.DataFrame(rows)
+
+        progress.progress(20)
+
+        df_patron["UMA_HC_code"] = df_patron["UMA HC"].apply(extract_uma_code_by_space)
+        df_patron["UMA_HDJ_code"] = df_patron["UMA HDJ"].apply(extract_uma_code_by_space)
+
+        uma_to_tim_count = defaultdict(int)
+        for tim, sites in tim_dict.items():
+            for site, dmus in sites.items():
+                for dmu, umas in dmus.items():
+                    for uma in umas:
+                        uma_to_tim_count[uma["code"]] += 1
+
+        progress.progress(30)
+
+        for idx_site, (site_label, tns) in enumerate(TNS_MAP.items()):
+            st.write(f"🔹 Traitement site {site_label} ({idx_site+1}/{len(TNS_MAP)})")
+
+            spool_mois = DATA_DIR / f"RUM_MOIS_{site_label}.csv"
+            spool_cum = DATA_DIR / f"RUM_CUMULE_{site_label}.csv"
+
+            sql_mois = build_sql_spool_rum(site_label, str(spool_mois), "mois", mois, annee)
+            sql_cum = build_sql_spool_rum(site_label, str(spool_cum), "cumule", mois, annee)
+
+            tmp_sql_mois = SQL_DIR / f"rum_mois_{site_label}.sql"
+            tmp_sql_cum = SQL_DIR / f"rum_cumule_{site_label}.sql"
+
+            tmp_sql_mois.write_text(sql_mois, encoding="utf-8")
+            tmp_sql_cum.write_text(sql_cum, encoding="utf-8")
+
+            run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}", timeout=60)
+
+            run_sqlplus_and_wait(f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}", timeout=60)
+            
+            #################################################################################################
+            #### Le code commenté ci-dessous permet d'afficher les erreurs si bug de connexion aux bases ####
+            #################################################################################################
+
+            # out_mois = run_sqlplus_and_wait(
+            #     f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_mois}",
+            #     timeout=60
+            # )
+            # out_cum = run_sqlplus_and_wait(
+            #     f"sqlplus -S {st.session_state.oracle_user}/{st.session_state.oracle_password}@{tns} @{tmp_sql_cum}",
+            #     timeout=60
+            # )
+
+            # # Debug: afficher la sortie uniquement pour HTD (ou si ORA-/SP2- détecté)
+            # def looks_like_sqlplus_error(txt: str) -> bool:
+            #     if not txt:
+            #         return False
+            #     return ("ORA-" in txt) or ("SP2-" in txt)
+
+            # if site_label == "HTD" or looks_like_sqlplus_error(out_mois) or looks_like_sqlplus_error(out_cum):
+            #     st.subheader(f"Debug SQL*Plus — {site_label}")
+            #     st.write("Sortie MOIS :")
+            #     st.code(out_mois[-4000:] if out_mois else "(vide)")
+            #     st.write("Sortie CUMUL :")
+            #     st.code(out_cum[-4000:] if out_cum else "(vide)")
+
+            df_m = read_spool_csv_to_df(spool_mois)
+            df_c = read_spool_csv_to_df(spool_cum)
+
+            tims_for_site = {tim: sites for tim, sites in tim_dict.items() if site_label in sites}
+
+            for tim, sites in tims_for_site.items():
+                dmus = sites[site_label]
+
+                for dmu, umas in dmus.items():
+                    for uma in umas:
+
+                        uma_code = uma["code"]
+                        uma_type = uma["type"]
+
+                        base_m = df_m.loc[df_m["UMA"] == uma_code, "COUNT"].sum()
+                        base_c = df_c.loc[df_c["UMA"] == uma_code, "COUNT"].sum()
+
+                        if base_m == 0 and base_c == 0:
+                            continue
+
+                        default_count = uma_to_tim_count.get(uma_code, 1)
+                        weight = UMA_WEIGHTS.get((uma_code, tim), 1.0 / default_count)
+                        
+                        assigned_m = base_m * weight
+                        assigned_c = base_c * weight
+
+                        mask_hc = (
+                            (df_patron["TIM"] == tim) &
+                            (df_patron["SITE"] == site_label) &
+                            (df_patron["DMU"] == dmu) &
+                            (df_patron["UMA_HC_code"] == uma_code)
+                        )
+
+                        mask_hdj = (
+                            (df_patron["TIM"] == tim) &
+                            (df_patron["SITE"] == site_label) &
+                            (df_patron["DMU"] == dmu) &
+                            (df_patron["UMA_HDJ_code"] == uma_code)
+                        )
+
+                        if uma_type == "HC":
+                            df_patron.loc[mask_hc, "RUM codés mois"] = assigned_m
+                            df_patron.loc[mask_hc, "RUM codés cumulés"] = assigned_c
+                        else:
+                            df_patron.loc[mask_hdj, "RUM relancés mois"] = assigned_m
+                            df_patron.loc[mask_hdj, "RUM relancés cumulés"] = assigned_c
+
+            try:
+                tmp_sql_mois.unlink()
+            except FileNotFoundError:
+                pass
+
+            try:
+                tmp_sql_cum.unlink()
+            except FileNotFoundError:
+                pass
+
+            progress.progress(30 + int((idx_site + 1) * 20))
+
+        df_patron = apply_uma_exceptions(df_patron)
+        output = write_copy_with_values_to_patron(df_patron, PATRON_FILL_XLSX)
+
+        progress.progress(100)
+        st.success("Fichier prêt au téléchargement 🎉")
+
+        st.download_button(
+            "Télécharger le fichier rempli",
+            data=output,
+            file_name=f"tableau_rum_tim_rempli_{mois:02d}_{annee}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except Exception as e:
+        st.write("Exception capturée :", e)
+        safe_show_exception(e)
+
+# Fonction de la page de connexion permettant de se connecter à la base SQL et garder les identifiants en session
+def page_connexion():
+    st.title("Connexion Oracle")
+
+    if DEBUG_CONNEXION and st.session_state.get("last_conn_exception"):
+        st.warning("Dernière exception connexion (persistée)")
+        st.code(st.session_state["last_conn_exception"])
+        if st.button("Effacer dernière exception", key="clear_last_conn_exception"):
+            st.session_state["last_conn_exception"] = ""
+            rerun()
+
+    dbg_show("_conn")
+
+    if not st.session_state.logged_in:
+        with st.form("connexion"):
+            st.subheader("Connexion Oracle")
+            user = st.text_input("👤 Nom d'utilisateur Oracle :", key="conn_user")
+            password = st.text_input("🔑 Mot de passe :", type="password", key="conn_pwd")
+            submitted = st.form_submit_button("🚀 Se connecter")
+
+        if submitted:
+            st.session_state.logged_in = False
+            st.session_state.oracle_connected = False
+            st.session_state.page = "connexion"
+
+            if DEBUG_CONNEXION:
+                st.session_state["debug_log"] = ""
+
+            if not user or not password:
+                st.error("Veuillez renseigner vos identifiants Oracle.")
+                return
+
+            try:
+                st.info("Test de connexion...")
+
+                dsn = TNS_MAP["CCH"]
+                test_sql_path = SQL_DIR / "test_connexion.sql"
+
+                dbg_append("=== Tentative de connexion Oracle ===")
+                dbg_append(f"User: {user}")
+                dbg_append(f"DSN: {dsn}")
+                dbg_append(f"test_sql_path: {test_sql_path}")
+                dbg_append(f"test_sql_exists: {test_sql_path.exists()}")
+
+                if DEBUG_CONNEXION:
+                    try:
+                        w = subprocess.run(["which", "sqlplus"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        dbg_append(f"which sqlplus: {w.stdout.strip()} {w.stderr.strip()}")
+                    except Exception as e:
+                        dbg_append(f"which sqlplus failed: {e}")
+
+                    dbg_append(
+                        f"PATH: {subprocess.run(['sh','-lc','echo $PATH'], stdout=subprocess.PIPE, text=True).stdout.strip()}"
+                    )
+                    dbg_append(
+                        f"ORACLE_HOME: {subprocess.run(['sh','-lc','echo $ORACLE_HOME'], stdout=subprocess.PIPE, text=True).stdout.strip()}"
+                    )
+                    dbg_append(
+                        f"LD_LIBRARY_PATH: {subprocess.run(['sh','-lc','echo $LD_LIBRARY_PATH'], stdout=subprocess.PIPE, text=True).stdout.strip()}"
+                    )
+                    dbg_append("Command (password masked):")
+                    dbg_append(f"sqlplus -S {user}/******@{dsn} @{test_sql_path}")
+
+                result = subprocess.run(
+                    ["sqlplus", "-S", f"{user}/{password}@{dsn}", f"@{test_sql_path}"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=10
+                )
+
+                dbg_append(f"returncode: {result.returncode}")
+                dbg_append("---- STDOUT ----")
+                dbg_append(result.stdout or "(vide)")
+                dbg_append("---- STDERR ----")
+                dbg_append(result.stderr or "(vide)")
+
+                if result.returncode == 0:
+                    dbg_append(">>> SUCCESS branch entered (returncode==0)")
+                    dbg_state("AVANT set session")
+
+                    st.session_state.oracle_connected = True
+                    st.session_state.logged_in = True
+                    st.session_state.oracle_user = user
+                    st.session_state.oracle_password = password
+                    st.session_state.page = "rum"
+
+                    dbg_state("APRES set session")
+
+                    st.success("Connexion OK.")
+                    if DEBUG_CONNEXION:
+                        st.write("MARKER: avant rerun()")
+
+                    rerun()
+                else:
+                    st.error("Connexion échouée. Vérifiez vos identifiants Oracle.")
+                    st.code(result.stderr or result.stdout)
+
+            except Exception as e:
+                if DEBUG_CONNEXION:
+                    import traceback
+                    tb = traceback.format_exc()
+                    st.session_state["last_conn_exception"] = f"{repr(e)}\n\n{tb}"
+                    st.error("EXCEPTION dans page_connexion() (debug)")
+                    st.code(tb)
+                    dbg_state("ETAT AU MOMENT EXCEPTION")
+                    st.stop()
+                else:
+                    safe_show_exception(e)
+                    return
+    else:
+        st.success("Connexion active.")
+        if st.button("➡ Aller à la page RUM", key="go_rum"):
+            st.session_state.page = "rum"
+            rerun()
+
+
+def ensure_session_vars():
+    if DEBUG_CONNEXION:
+        st.session_state["debug_log"] = st.session_state.get("debug_log", "")
+        dbg_append("\n=== ensure_session_vars() called ===")
+        dbg_state("DANS ensure_session_vars (avant defaults)")
+
+    defaults = {
+        "logged_in": False,
+        "oracle_connected": False,
+        "page": "connexion",
+        "oracle_user": "",
+        "oracle_password": "",
+        "last_exception_str": "",
+        "show_exception": False,
+        "last_conn_exception": "",
+        "run_count": 0,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
+
+def main():
+    st.title("Tableau d'exhaustivité des RUMs par TIM")
+    ensure_session_vars()
+
+    if DEBUG_CONNEXION:
+        st.session_state.run_count = st.session_state.get("run_count", 0) + 1
+        dbg_append(f"\n=== RUN #{st.session_state.run_count} {datetime.now().isoformat()} ===")
+        dbg_append(
+            f"=== MAIN routing: page={st.session_state.get('page')} "
+            f"logged_in={st.session_state.get('logged_in')} "
+            f"oracle_connected={st.session_state.get('oracle_connected')} ==="
+        )
+        dbg_show("_main")
+
+    if st.session_state.page == "connexion":
+        page_connexion()
+    elif st.session_state.page == "rum":
+        if not st.session_state.logged_in:
+            st.session_state.page = "connexion"
+            rerun()
+        page_rum()
+    else:
+        st.session_state.page = "connexion"
+        rerun()
+
+
+if __name__ == "__main__":
+    main()
