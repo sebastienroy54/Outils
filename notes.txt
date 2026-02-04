@@ -1,23 +1,13 @@
-def safe_read_oracle_spool_csv(csv_path: Path) -> pd.DataFrame:
-    # Lit le fichier spooled par SQL*Plus en filtrant les lignes non-CSV.
-    raw = csv_path.read_text(encoding="latin-1", errors="ignore").splitlines()
+KeyError: 'TYPE_RELATION'
+Traceback:
 
-    # On garde uniquement les lignes qui ont au moins 6 séparateurs => 7 colonnes attendues
-    kept = [ln for ln in raw if ln.count(";") >= 6]
-
-    if not kept:
-        # Aucun contenu exploitable
-        return pd.DataFrame(columns=["IPP", "DATE_NAISSANCE", "NDA", "UMA", "GHM", "DATE_ENTREE", "DATE_SORTIE"])
-
-    buf = StringIO("\n".join(kept))
-
-    # On lit sans header “intelligent” : on force dtype=str et sep=';'
-    df = pd.read_csv(
-        buf,
-        sep=";",
-        header=0,          # la 1ère ligne kept est normalement l'entête (HEADING ON)
-        dtype=str,
-        engine="python"
-    )
-
-    return df
+File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 552, in _run_script
+    exec(code, module.__dict__)
+File "/app/app.py", line 15, in <module>
+    doublons_app.main()
+File "/app/outils/doublons_app.py", line 467, in main
+    subset = res[res["TYPE_RELATION"] == groupe].copy()
+File "/usr/local/lib/python3.7/site-packages/pandas/core/frame.py", line 3458, in __getitem__
+    indexer = self.columns.get_loc(key)
+File "/usr/local/lib/python3.7/site-packages/pandas/core/indexes/base.py", line 3363, in get_loc
+    raise KeyError(key) from err
