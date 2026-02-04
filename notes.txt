@@ -1,13 +1,23 @@
-KeyError: 'TYPE_RELATION'
-Traceback:
+    # ... après avoir rempli rows ...
 
-File "/usr/local/lib/python3.7/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 552, in _run_script
-    exec(code, module.__dict__)
-File "/app/app.py", line 15, in <module>
-    doublons_app.main()
-File "/app/outils/doublons_app.py", line 467, in main
-    subset = res[res["TYPE_RELATION"] == groupe].copy()
-File "/usr/local/lib/python3.7/site-packages/pandas/core/frame.py", line 3458, in __getitem__
-    indexer = self.columns.get_loc(key)
-File "/usr/local/lib/python3.7/site-packages/pandas/core/indexes/base.py", line 3363, in get_loc
-    raise KeyError(key) from err
+    expected_rel_cols = [
+        "IPP", "DATE_NAISSANCE",
+        "NDA1", "UMA1", "GHM1", "DATEE1", "DATES1",
+        "NDA2", "UMA2", "GHM2", "DATEE2", "DATES2",
+        "TYPE_RELATION"
+    ]
+
+    res = pd.DataFrame(rows)
+
+    # Si aucun résultat: DataFrame vide sans colonnes -> on force le schéma
+    if res.empty:
+        res = pd.DataFrame(columns=expected_rel_cols)
+
+    # Si jamais une colonne manque (sécurité), on la crée
+    for c in expected_rel_cols:
+        if c not in res.columns:
+            res[c] = pd.Series(dtype="object")
+
+    res = res.drop_duplicates().reset_index(drop=True)
+    res["PAIR_ID"] = res.index + 1
+    return res
