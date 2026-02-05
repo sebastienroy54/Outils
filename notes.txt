@@ -1,10 +1,12 @@
-set verify off
-set linesize 300
-set pagesize 6000
-set termout off
-
-spool M:/rsm_dec2025_non_groupes_sans_rss_fin2025_ni_2026.txt
-
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\rsm_non_groupes_dec2025_2.csv
 SELECT DISTINCT
     R.KYRES,
     R.NODA,
