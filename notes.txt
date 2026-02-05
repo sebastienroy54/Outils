@@ -1,11 +1,61 @@
-# ---- FORMAT DES DATES POUR LE FICHIER FINAL ----
+UHCD :
+SPOOL ...\passage_UHCD_MI.csv
 
-# Date de pose : dd/mm/yyyy (sans heure)
-if "Date de pose" in df_out.columns:
-    d = pd.to_datetime(df_out["Date de pose"], errors="coerce", dayfirst=True)
-    df_out["Date de pose"] = d.dt.strftime("%d/%m/%Y")
+SELECT
+  x.IPP,
+  x.NDA_MI,
+  x.KYRES_MI,
+  x.UM_MI,
+  TO_CHAR(x.ENTREE_MI,'DD/MM/YYYY HH24:MI:SS') AS ENTREE_MI,
+  x.NDA_UHCD,
+  x.KYRES_UHCD,
+  x.UM_UHCD,
+  TO_CHAR(x.ENTREE_UHCD,'DD/MM/YYYY HH24:MI:SS') AS ENTREE_UHCD,
+  TO_CHAR(x.SORTIE_UHCD,'DD/MM/YYYY HH24:MI:SS') AS SORTIE_UHCD,
+  x.DP_UHCD,
+  MAX(CASE WHEN x.RN_DAS = 1 THEN x.DAS END) AS DAS1,
+  MAX(CASE WHEN x.RN_DAS = 2 THEN x.DAS END) AS DAS2,
+  MAX(CASE WHEN x.RN_DAS = 3 THEN x.DAS END) AS DAS3,
+  MAX(CASE WHEN x.RN_DAS = 4 THEN x.DAS END) AS DAS4
+FROM (
+  SELECT
+    mi.NOIP AS IPP,
+    mi.NODA AS NDA_MI,
+    mi.KYRES AS KYRES_MI,
+    mi.CDURM_P AS UM_MI,
+    mi.D8EEUE AS ENTREE_MI,
+    uh.NODA AS NDA_UHCD,
+    uh.KYRES AS KYRES_UHCD,
+    uh.CDURM_P AS UM_UHCD,
+    uh.D8EEUE AS ENTREE_UHCD,
+    uh.D8SOUE AS SORTIE_UHCD,
+    uh.CDDNC9 AS DP_UHCD,
+    d.KYCDDG AS DAS,
+    ROW_NUMBER() OVER (PARTITION BY uh.KYRES ORDER BY d.KYCDDG) AS RN_DAS,
+    ROW_NUMBER() OVER (
+      PARTITION BY mi.KYRES
+      ORDER BY uh.D8SOUE DESC
+    ) AS RN_UHCD
+  FROM
+    RSM mi,
+    RSM uh,
+    DGN d
+  WHERE
+    mi.CDURM_P IN ('010','010S')
+    AND mi.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+    AND mi.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
 
-# Date saisie SEDITRACE : dd/mm/yyyy HH:MM:SS (avec heure)
-if "Date saisie SEDITRACE" in df_out.columns:
-    d = pd.to_datetime(df_out["Date saisie SEDITRACE"], errors="coerce", dayfirst=True)
-    df_out["Date saisie SEDITRACE"] = d.dt.strftime("%d/%m/%Y %H:%M:%S")
+    AND uh.NOIP = mi.NOIP
+    AND uh.CDURM_P IN ('540','543')
+    AND uh.D8SOUE <= mi.D8EEUE
+    AND uh.D8SOUE >= (mi.D8EEUE - 1)   -- fenêtre 1 jour (incluse)
+
+    AND d.KYRES(+) = uh.KYRES
+) x
+WHERE x.RN_UHCD = 1
+GROUP BY
+  x.IPP, x.NDA_MI, x.KYRES_MI, x.UM_MI, x.ENTREE_MI,
+  x.NDA_UHCD, x.KYRES_UHCD, x.UM_UHCD, x.ENTREE_UHCD, x.SORTIE_UHCD, x.DP_UHCD
+ORDER BY
+  x.IPP, x.ENTREE_MI;
+SPOOL OFF;
