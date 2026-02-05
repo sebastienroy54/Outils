@@ -1,78 +1,20 @@
-/* UHCD -> MI (porte d'entrée) : dernier UHCD (par séjour MI) dans la fenêtre 1 jour
-   Sortie: IPP, NDA, KYRES, UM_UHCD, ENTREE_UHCD, SORTIE_UHCD, DP, DAS1..DAS4
-*/
-
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\passage_UHCD_MI.csv
-
-SELECT
-  IPP,
-  NDA,
-  KYRES,
-  UM_UHCD,
-  TO_CHAR(ENTREE_UHCD,'DD/MM/YYYY HH24:MI:SS') AS ENTREE_UHCD,
-  TO_CHAR(SORTIE_UHCD,'DD/MM/YYYY HH24:MI:SS') AS SORTIE_UHCD,
-  DP,
-  MAX(CASE WHEN RN_DAS = 1 THEN DAS END) AS DAS1,
-  MAX(CASE WHEN RN_DAS = 2 THEN DAS END) AS DAS2,
-  MAX(CASE WHEN RN_DAS = 3 THEN DAS END) AS DAS3,
-  MAX(CASE WHEN RN_DAS = 4 THEN DAS END) AS DAS4
-FROM
-(
-  SELECT
-    x.IPP,
-    x.NDA,
-    x.KYRES,
-    x.UM_UHCD,
-    x.ENTREE_UHCD,
-    x.SORTIE_UHCD,
-    x.DP,
-    d.KYCDDG AS DAS,
-    ROW_NUMBER() OVER (PARTITION BY x.KYRES ORDER BY d.KYCDDG) AS RN_DAS
-  FROM
-  (
-    /* 1) On part des MI, on rattache les UHCD éligibles, puis on garde le dernier UHCD par MI */
-    SELECT
-      mi.NOIP    AS IPP,
-      uh.NODA    AS NDA,
-      uh.KYRES   AS KYRES,
-      uh.CDURM_P AS UM_UHCD,
-      uh.D8EEUE  AS ENTREE_UHCD,
-      uh.D8SOUE  AS SORTIE_UHCD,
-      uh.CDDNC9  AS DP,
-      ROW_NUMBER() OVER (
-        PARTITION BY mi.KYRES
-        ORDER BY uh.D8SOUE DESC
-      ) AS RN_UHCD
-    FROM
-      RSM mi,
-      RSM uh
-    WHERE
-      mi.CDURM_P IN ('010','010S')
-      AND mi.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-      AND mi.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-
-      AND uh.NOIP = mi.NOIP
-      AND uh.CDURM_P IN ('540','543')
-      AND uh.D8SOUE <= mi.D8EEUE
-      AND uh.D8SOUE >= (mi.D8EEUE - 1)  /* fenêtre 1 jour incluse */
-  ) x,
-  DGN d
-  WHERE
-    x.RN_UHCD = 1
-    AND d.KYRES(+) = x.KYRES
-)
-GROUP BY
-  IPP, NDA, KYRES, UM_UHCD, ENTREE_UHCD, SORTIE_UHCD, DP
-ORDER BY
-  SORTIE_UHCD, IPP;
-
-SPOOL OFF;
+SP2-0734: commande inconnue au début de "AND uh.NOI..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "AND uh.CDU..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "AND uh.D8S..." - le reste de la ligne est ignoré.
+SP2-0734: commande inconnue au début de "AND uh.D8S..." - le reste de la ligne est ignoré.
+SP2-0044: Pour la liste des commandes connues entrez HELP
+and et pour sortir EXIT.
+SP2-0042: commande inconnue ") x," - reste de la ligne ignoré.
+SP2-0042: commande inconnue "DGN d" - reste de la ligne ignoré.
+SP2-0042: commande inconnue "WHERE" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de "x.RN_UHCD ..." - le reste de la ligne est ignoré.
+SP2-0044: Pour la liste des commandes connues entrez HELP
+and et pour sortir EXIT.
+SP2-0734: commande inconnue au début de "AND d.KYRE..." - le reste de la ligne est ignoré.
+SP2-0042: commande inconnue ")" - reste de la ligne ignoré.
+SP2-0042: commande inconnue "GROUP BY" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de "IPP, NDA, ..." - le reste de la ligne est ignoré.
+SP2-0044: Pour la liste des commandes connues entrez HELP
+and et pour sortir EXIT.
+SP2-0042: commande inconnue "ORDER BY" - reste de la ligne ignoré.
+SP2-0734: commande inconnue au début de "SORTIE_UHC..." - le reste de la ligne est ignoré.
