@@ -1,45 +1,40 @@
-UHCD :
-SPOOL ...\passage_UHCD_MI.csv
+/* UHCD -> MI (porte d'entrée) : 1 UHCD retenu (le dernier) par séjour MI
+   Sortie : IPP ; NDA ; UMA ; Date entree ; Date sortie
+*/
+
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\passage_UHCD_MI.csv
 
 SELECT
   x.IPP,
-  x.NDA_MI,
-  x.KYRES_MI,
-  x.UM_MI,
-  TO_CHAR(x.ENTREE_MI,'DD/MM/YYYY HH24:MI:SS') AS ENTREE_MI,
-  x.NDA_UHCD,
-  x.KYRES_UHCD,
-  x.UM_UHCD,
-  TO_CHAR(x.ENTREE_UHCD,'DD/MM/YYYY HH24:MI:SS') AS ENTREE_UHCD,
-  TO_CHAR(x.SORTIE_UHCD,'DD/MM/YYYY HH24:MI:SS') AS SORTIE_UHCD,
-  x.DP_UHCD,
-  MAX(CASE WHEN x.RN_DAS = 1 THEN x.DAS END) AS DAS1,
-  MAX(CASE WHEN x.RN_DAS = 2 THEN x.DAS END) AS DAS2,
-  MAX(CASE WHEN x.RN_DAS = 3 THEN x.DAS END) AS DAS3,
-  MAX(CASE WHEN x.RN_DAS = 4 THEN x.DAS END) AS DAS4
+  x.NDA,
+  x.UMA,
+  TO_CHAR(x.ENTREE,'DD/MM/YYYY HH24:MI:SS') AS DATE_ENTREE,
+  TO_CHAR(x.SORTIE,'DD/MM/YYYY HH24:MI:SS') AS DATE_SORTIE
 FROM (
   SELECT
-    mi.NOIP AS IPP,
-    mi.NODA AS NDA_MI,
-    mi.KYRES AS KYRES_MI,
-    mi.CDURM_P AS UM_MI,
-    mi.D8EEUE AS ENTREE_MI,
-    uh.NODA AS NDA_UHCD,
-    uh.KYRES AS KYRES_UHCD,
-    uh.CDURM_P AS UM_UHCD,
-    uh.D8EEUE AS ENTREE_UHCD,
-    uh.D8SOUE AS SORTIE_UHCD,
-    uh.CDDNC9 AS DP_UHCD,
-    d.KYCDDG AS DAS,
-    ROW_NUMBER() OVER (PARTITION BY uh.KYRES ORDER BY d.KYCDDG) AS RN_DAS,
+    mi.NOIP   AS IPP,
+
+    uh.NODA   AS NDA,
+    uh.CDURM_P AS UMA,
+    uh.D8EEUE AS ENTREE,
+    uh.D8SOUE AS SORTIE,
+
     ROW_NUMBER() OVER (
       PARTITION BY mi.KYRES
       ORDER BY uh.D8SOUE DESC
-    ) AS RN_UHCD
+    ) AS rn
   FROM
     RSM mi,
-    RSM uh,
-    DGN d
+    RSM uh
   WHERE
     mi.CDURM_P IN ('010','010S')
     AND mi.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
@@ -48,14 +43,9 @@ FROM (
     AND uh.NOIP = mi.NOIP
     AND uh.CDURM_P IN ('540','543')
     AND uh.D8SOUE <= mi.D8EEUE
-    AND uh.D8SOUE >= (mi.D8EEUE - 1)   -- fenêtre 1 jour (incluse)
-
-    AND d.KYRES(+) = uh.KYRES
+    AND uh.D8SOUE >= (mi.D8EEUE - 1)   -- fenêtre 1 jour incluse
 ) x
-WHERE x.RN_UHCD = 1
-GROUP BY
-  x.IPP, x.NDA_MI, x.KYRES_MI, x.UM_MI, x.ENTREE_MI,
-  x.NDA_UHCD, x.KYRES_UHCD, x.UM_UHCD, x.ENTREE_UHCD, x.SORTIE_UHCD, x.DP_UHCD
-ORDER BY
-  x.IPP, x.ENTREE_MI;
-SPOOL OFF;
+WHERE x.rn = 1
+ORDER BY x.IPP, x.SORTIE;
+
+SPOOL OFF
