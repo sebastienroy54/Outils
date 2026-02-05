@@ -1,23 +1,18 @@
-    # ... après avoir rempli rows ...
-
-    expected_rel_cols = [
-        "IPP", "DATE_NAISSANCE",
-        "NDA1", "UMA1", "GHM1", "DATEE1", "DATES1",
-        "NDA2", "UMA2", "GHM2", "DATEE2", "DATES2",
-        "TYPE_RELATION"
-    ]
-
-    res = pd.DataFrame(rows)
-
-    # Si aucun résultat: DataFrame vide sans colonnes -> on force le schéma
-    if res.empty:
-        res = pd.DataFrame(columns=expected_rel_cols)
-
-    # Si jamais une colonne manque (sécurité), on la crée
-    for c in expected_rel_cols:
-        if c not in res.columns:
-            res[c] = pd.Series(dtype="object")
-
-    res = res.drop_duplicates().reset_index(drop=True)
-    res["PAIR_ID"] = res.index + 1
-    return res
+/* croiser requete1 et requete2 KYRES vs NORES */
+set verify off
+set linesize 300
+set pagesize 6000
+spool M:/rsm_non_groupes_.txt
+set termout off
+/*requete 1*/
+SELECT DISTINCT RSM.KYRES, RSM.NODA, RSM.CDURM_P, RSM.D8EEUE, RSM.D8SOUE, RSM.D8RES
+FROM RSM WHERE 
+RSM.D8SOUE >= to_date('01/12/2025','DD/MM/YYYY')
+AND RSM.D8SOUE < to_date('01/01/2026','DD/MM/YYYY')
+;
+/* requete2*/
+SELECT DISTINCT RUM.NORES
+FROM RUM WHERE 
+RUM.D8SOUE >= to_date('01/01/2025','DD/MM/YYYY')
+AND RUM.D8SOUE < to_date('01/01/2026','DD/MM/YYYY')
+spool off;
