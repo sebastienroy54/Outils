@@ -1,8 +1,4 @@
-set verify off
-set linesize 300
-set pagesize 6000
-set termout off
-spool M:/rsm_non_groupes_dec2025.txt
+spool M:/rsm_sans_rum_dec2025.txt
 
 SELECT DISTINCT
     R.KYRES,
@@ -18,12 +14,8 @@ WHERE
     AND R.D8SOUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
     AND NOT EXISTS (
         SELECT 1
-        FROM RUM U, RSS S
+        FROM RUM U
         WHERE U.NORES = R.KYRES
-          AND S.KYRSS = U.KYRSS
-    )
-ORDER BY
-    R.D8SOUE, R.KYRES;
+    );
 
 spool off
-set termout on
