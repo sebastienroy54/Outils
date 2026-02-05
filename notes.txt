@@ -1,6 +1,21 @@
-Serait-il possible d’avoir une extraction pour 2025 : 
-1.	Les passages au SAU avec date pour les patients passés par HC Médecine Interne (UH 010) et HDS Médecine Interne (UH 010S)
-2.	L’ensemble des RUM avec dates entrée/sortie des patients passés par HC MI et HDS MI
-3.	Les séjours en UHCD avec date, DP et DAS pour les patients passés par HC MI et HDS MI
+SELECT COUNT(DISTINCT R2.NOIP) AS NB_PATIENTS_MI
+FROM RSM R2
+WHERE R2.CDURM_P IN ('010','010S')
+  AND R2.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND R2.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY');
 
-Pour contexte, nous aimerions essayer d’avoir des casemix des patients hospitalisés en médecine interne avec entrée directe via médecine de ville, via passage par SAU et via passage en UHCD.
+SELECT
+  COUNT(*) AS NB_RUM,
+  COUNT(DISTINCT R1.NOIP) AS NB_PATIENTS,
+  ROUND(COUNT(*) / NULLIF(COUNT(DISTINCT R1.NOIP),0), 2) AS RUM_PAR_PATIENT
+FROM RUM U, RSM R1
+WHERE U.NORES = R1.KYRES
+  AND U.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND U.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND R1.NOIP IN (
+    SELECT DISTINCT R2.NOIP
+    FROM RSM R2
+    WHERE R2.CDURM_P IN ('010','010S')
+      AND R2.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+      AND R2.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  );
