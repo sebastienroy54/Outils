@@ -34,6 +34,6 @@ WHERE
           AND S.D8FIN >= TO_DATE('01/01/2026','DD/MM/YYYY')
     )
 ORDER BY
-    R.D8SOUE, R.KYRES;
+    R.D8SOUE;
 spool off
 set termout on
