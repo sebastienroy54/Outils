@@ -1,50 +1,69 @@
 import pandas as pd
 
+def norm_str(s: pd.Series) -> pd.Series:
+    # string + trim + normalisation espaces + casse
+    s = s.astype("string")
+    s = s.str.replace(r"\s+", " ", regex=True).str.strip().str.upper()
+    return s
+
+def norm_nip(s: pd.Series) -> pd.Series:
+    # IMPORTANT: préserver les zéros en tête
+    # On normalise en string, on enlève ".0" si Excel a converti en float,
+    # puis on garde les chiffres tels quels.
+    s = s.astype("string").str.strip()
+    s = s.str.replace(r"\.0$", "", regex=True)
+    return s
+
 def build_key(df: pd.DataFrame,
               nip_col="NIP",
               date_col="Date de pose",
               ref_col="Réf commerciale") -> pd.Series:
-    # NIP + Ref : string trim
-    nip = df[nip_col].astype("string").str.strip()
-    ref = df[ref_col].astype("string").str.strip()
+    nip = norm_nip(df[nip_col])
+    ref = norm_str(df[ref_col])
 
-    # Date : parse en date puis format stable YYYYMMDD (pas d'heure)
-    date = pd.to_datetime(df[date_col], errors="coerce").dt.strftime("%Y%m%d")
+    # Date -> YYYYMMDD (sans heure)
+    d = pd.to_datetime(df[date_col], errors="coerce", dayfirst=True)
+    date = d.dt.strftime("%Y%m%d")
 
-    # Clé
     return nip.fillna("") + "|" + date.fillna("") + "|" + ref.fillna("")
 
-
-def extract_a_not_in_b(path_a: str, path_b: str, out_path: str,
-                       sheet_a=0, sheet_b=0) -> None:
+def main(path_a, path_b, out_path, sheet_a=0, sheet_b=0):
     df_a = pd.read_excel(path_a, sheet_name=sheet_a, dtype=object)
     df_b = pd.read_excel(path_b, sheet_name=sheet_b, dtype=object)
 
-    # Construire les clés
+    # Recréer la clé des deux côtés à partir des mêmes colonnes
     df_a["_key"] = build_key(df_a)
-    # Si B a déjà une colonne de clé, tu peux l'utiliser ; sinon on la reconstruit pareil
-    if "Clé technique (IPP|date|ref)" in df_b.columns:
-        df_b["_key"] = df_b["Clé technique (IPP|date|ref)"].astype("string").str.strip()
-    else:
-        df_b["_key"] = build_key(df_b)
+    df_b["_key"] = build_key(df_b)
 
-    # Filtre : A \ B
+    # Stats debug
+    keys_a = set(df_a["_key"].dropna())
     keys_b = set(df_b["_key"].dropna())
-    df_out = df_a[~df_a["_key"].isin(keys_b)].copy()
+    inter = keys_a & keys_b
 
-    # Optionnel : retirer la colonne technique
+    print(f"Lignes A: {len(df_a)}")
+    print(f"Lignes B: {len(df_b)}")
+    print(f"Clés uniques A: {len(keys_a)}")
+    print(f"Clés uniques B: {len(keys_b)}")
+    print(f"Clés communes A∩B: {len(inter)}")
+
+    # Si 0 clé commune -> on affiche des exemples pour diagnostiquer
+    if len(inter) == 0:
+        print("\n⚠️ Aucune clé ne matche. Exemples de clés (A puis B) :")
+        print("A:", df_a["_key"].dropna().head(5).tolist())
+        print("B:", df_b["_key"].dropna().head(5).tolist())
+
+        # Bonus : vérifier si NIP semble perdre des zéros en tête
+        # (ex: longueur variable)
+        print("\nInfo NIP (longueurs) :")
+        print("A NIP lengths:", df_a["NIP"].astype("string").str.strip().str.len().dropna().value_counts().head())
+        print("B NIP lengths:", df_b["NIP"].astype("string").str.strip().str.len().dropna().value_counts().head())
+
+    # Extraction A \ B
+    df_out = df_a[~df_a["_key"].isin(keys_b)].copy()
     df_out.drop(columns=["_key"], inplace=True)
 
-    # Export
     df_out.to_excel(out_path, index=False)
-
+    print(f"\n✅ Export: {out_path} | Lignes finales (A\\B): {len(df_out)}")
 
 if __name__ == "__main__":
-    extract_a_not_in_b(
-        path_a="fichier1.xlsx",
-        path_b="fichier2.xlsx",
-        out_path="final_A_moins_B.xlsx",
-        sheet_a=0,
-        sheet_b=0
-    )
-    print("✅ Export terminé : final_A_moins_B.xlsx")
+    main("fichier1.xlsx", "fichier2.xlsx", "final_A_moins_B.xlsx")
