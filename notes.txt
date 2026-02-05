@@ -6,7 +6,9 @@ SET COLSEP ';'
 SET TRIMSPOOL ON
 SET WRAP OFF
 SET TERMOUT OFF
+
 SPOOL C:\Users\4251352\Documents\Resultats_requetes\passage_UHCD_MI.csv
+
 SELECT
     IPP,
     NDA,
@@ -22,36 +24,48 @@ SELECT
 FROM
 (
     SELECT
-        U.NOIP AS IPP,
-        U.NODA AS NDA,
-        U.KYRES AS KYRES,
+        U.NOIP    AS IPP,
+        U.NODA    AS NDA,
+        U.KYRES   AS KYRES,
         U.CDURM_P AS UM_UHCD,
-        U.D8EEUE AS ENTREE_UHCD,
-        U.D8SOUE AS SORTIE_UHCD,
-        U.CDDNC9 AS DP,
-        D.KYCDDG AS DAS,
-        ROW_NUMBER() OVER (PARTITION BY U.KYRES ORDER BY D.KYCDDG) AS RN
+        U.D8EEUE  AS ENTREE_UHCD,
+        U.D8SOUE  AS SORTIE_UHCD,
+        U.CDDNC9  AS DP,
+        D.KYCDDG  AS DAS,
+
+        ROW_NUMBER() OVER (PARTITION BY U.KYRES ORDER BY D.KYCDDG) AS RN,
+
+        /* ✅ Sélection du dernier UHCD par séjour MI */
+        ROW_NUMBER() OVER (PARTITION BY M.KYRES ORDER BY U.D8SOUE DESC) AS RN_UHCD_MI
+
     FROM
         RSM U,
+        RSM M,
         DGN D
     WHERE
+        /* DAS en left join old-school */
         D.KYRES(+) = U.KYRES
+
+        /* Périmètre UHCD */
         AND U.CDURM_P IN ('540','543')
         AND U.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
         AND U.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-        AND EXISTS (
-            SELECT 1
-            FROM RSM M
-            WHERE M.NOIP = U.NOIP
-              AND M.CDURM_P IN ('010','010S')
-              AND M.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND M.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND U.D8SOUE <= M.D8EEUE
-              AND U.D8SOUE >  M.D8EEUE - 1
-        )
+
+        /* Périmètre MI */
+        AND M.CDURM_P IN ('010','010S')
+        AND M.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+        AND M.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+
+        /* Lien patient + fenêtre 1 jour */
+        AND M.NOIP = U.NOIP
+        AND U.D8SOUE <= M.D8EEUE
+        AND U.D8SOUE >  M.D8EEUE - 1
 )
+WHERE
+    RN_UHCD_MI = 1
 GROUP BY
     IPP, NDA, KYRES, UM_UHCD, ENTREE_UHCD, SORTIE_UHCD, DP
 ORDER BY
     SORTIE_UHCD, IPP;
-SPOOL OFF;
+
+SPOOL OFF
