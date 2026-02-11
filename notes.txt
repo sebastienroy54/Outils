@@ -1,8 +1,51 @@
-donner les chiffres de chimioembolisation hépatique et de radioembolisation hepatique des 5 dernieres années
-les codes CCAM correspondants :
-Pour la chimioembolisation :
-CODE : EDLF016 - EDLF017 - EDLF014 - EDLF01 (s’il est possible de séparer les 4 ?)
-LIBELLE : Injection intraartérielle hépatique in situ suprasélective d'agent pharmacologique anticancéreux non radio-isotopique avec embolisation de particules, par voie artérielle transcutanée
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
 
-Pour la radioembolisation : 
-EDLL001 ou EDLL002
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\chimio_radio_embo_5ans.csv
+
+SELECT ANNEE, TYPE_ACTE, CODE_ACTE, NB_SEJOURS
+FROM (
+  SELECT
+    TO_CHAR(A.D8ACT,'YYYY') AS ANNEE,
+    CASE
+      WHEN A.KYCDAC IN ('EDLL001','EDLL002') THEN 'RADIOEMBOLISATION'
+      WHEN A.KYCDAC LIKE 'EDLF01%' THEN 'CHIMIOEMBOLISATION'
+      ELSE 'AUTRE'
+    END AS TYPE_ACTE,
+    CASE
+      WHEN A.KYCDAC IN ('EDLF014','EDLF016','EDLF017','EDLL001','EDLL002') THEN A.KYCDAC
+      WHEN A.KYCDAC LIKE 'EDLF01%' THEN 'EDLF01_AUTRES'
+      ELSE A.KYCDAC
+    END AS CODE_ACTE,
+    COUNT(DISTINCT R.KYRES) AS NB_SEJOURS
+  FROM RSM R, RAC A
+  WHERE A.KYRES = R.KYRES
+    AND A.D8ACT >= TO_DATE('01/01/2021','DD/MM/YYYY')
+    AND A.D8ACT <  TO_DATE('01/01/2026','DD/MM/YYYY')
+    AND (
+      A.KYCDAC IN ('EDLF014','EDLF016','EDLF017','EDLL001','EDLL002')
+      OR A.KYCDAC LIKE 'EDLF01%'
+    )
+  GROUP BY
+    TO_CHAR(A.D8ACT,'YYYY'),
+    CASE
+      WHEN A.KYCDAC IN ('EDLL001','EDLL002') THEN 'RADIOEMBOLISATION'
+      WHEN A.KYCDAC LIKE 'EDLF01%' THEN 'CHIMIOEMBOLISATION'
+      ELSE 'AUTRE'
+    END,
+    CASE
+      WHEN A.KYCDAC IN ('EDLF014','EDLF016','EDLF017','EDLL001','EDLL002') THEN A.KYCDAC
+      WHEN A.KYCDAC LIKE 'EDLF01%' THEN 'EDLF01_AUTRES'
+      ELSE A.KYCDAC
+    END
+)
+WHERE TYPE_ACTE <> 'AUTRE'
+ORDER BY ANNEE, TYPE_ACTE, CODE_ACTE;
+
+SPOOL OFF
