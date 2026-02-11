@@ -1,8 +1,90 @@
-Joining with `by = join_by(URM_APHP)`
-Warning message:
-In left_join(MCO_CCH, UM_CCH) :
-  Detected an unexpected many-to-many relationship between `x` and `y`.
-ℹ Row 463 of `x` matches multiple rows in `y`.
-ℹ Row 64 of `y` matches multiple rows in `x`.
-ℹ If a many-to-many relationship is expected, set `relationship = "many-to-many"` to silence this
-  warning.
+####### FORMATAGE DES RIM-P DIME POUR IMPORT DANS PMSIPilot ###############
+gc()
+# Loading libraries
+library(tidyr)
+library(dplyr)
+library(stringr)
+library("readxl")
+
+####### ********** A PARAMETRER A CHAQUE REMONTEE ************#############
+
+chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/MCO"
+# DEPLACER LES 6 FICHIERS
+UMA_BRC = "CORREPONDANCE_UM_MCO_SITE_00016_APHP_202512.xls"
+MCO_BRC = "750801441.2025.12.rss.ini.txt"
+UMA_CCH = "CORREPONDANCE_UM_MCO_SITE_00021_APHP_202512.xls"
+MCO_CCH = "750100166.2025.12.rss.ini.txt"
+UMA_CCL = "CORREPONDANCE_UM_MCO_SITE_00022_APHP_202512.xls"
+MCO_CCL = "920100062.2025.12.rss.ini.txt"
+UMA_HTD = "CORREPONDANCE_UM_MCO_SITE_00041_APHP_202512.xls"
+MCO_HTD = "750100018.2025.12.rss.ini.txt"
+
+taille_um = 4
+deb_pos_UM_RAA = 87  # 2025
+
+###########################################  FIN ZONE PARAMETRAGE ###################
+
+# chemin    
+setwd (chemin)
+# nom des fichiers de sortie
+MCO_BRC_SITE = paste(str_sub(MCO_BRC, start = 1, end = nchar(MCO_BRC)-4),".site",str_sub(MCO_BRC, start = nchar(MCO_BRC)-3),sep="")
+MCO_CCH_SITE = paste(str_sub(MCO_CCH, start = 1, end = nchar(MCO_CCH)-4),".site",str_sub(MCO_CCH, start = nchar(MCO_CCH)-3),sep="")
+MCO_CCL_SITE = paste(str_sub(MCO_CCL, start = 1, end = nchar(MCO_CCL)-4),".site",str_sub(MCO_CCL, start = nchar(MCO_CCL)-3),sep="")
+MCO_HTD_SITE = paste(str_sub(MCO_HTD, start = 1, end = nchar(MCO_HTD)-4),".site",str_sub(MCO_HTD, start = nchar(MCO_HTD)-3),sep="")
+
+# fichiers de travail
+UM_BRC<-read_excel(UMA_BRC, skip  = 2)
+UM_CCH<-read_excel(UMA_CCH, skip  = 2)
+UM_CCL<-read_excel(UMA_CCL, skip  = 2)
+UM_HTD<-read_excel(UMA_HTD, skip  = 2)
+
+############ RAA ################
+MCO_BRC<-read.csv2(MCO_BRC, header = FALSE)
+A<-str_replace_all(str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA+4), " ", "")
+MCO_BRC<-MCO_BRC%>%mutate(URM_APHP = A)
+MCO_BRC<-left_join(MCO_BRC, UM_BRC)
+B<-str_sub(MCO_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_BRC$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_BRC$URM_SITE,Z,C,sep="")
+write(D, file = MCO_BRC_SITE)
+
+MCO_CCH<-read.csv2(MCO_CCH, header = FALSE)
+A<-str_replace_all(str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA+4), " ", "")
+MCO_CCH<-MCO_CCH%>%mutate(URM_APHP = A)
+MCO_CCH<-left_join(MCO_CCH, UM_CCH)
+B<-str_sub(MCO_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_CCH$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_CCH$URM_SITE,Z,C,sep="")
+write(D, file = MCO_CCH_SITE)
+
+MCO_CCL<-read.csv2(MCO_CCL, header = FALSE)
+A<-str_replace_all(str_sub(MCO_CCL[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA+4), " ", "")
+MCO_CCL<-MCO_CCL%>%mutate(URM_APHP = A)
+MCO_CCL<-left_join(MCO_CCL, UM_CCL)
+B<-str_sub(MCO_CCL[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_CCL[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_CCL$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_CCL$URM_SITE,Z,C,sep="")
+write(D, file = MCO_CCL_SITE)
+
+MCO_HTD<-read.csv2(MCO_HTD, header = FALSE)
+A<-str_replace_all(str_sub(MCO_HTD[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA+4), " ", "")
+MCO_HTD<-MCO_HTD%>%mutate(URM_APHP = A)
+MCO_HTD<-left_join(MCO_HTD, UM_HTD)
+B<-str_sub(MCO_HTD[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_HTD[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_HTD$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_HTD$URM_SITE,Z,C,sep="")
+write(D, file = MCO_HTD_SITE)
+
+
+# FIN DE PROCEDURE 
+
+1311195322387  041220248 041220246193210000000
+1311195320129080412202461070120257293210000000
