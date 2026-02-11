@@ -1,157 +1,87 @@
-> ####### FORMATAGE DES RIM-P DIME POUR IMPORT DANS PMSIPilot ###############
-> gc()
-           used  (Mb) gc trigger  (Mb) max used  (Mb)
-Ncells  1786659  95.5    3935434 210.2  2759324 147.4
-Vcells 14455515 110.3   32435616 247.5 32327718 246.7
-> # Loading libraries
-> library(tidyr)
-> library(dplyr)
-> library(stringr)
-> library("readxl")
-> 
-> ####### ********** A PARAMETRER A CHAQUE REMONTEE ************#############
-> 
-> chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/MCO"
-> # DEPLACER LES 6 FICHIERS
-> UMA_BRC = "CORREPONDANCE_UM_MCO_SITE_00016_APHP_202512.xls"
-> MCO_BRC = "750801441.2025.12.rss.ini.txt"
-> UMA_CCH = "CORREPONDANCE_UM_MCO_SITE_00021_APHP_202512.xls"
-> MCO_CCH = "750100166.2025.12.rss.ini.txt"
-> UMA_CCL = "CORREPONDANCE_UM_MCO_SITE_00022_APHP_202512.xls"
-> MCO_CCL = "920100062.2025.12.rss.ini.txt"
-> UMA_HTD = "CORREPONDANCE_UM_MCO_SITE_00041_APHP_202512.xls"
-> MCO_HTD = "750100018.2025.12.rss.ini.txt"
-> 
-> taille_um = 4
-> deb_pos_UM_RAA = 87  # 2025
-> 
-> ###########################################  FIN ZONE PARAMETRAGE ###################
-> 
-> # chemin
-> setwd (chemin)
-> # nom des fichiers de sortie
-> MCO_BRC_SITE = paste(str_sub(MCO_BRC, start = 1, end = nchar(MCO_BRC)-4),".site",str_sub(MCO_BRC, start = nchar(MCO_BRC)-3),sep="")
-> MCO_CCH_SITE = paste(str_sub(MCO_CCH, start = 1, end = nchar(MCO_CCH)-4),".site",str_sub(MCO_CCH, start = nchar(MCO_CCH)-3),sep="")
-> MCO_CCL_SITE = paste(str_sub(MCO_CCL, start = 1, end = nchar(MCO_CCL)-4),".site",str_sub(MCO_CCL, start = nchar(MCO_CCL)-3),sep="")
-> MCO_HTD_SITE = paste(str_sub(MCO_HTD, start = 1, end = nchar(MCO_HTD)-4),".site",str_sub(MCO_HTD, start = nchar(MCO_HTD)-3),sep="")
-> 
-> # fichiers de travail
-> UM_BRC<-read_excel(UMA_BRC, skip  = 2)
-> UM_CCH<-read_excel(UMA_CCH, skip  = 2)
-> UM_CCL<-read_excel(UMA_CCL, skip  = 2)
-> UM_HTD<-read_excel(UMA_HTD, skip  = 2)
-> 
-> ############ RAA ################
-> MCO_BRC<-read.csv2(MCO_BRC, header = FALSE)
-> A<-str_replace_all(str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA+4), " ", "")
-> MCO_BRC<-MCO_BRC%>%mutate(URM_APHP = A)
-> MCO_BRC<-left_join(MCO_BRC, UM_BRC)
-Joining with `by = join_by(URM_APHP)`
-> B<-str_sub(MCO_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
-> C<-str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA+4)
-> X<-(4-nchar(MCO_BRC$URM_SITE))
-> Z<-strrep(" ",X)
-> D<-paste(B,MCO_BRC$URM_SITE,Z,C,sep="")
-> write(D, file = MCO_BRC_SITE)
-> 
-> ##### CCH (DEBUG AJOUTE ICI UNIQUEMENT) #####
-> MCO_CCH<-read.csv2(MCO_CCH, header = FALSE)
-> 
-> # DEBUG: identifiant de ligne + contexte autour de la zone UM
-> MCO_CCH <- MCO_CCH %>% mutate(.row_id = row_number())
-> MCO_CCH <- MCO_CCH %>% mutate(.ctx = str_sub(MCO_CCH[,1], start = deb_pos_UM_RAA - 10, end = deb_pos_UM_RAA + 20))
-> 
-> # DEBUG: extraction UM sur EXACTEMENT 4 caracteres (taille_um)
-> A<-str_replace_all(
-+   str_sub(MCO_CCH[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1),
-+   " ", ""
-+ )
-> 
-> MCO_CCH<-MCO_CCH%>%mutate(URM_APHP = A)
-> MCO_CCH<-left_join(MCO_CCH, UM_CCH)
-Joining with `by = join_by(URM_APHP)`
-Warning message:
-In left_join(MCO_CCH, UM_CCH) :
-  Detected an unexpected many-to-many relationship between `x` and `y`.
-ℹ Row 463 of `x` matches multiple rows in `y`.
-ℹ Row 64 of `y` matches multiple rows in `x`.
-ℹ If a many-to-many relationship is expected, set `relationship = "many-to-many"` to silence this
-  warning.
-> 
-> # DEBUG: afficher les cas où la jointure ne matche pas (URM_SITE = NA)
-> pb <- MCO_CCH %>%
-+   filter(is.na(URM_SITE)) %>%
-+   select(.row_id, URM_APHP, .ctx) %>%
-+   head(50)
-> print(pb)
-[1] .row_id  URM_APHP .ctx    
-<0 lignes> (ou 'row.names' de longueur nulle)
-> 
-> # DEBUG: zoom sur la clé 0129 / 129 si présente
-> print(MCO_CCH %>% filter(URM_APHP %in% c("0129","129")) %>% select(.row_id, URM_APHP, .ctx, URM_SITE) %>% head(50))
-   .row_id URM_APHP                            .ctx URM_SITE
-1      386     0129  131119532012908041220246107012      060
-2      464     0129  0808193710129  251220246102012      060
-3      581     0129  3006196420129  030120256104012      060
-4      690     0129  2604195010129  291220246103012      060
-5      700     0129  1503196920129  030120256104012      060
-6      755     0129  0301194620129  020120256104012      060
-7      757     0129  3007194910129  261220246104012      060
-8      899     0129  1710197410129  020120258 03012      060
-9      905     0129  1111194220129  271220248 02012      060
-10     907     0129  0502195910129  301220248 02012      060
-11     909     0129  1302195110129  030120256104012      060
-12     911     0129  0502198020129  191220248 03012      060
-13     912     0129  0510194220129  301220248 03012      060
-14     913     0129  2509196820129  281220248 02012      060
-15     914     0129  0909198820129  311220248 03012      060
-16     919     0129  1601198010129  281220248 03012      060
-17    1022     0129  0607194220129  251220246125122      060
-18    1024     0129  0607194220129  040120256107012      060
-19    1041     0129  2405196710129  030120256107012      060
-20    1044     0129  0901194420129  311220246107012      060
-21    1079     0129  0312193610129  211220246106012      060
-22    1153     0129  1910196510129  231220248 06012      060
-23    1357     0129  1202196310129  231220246108012      060
-24    1440     0129  2801193820129  251220247106012      060
-25    1450     0129  3012197520129  311220248 06012      060
-26    1478     0129  1803193510129  241220246108012      060
-27    1634     0129  1301198920129  030120256107012      060
-28    1647     0129  0409194920129  301220246108012      060
-29    1650     0129  1401193410129  040120256111012      060
-30    1661     0129  0404199010129  311220248 07012      060
-31    1674     0129  2105199910129  271220248 28122      060
-32    1766     0129  1805197910129  271220246107012      060
-33    1807     0129  0604196110129  261220246105012      060
-34    1809     0129  0604196110129  130120256114012      060
-35    1823     0129  1004195610129  050120256110012      060
-36    1828     0129  2609197220129  050120256110012      060
-37    1923     0129  2102194710129  221220246102012      060
-38    1924     0129  2009194220129  301220248 09012      060
-39    1925     0129  0407195520129  301220248 13012      060
-40    1926     0129  0504196310129  050120258 09012      060
-41    1932     0129  0802194810129  171220248 09012      060
-42    1933     0129  2907194610129  060120258 09012      060
-43    1939     0129  1502195820129  020120258 04012      060
-44    1940     0129  0508194220129  070120258 10012      060
-45    1941     0129  0310198310129  070120258 10012      060
-46    1946     0129  1104197310129  070120258 11012      060
-47    1992     0129  0405194420129  020120256103012      060
-48    2019     0129  1102197310129  080120256113012      060
-49    2092     0129  1401196810129  311220246115012      060
-50    2163     0129  1603198210129  010120256114012      060
-> 
-> # DEBUG: vérifier si l'excel contient 0129 vs 129
-> print(UM_CCH %>% filter(URM_APHP %in% c("0129","129")) %>% head(50))
-# A tibble: 1 × 7
-  CODE_HOPITAL URM_SITE URM_APHP TYPE_AUTORISATION DATE_EFFET NB_LITS TYPE_HOSPITALISATION
-  <chr>        <chr>    <chr>    <chr>             <chr>      <chr>   <chr>               
-1 00021        060      0129     29                01/01/2005 000     C                   
-> ##### FIN DEBUG CCH #####
-> 
-> B<-str_sub(MCO_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
-> C<-str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA+4)
-> X<-(4-nchar(MCO_CCH$URM_SITE))
-> Z<-strrep(" ",X)
-> D<-paste(B,MCO_CCH$URM_SITE,Z,C,sep="")
-> write(D, file = MCO_CCH_SITE)
+####### FORMATAGE DES RIM-P DIME POUR IMPORT DANS PMSIPilot ###############
+gc()
+# Loading libraries
+library(tidyr)
+library(dplyr)
+library(stringr)
+library("readxl")
+
+####### ********** A PARAMETRER A CHAQUE REMONTEE ************#############
+
+chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/MCO"
+# DEPLACER LES 6 FICHIERS
+UMA_BRC = "CORREPONDANCE_UM_MCO_SITE_00016_APHP_202512.xls"
+MCO_BRC = "750801441.2025.12.rss.ini.txt"
+UMA_CCH = "CORREPONDANCE_UM_MCO_SITE_00021_APHP_202512.xls"
+MCO_CCH = "750100166.2025.12.rss.ini.txt"
+UMA_CCL = "CORREPONDANCE_UM_MCO_SITE_00022_APHP_202512.xls"
+MCO_CCL = "920100062.2025.12.rss.ini.txt"
+UMA_HTD = "CORREPONDANCE_UM_MCO_SITE_00041_APHP_202512.xls"
+MCO_HTD = "750100018.2025.12.rss.ini.txt"
+
+taille_um = 4
+deb_pos_UM_RAA = 87  # 2025
+
+###########################################  FIN ZONE PARAMETRAGE ###################
+
+# chemin    
+setwd (chemin)
+# nom des fichiers de sortie
+MCO_BRC_SITE = paste(str_sub(MCO_BRC, start = 1, end = nchar(MCO_BRC)-4),".site",str_sub(MCO_BRC, start = nchar(MCO_BRC)-3),sep="")
+MCO_CCH_SITE = paste(str_sub(MCO_CCH, start = 1, end = nchar(MCO_CCH)-4),".site",str_sub(MCO_CCH, start = nchar(MCO_CCH)-3),sep="")
+MCO_CCL_SITE = paste(str_sub(MCO_CCL, start = 1, end = nchar(MCO_CCL)-4),".site",str_sub(MCO_CCL, start = nchar(MCO_CCL)-3),sep="")
+MCO_HTD_SITE = paste(str_sub(MCO_HTD, start = 1, end = nchar(MCO_HTD)-4),".site",str_sub(MCO_HTD, start = nchar(MCO_HTD)-3),sep="")
+
+# fichiers de travail
+UM_BRC<-read_excel(UMA_BRC, skip  = 2)
+UM_CCH<-read_excel(UMA_CCH, skip  = 2)
+UM_CCL<-read_excel(UMA_CCL, skip  = 2)
+UM_HTD<-read_excel(UMA_HTD, skip  = 2)
+
+############ RAA ################
+MCO_BRC<-read.csv2(MCO_BRC, header = FALSE)
+A<-str_replace_all(str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+MCO_BRC<-MCO_BRC%>%mutate(URM_APHP = A)
+MCO_BRC<-left_join(MCO_BRC, UM_BRC)
+B<-str_sub(MCO_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_BRC$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_BRC$URM_SITE,Z,C,sep="")
+write(D, file = MCO_BRC_SITE)
+
+MCO_CCH<-read.csv2(MCO_CCH, header = FALSE)
+A<-str_replace_all(str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+MCO_CCH<-MCO_CCH%>%mutate(URM_APHP = A)
+MCO_CCH<-left_join(MCO_CCH, UM_CCH)
+B<-str_sub(MCO_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_CCH$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_CCH$URM_SITE,Z,C,sep="")
+write(D, file = MCO_CCH_SITE)
+
+MCO_CCL<-read.csv2(MCO_CCL, header = FALSE)
+A<-str_replace_all(str_sub(MCO_CCL[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+MCO_CCL<-MCO_CCL%>%mutate(URM_APHP = A)
+MCO_CCL<-left_join(MCO_CCL, UM_CCL)
+B<-str_sub(MCO_CCL[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_CCL[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_CCL$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_CCL$URM_SITE,Z,C,sep="")
+write(D, file = MCO_CCL_SITE)
+
+MCO_HTD<-read.csv2(MCO_HTD, header = FALSE)
+A<-str_replace_all(str_sub(MCO_HTD[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+MCO_HTD<-MCO_HTD%>%mutate(URM_APHP = A)
+MCO_HTD<-left_join(MCO_HTD, UM_HTD)
+B<-str_sub(MCO_HTD[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(MCO_HTD[,1],start = deb_pos_UM_RAA+4)
+X<-(4-nchar(MCO_HTD$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,MCO_HTD$URM_SITE,Z,C,sep="")
+write(D, file = MCO_HTD_SITE)
+
+
+# FIN DE PROCEDURE 
