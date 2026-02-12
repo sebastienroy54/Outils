@@ -1,2 +1,20 @@
-[DEBUG] row 135 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
-[DEBUG] row 136 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
+# ===== DEBUG MERGE INTERVALLE pour idx 135/136 (sans IPP/NDA) =====
+sample_idx = [135, 136]
+sample = df_final.loc[sample_idx, ["ipp", "date_pose"]].copy().reset_index()
+
+cand = sample.merge(mapping, left_on="ipp", right_on="nip", how="left")
+
+# on ne montre pas ipp/nip/nas : seulement dates + bool
+cand["ge_deb"] = cand["date_pose"] >= cand["date_deb"]
+cand["le_fin"] = cand["date_pose"] <= cand["date_fin"]
+cand["in_interval"] = cand["ge_deb"] & cand["le_fin"]
+
+print("\n[DEBUG] candidats après merge (dates uniquement) pour idx 135/136:")
+print(cand[["index", "date_pose", "date_deb", "date_fin", "ge_deb", "le_fin", "in_interval"]].to_string(index=False))
+
+print("\n[DEBUG] nb de séjours récupérés par index:")
+print(cand.groupby("index").size().to_string())
+
+print("\n[DEBUG] nb de séjours valides (date_deb/date_fin non nulles):")
+valid = cand[cand["date_deb"].notna() & cand["date_fin"].notna()]
+print(valid.groupby("index").size().to_string())
