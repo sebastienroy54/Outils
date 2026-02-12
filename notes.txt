@@ -1,14 +1,16 @@
-# Export XLSX avec format date dd/mm/yyyy
-with pd.ExcelWriter(out_xlsx_path, engine="openpyxl") as writer:
-    df_final.to_excel(writer, index=False, sheet_name="flat")
-    ws = writer.sheets["flat"]
-
-    headers = [cell.value for cell in ws[1]]
-    date_cols = {"date_pose", "date_naissance", "nda_date_deb_match", "nda_date_fin_match"}
-    date_col_indexes = [i + 1 for i, h in enumerate(headers) if h in date_cols]
-
-    for col_idx in date_col_indexes:
-        for row in range(2, ws.max_row + 1):
-            cell = ws.cell(row=row, column=col_idx)
-            if cell.value is not None:
-                cell.number_format = "DD/MM/YYYY"
+def clean_digits_id(x) -> str:
+    """
+    Normalise un identifiant (IPP/NDA/NIP/NAS) :
+    - strip, supprime .0
+    - supprime H si H61...
+    - garde uniquement les chiffres
+    """
+    s = "" if x is None else str(x).strip()
+    if not s:
+        return ""
+    s = s.replace("\u00A0", " ").strip()
+    s = re.sub(r"\.0$", "", s)
+    s = s.upper()
+    s = re.sub(r"^H(?=61\d+)", "", s)  # H615... -> 615...
+    s = re.sub(r"\D+", "", s)         # digits only
+    return s
