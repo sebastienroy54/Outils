@@ -1,36 +1,14 @@
-def read_mapping_csv(map_path: str) -> pd.DataFrame:
-    # tente ; puis ,
-    try:
-        m = pd.read_csv(map_path, sep=";", dtype=str)
-        if m.shape[1] == 1:
-            raise ValueError("Bad sep")
-    except Exception:
-        m = pd.read_csv(map_path, sep=",", dtype=str)
+# Export XLSX avec format date dd/mm/yyyy
+with pd.ExcelWriter(out_xlsx_path, engine="openpyxl") as writer:
+    df_final.to_excel(writer, index=False, sheet_name="flat")
+    ws = writer.sheets["flat"]
 
-    # colonnes attendues: NIP NAS type date.deb date.fin
-    m = m.rename(columns={
-        "NIP": "nip",
-        "NAS": "nas",
-        "type": "type",
-        "date.deb": "date_deb",
-        "date.fin": "date_fin",
-    })
-    # fallback si déjà normalisées / variantes
-    if "nip" not in m.columns and "NIP" in m.columns:
-        m["nip"] = m["NIP"]
-    if "nas" not in m.columns and "NAS" in m.columns:
-        m["nas"] = m["NAS"]
-    if "date_deb" not in m.columns and "date.deb" in m.columns:
-        m["date_deb"] = m["date.deb"]
-    if "date_fin" not in m.columns and "date.fin" in m.columns:
-        m["date_fin"] = m["date.fin"]
+    headers = [cell.value for cell in ws[1]]
+    date_cols = {"date_pose", "date_naissance", "nda_date_deb_match", "nda_date_fin_match"}
+    date_col_indexes = [i + 1 for i, h in enumerate(headers) if h in date_cols]
 
-    m["nip"] = m["nip"].fillna("").astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
-    m["nas"] = m["nas"].fillna("").astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
-
-    # Dates normalisées au jour (supprime hh:mm:ss) pour matcher proprement
-    m["date_deb"] = pd.to_datetime(m["date_deb"], errors="coerce", dayfirst=True).dt.normalize()
-    m["date_fin"] = pd.to_datetime(m["date_fin"], errors="coerce", dayfirst=True).dt.normalize()
-
-    m = m[(m["nip"] != "") & m["date_deb"].notna() & m["date_fin"].notna()].copy()
-    return m[["nip", "nas", "date_deb", "date_fin"]]
+    for col_idx in date_col_indexes:
+        for row in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row, column=col_idx)
+            if cell.value is not None:
+                cell.number_format = "DD/MM/YYYY"
