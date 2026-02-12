@@ -1,4 +1,5 @@
- CSV ligne Excel 38884 (pandas iloc 38882)
-'type': 'hc', 'date.deb': '2025-01-08', 'date.fin': '2025-01-16'}
---- CSV ligne Excel 38885 (pandas iloc 38883) ---
- 'type': 'hc', 'date.deb': '2025-01-23', 'date.fin': '2025-02-11'}
+# ===== DEBUG TEST 1: vérifier date_pose ligne 137/138 (index pandas) =====
+for idx in [137, 138]:
+    if idx < len(df_final):
+        dp = df_final.loc[idx, "date_pose"]
+        print(f"[DEBUG] row {idx} date_pose pandas = {dp} (type={type(dp)})")
