@@ -1,16 +1,150 @@
-def clean_digits_id(x) -> str:
-    """
-    Normalise un identifiant (IPP/NDA/NIP/NAS) :
-    - strip, supprime .0
-    - supprime H si H61...
-    - garde uniquement les chiffres
-    """
-    s = "" if x is None else str(x).strip()
-    if not s:
-        return ""
-    s = s.replace("\u00A0", " ").strip()
-    s = re.sub(r"\.0$", "", s)
-    s = s.upper()
-    s = re.sub(r"^H(?=61\d+)", "", s)  # H615... -> 615...
-    s = re.sub(r"\D+", "", s)         # digits only
-    return s
+def post_clean(df_final: pd.DataFrame) -> pd.DataFrame:
+    # Identifiants
+    df_final["ipp"] = df_final["ipp"].apply(clean_digits_id)
+    df_final["nda"] = df_final["nda"].apply(clean_digits_id)
+
+    # Dates au jour
+    df_final["date_pose"] = pd.to_datetime(df_final["date_pose"], errors="coerce", dayfirst=True).dt.normalize()
+
+    # Split Nom/Prénom pour 3416095 si prenom vide (prénom en Title Case)
+    def is_titlecase_word(w: str) -> bool:
+        if not w:
+            return False
+        w2 = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ'\-]", "", w)
+        return bool(w2) and w2[0].isupper() and (w2[1:].islower() or w2[1:].replace("-", "").replace("'", "").islower())
+
+    def split_nom_prenom(full: str):
+        s = "" if full is None else str(full).strip()
+        if not s:
+            return "", ""
+        parts = s.split()
+        if len(parts) == 1:
+            return s, ""
+        idx = None
+        for i, w in enumerate(parts):
+            if is_titlecase_word(w):
+                idx = i
+                break
+        if idx is None or idx == 0:
+            return s, ""
+        return " ".join(parts[:idx]).strip(), " ".join(parts[idx:]).strip()
+
+    mask_3416095 = df_final["lppr"].astype(str).eq("3416095")
+    mask_need_split = mask_3416095 & df_final["prenom"].astype(str).str.strip().eq("") & df_final["nom"].astype(str).str.strip().ne("")
+    splits = df_final.loc[mask_need_split, "nom"].apply(split_nom_prenom)
+    df_final.loc[mask_need_split, "nom"] = splits.apply(lambda x: x[0])
+    df_final.loc[mask_need_split, "prenom"] = splits.apply(lambda x: x[1])
+
+    # Filtres lignes inutilisables
+    no_date_and_no_nda = df_final["date_pose"].isna() & df_final["nda"].eq("")
+    no_id = df_final["ipp"].eq("") & df_final["nda"].eq("")
+    df_final = df_final.loc[~(no_date_and_no_nda | no_id)].copy()
+    df_final.reset_index(drop=True, inplace=True)
+    return df_final
+
+
+def read_mapping_csv(map_path: str) -> pd.DataFrame:
+    try:
+        m = pd.read_csv(map_path, sep=";", dtype=str)
+        if m.shape[1] == 1:
+            raise ValueError("Bad sep")
+    except Exception:
+        m = pd.read_csv(map_path, sep=",", dtype=str)
+
+    m = m.rename(columns={"NIP": "nip", "NAS": "nas", "date.deb": "date_deb", "date.fin": "date_fin"})
+
+    # fallback variantes
+    if "nip" not in m.columns and "NIP" in m.columns: m["nip"] = m["NIP"]
+    if "nas" not in m.columns and "NAS" in m.columns: m["nas"] = m["NAS"]
+    if "date_deb" not in m.columns and "date.deb" in m.columns: m["date_deb"] = m["date.deb"]
+    if "date_fin" not in m.columns and "date.fin" in m.columns: m["date_fin"] = m["date.fin"]
+
+    m["nip"] = m["nip"].apply(clean_digits_id)
+    m["nas"] = m["nas"].apply(clean_digits_id)
+
+    m["date_deb"] = pd.to_datetime(m["date_deb"], errors="coerce", dayfirst=True).dt.normalize()
+    m["date_fin"] = pd.to_datetime(m["date_fin"], errors="coerce", dayfirst=True).dt.normalize()
+
+    m = m[(m["nip"] != "") & (m["nas"] != "") & m["date_deb"].notna() & m["date_fin"].notna()].copy()
+    return m[["nip", "nas", "date_deb", "date_fin"]]
+
+def fill_ipp_from_nda(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if "ipp_fill_status" not in df.columns:
+        df["ipp_fill_status"] = ""
+
+    mask = df["ipp"].eq("") & df["nda"].ne("")
+    if not mask.any():
+        return df
+
+    tmp = df.loc[mask].reset_index().merge(
+        mapping[["nip", "nas"]],
+        left_on="nda",
+        right_on="nas",
+        how="left"
+    )
+
+    tmp = tmp.drop_duplicates(subset=["index"], keep="first").set_index("index")
+
+    df.loc[tmp.index, "ipp"] = tmp["nip"].fillna("").values
+    df.loc[tmp.index, "ipp_fill_status"] = df.loc[tmp.index, "ipp"].ne("").map(
+        {True: "Rempli via CSV (NDA->IPP)", False: "IPP non trouvé via NDA"}
+    )
+    return df
+
+def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["nda_fill_status"] = ""
+
+    need_mask = df["nda"].eq("") & df["ipp"].ne("") & df["date_pose"].notna()
+    need = df.loc[need_mask].reset_index().copy()
+
+    if need.empty:
+        df.loc[df["nda_fill_status"].eq(""), "nda_fill_status"] = "Déjà rempli / pas concerné"
+        return df
+
+    # Merge IPP -> séjours
+    cand = need.merge(mapping, left_on="ipp", right_on="nip", how="left")
+
+    # Debug: nb séjours trouvés pour cet IPP
+    cnt_any = cand.groupby("index")["nas"].size()
+    df["nb_sejours_pour_ipp"] = 0
+    df.loc[cnt_any.index, "nb_sejours_pour_ipp"] = cnt_any.values
+
+    # Filtre intervalle
+    cand["in_interval"] = (cand["date_pose"] >= cand["date_deb"]) & (cand["date_pose"] <= cand["date_fin"])
+    cand = cand[cand["in_interval"]].copy()
+
+    # Debug: nb séjours matchants par date
+    cnt_in = cand.groupby("index")["nas"].size()
+    df["nb_sejours_dans_intervalle"] = 0
+    df.loc[cnt_in.index, "nb_sejours_dans_intervalle"] = cnt_in.values
+
+    if cand.empty:
+        df.loc[need_mask, "nda_fill_status"] = "NDA non trouvé (intervalle)"
+        return df
+
+    # Choix meilleur séjour si multiples
+    cand["stay_duration_days"] = (cand["date_fin"] - cand["date_deb"]).dt.days
+    cand["gap_start_days"] = (cand["date_pose"] - cand["date_deb"]).dt.days.abs()
+
+    cand = cand.sort_values(
+        by=["index", "stay_duration_days", "gap_start_days", "date_deb"],
+        ascending=[True, True, True, False]
+    )
+
+    best = cand.drop_duplicates(subset=["index"], keep="first").set_index("index")
+
+    if "nda_date_deb_match" not in df.columns:
+        df["nda_date_deb_match"] = pd.NaT
+    if "nda_date_fin_match" not in df.columns:
+        df["nda_date_fin_match"] = pd.NaT
+
+    df.loc[best.index, "nda"] = best["nas"].values
+    df.loc[best.index, "nda_fill_status"] = "Rempli via CSV (intervalle)"
+    df.loc[best.index, "nda_date_deb_match"] = best["date_deb"].values
+    df.loc[best.index, "nda_date_fin_match"] = best["date_fin"].values
+
+    still_empty = need_mask & df["nda"].eq("")
+    df.loc[still_empty, "nda_fill_status"] = "NDA non trouvé (intervalle)"
+    return df
