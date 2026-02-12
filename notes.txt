@@ -1,11 +1,354 @@
-LPPR = 3299070
-idem que 8127390
+import os
+import re
+from datetime import datetime
+import pandas as pd
+from openpyxl import load_workbook
 
-LPPR = 8127390
-x_pk	x_chrono	x_ref	x_lot	x_tperemp	x_dest	x_four	x_societe	x_no_serie	x_refour	x_user	x_poseur	x_id_traca	x_nip	x_nda	x_nom	x_secu	x_prenom	x_dnaiss	x_tpose	x_etat	x_type_indic	x_comment	x_dvalid	x_user_valid	x_dcde	x_treport	x_dest_pose	x_no_cde	x_no_liv	x_indic_gest	x_depot	x_prix_u	x_tva	x_t2a	x_cpt_budg	x_marche	x_lppr	x_ref_sap	x_cab	x_motif_fin	x_pk_it_s	x_renouveler	x_id_ext	x_statut_ext	x_localisation_ext	x_ddemande	x_gratuit	x_tstatut_ext	x_desig	x_depot1	x_sel	x_peremp	x_lib_dest	x_lib_etat
+# ========= CONFIG =========
+BASE_DIR = r"C:/Users/4251352/Documents/DMI_NCK"
+XLSM_NAME = "Copie de bilan DIM 2025.xlsm"
+OUT_CSV = "pharma_flat_normalise.csv"
+OUT_XLSX = "pharma_flat_normalise.xlsx"  # optionnel
 
-LPPR = 3111645
-Reference: 	Denomination:	Lot 	Date d'intervention:	Nom:	Prénom:	Date de naissance:	IPP ou Nda:
+# LPPR codes attendus (pas obligatoire mais utile en contrôle)
+EXPECTED_LPPRS = {"8127390", "3299070", "3111645", "3416095"}
 
-LPPR = 3416095
-Nom Prénom	Date de Naissance	Coté	NIP	Date d'intervention	Chirurgien	Marque	Modèle implants	Date d'envoi du mail - fax	Modele de processeur	Date Achat	N° de Cde	Réception aux DM	N° série - implants	N° serie processeur	Récupération implants - bloc	Date de récupération processeur	Date d'activation processeur	Date de saisie dans le SAG	
+# Détection de la ligne "LPPR = 3111645"
+LPPR_LINE_RE = re.compile(r"\bLPPR\b\s*=?\s*(\d{6,8})", re.IGNORECASE)
+
+# ========= OUTILS =========
+def norm(s):
+    if s is None:
+        return ""
+    return str(s).strip()
+
+def norm_lc(s):
+    return norm(s).lower()
+
+def excel_date_to_dt(x):
+    """Convertit différentes représentations (datetime, date Excel, texte) en pandas Timestamp."""
+    if x is None or (isinstance(x, str) and x.strip() == ""):
+        return pd.NaT
+    # openpyxl renvoie souvent datetime/date déjà convertis
+    if isinstance(x, (datetime,)):
+        return pd.to_datetime(x, errors="coerce")
+    # parfois c'est déjà un Timestamp
+    if isinstance(x, pd.Timestamp):
+        return x
+    # nombre Excel ? (rare si data_only=True, mais possible)
+    if isinstance(x, (int, float)):
+        # Excel epoch 1899-12-30
+        return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
+    # texte
+    return pd.to_datetime(str(x), errors="coerce", dayfirst=True)
+
+def is_lppr_line(values):
+    text = " ".join([str(v) for v in values if v is not None])
+    m = LPPR_LINE_RE.search(text)
+    return m.group(1) if m else None
+
+def get_row_values(ws, r, max_col=120):
+    return [ws.cell(row=r, column=c).value for c in range(1, max_col + 1)]
+
+def looks_like_header(row):
+    """
+    Détecte une ligne d'en-têtes et retourne (ok, start_col_idx0).
+    start_col_idx0 = index 0-based dans la liste row.
+    """
+    # keywords "famille"
+    header_keywords = [
+        "x_pk", "x_nip", "x_nda", "x_nom", "x_prenom", "x_tpose", "x_societe", "x_ref",  # famille A
+        "reference", "denomination", "lot", "date d'intervention", "nom", "prénom", "date de naissance", "ipp ou nda",  # famille B
+        "nom prénom", "date de naissance", "nip", "date d'intervention"  # famille C
+    ]
+    row_lc = [norm_lc(v) for v in row]
+
+    best = None
+    hits = 0
+    for i, cell in enumerate(row_lc):
+        if any(k in cell for k in header_keywords):
+            if best is None:
+                best = i
+            hits += 1
+    if best is None:
+        return False, None
+    # on exige quelques hits pour éviter faux positifs
+    return hits >= 2, best
+
+def trim_header(header_cells):
+    """Coupe la liste à la dernière cellule non vide."""
+    last = -1
+    for i, v in enumerate(header_cells):
+        if norm(v) != "":
+            last = i
+    if last == -1:
+        return []
+    return [norm(v) for v in header_cells[: last + 1]]
+
+def detect_family(columns):
+    """Renvoie 'A' (x_), 'B' (Reference/IPP ou Nda), 'C' (NIP/Nom Prénom), ou 'UNK'."""
+    cols_lc = [c.strip().lower() for c in columns]
+    if sum(c.startswith("x_") for c in cols_lc) >= 5:
+        return "A"
+    if any("ipp ou nda" in c for c in cols_lc) or any(c == "reference" for c in cols_lc):
+        return "B"
+    if any(c == "nip" for c in cols_lc) and any("date d'intervention" in c for c in cols_lc):
+        return "C"
+    return "UNK"
+
+def normalize_block(df_block, lppr, family):
+    """
+    Normalise un bloc brut vers le schéma final.
+    """
+    out = pd.DataFrame()
+    out["lppr"] = lppr
+    out["source_format"] = family
+
+    # helpers: accès colonne sans casse
+    col_map = {c.strip().lower(): c for c in df_block.columns}
+
+    def col(name_lc):
+        return col_map.get(name_lc.lower())
+
+    # Colonnes finales
+    out["ipp"] = ""
+    out["nda"] = ""
+    out["date_pose"] = pd.NaT
+    out["nom"] = ""
+    out["prenom"] = ""
+    out["date_naissance"] = pd.NaT
+    out["fournisseur"] = ""
+    out["reference_commerciale"] = ""
+    out["lot"] = ""
+    out["numero_serie"] = ""
+    out["designation"] = ""
+
+    if family == "A":
+        # 8127390 / 3299070
+        if col("x_nip"):
+            out["ipp"] = df_block[col("x_nip")].astype(str).str.strip()
+        if col("x_nda"):
+            out["nda"] = df_block[col("x_nda")].astype(str).str.strip()
+        if col("x_tpose"):
+            out["date_pose"] = df_block[col("x_tpose")].apply(excel_date_to_dt)
+        if col("x_nom"):
+            out["nom"] = df_block[col("x_nom")].astype(str).str.strip()
+        if col("x_prenom"):
+            out["prenom"] = df_block[col("x_prenom")].astype(str).str.strip()
+        if col("x_dnaiss"):
+            out["date_naissance"] = df_block[col("x_dnaiss")].apply(excel_date_to_dt)
+        if col("x_societe"):
+            out["fournisseur"] = df_block[col("x_societe")].astype(str).str.strip()
+        if col("x_ref"):
+            out["reference_commerciale"] = df_block[col("x_ref")].astype(str).str.strip()
+        if col("x_lot"):
+            out["lot"] = df_block[col("x_lot")].astype(str).str.strip()
+        if col("x_no_serie"):
+            out["numero_serie"] = df_block[col("x_no_serie")].astype(str).str.strip()
+        if col("x_desig"):
+            out["designation"] = df_block[col("x_desig")].astype(str).str.strip()
+
+    elif family == "B":
+        # 3111645
+        if col("date d'intervention"):
+            out["date_pose"] = df_block[col("date d'intervention")].apply(excel_date_to_dt)
+        if col("nom"):
+            out["nom"] = df_block[col("nom")].astype(str).str.strip()
+        if col("prénom") or col("prenom"):
+            out["prenom"] = df_block[col("prénom") or col("prenom")].astype(str).str.strip()
+        if col("date de naissance"):
+            out["date_naissance"] = df_block[col("date de naissance")].apply(excel_date_to_dt)
+        if col("reference"):
+            out["reference_commerciale"] = df_block[col("reference")].astype(str).str.strip()
+        if col("lot"):
+            out["lot"] = df_block[col("lot")].astype(str).str.strip()
+
+        # colonne mixte IPP ou Nda (règle: commence par 8 => IPP, commence par 61 => NDA)
+        mix_col = col("ipp ou nda")
+        if mix_col:
+            vals = df_block[mix_col].astype(str).str.strip()
+            out.loc[vals.str.startswith("8", na=False), "ipp"] = vals[vals.str.startswith("8", na=False)]
+            out.loc[vals.str.startswith("61", na=False), "nda"] = vals[vals.str.startswith("61", na=False)]
+
+    elif family == "C":
+        # 3416095
+        if col("nip"):
+            out["ipp"] = df_block[col("nip")].astype(str).str.strip()
+        if col("date d'intervention"):
+            out["date_pose"] = df_block[col("date d'intervention")].apply(excel_date_to_dt)
+        if col("date de naissance"):
+            out["date_naissance"] = df_block[col("date de naissance")].apply(excel_date_to_dt)
+        # "Nom Prénom" (optionnel)
+        np_col = col("nom prénom") or col("nom prenom")
+        if np_col:
+            out["nom"] = df_block[np_col].astype(str).str.strip()  # on garde tel quel pour l’instant
+            out["prenom"] = ""  # on pourrait splitter plus tard si besoin
+
+    else:
+        # inconnu : on garde au moins lppr + dump
+        pass
+
+    # Nettoyage IPP/NDA (supprime .0 si Excel a casté en float)
+    for k in ("ipp", "nda"):
+        out[k] = (
+            out[k]
+            .astype(str)
+            .str.replace(r"\.0$", "", regex=True)
+            .str.strip()
+            .replace({"nan": "", "None": ""})
+        )
+
+    return out
+
+def extract_blocks_from_sheet(ws, max_col=120):
+    """
+    Extrait tous les blocs LPPR sous forme de DataFrame bruts.
+    Retourne une liste de dicts {lppr, df, source_sheet, source_row_lppr}
+    """
+    max_row = ws.max_row
+    blocks = []
+    r = 1
+
+    while r <= max_row:
+        row = get_row_values(ws, r, max_col=max_col)
+        lppr = is_lppr_line(row)
+        if lppr:
+            # trouver header dans les 3 lignes suivantes
+            header_row = None
+            header_start = None
+            header = None
+            for rr in (r + 1, r + 2, r + 3):
+                if rr > max_row:
+                    break
+                cand = get_row_values(ws, rr, max_col=max_col)
+                ok, start = looks_like_header(cand)
+                if ok:
+                    header_row = rr
+                    header_start = start
+                    header = cand
+                    break
+            if header_row is None:
+                r += 1
+                continue
+
+            # construire header
+            header_cells = header[header_start:]
+            header_cells = trim_header(header_cells)
+            if not header_cells:
+                r += 1
+                continue
+
+            # lire données jusqu'au prochain LPPR ou 3 lignes vides
+            data = []
+            rr = header_row + 1
+            empty_streak = 0
+            width = len(header_cells)
+
+            while rr <= max_row:
+                row_rr = get_row_values(ws, rr, max_col=max_col)
+                # stop si prochain bloc LPPR
+                if is_lppr_line(row_rr):
+                    break
+
+                vals = row_rr[header_start: header_start + width]
+                if all(norm(v) == "" for v in vals):
+                    empty_streak += 1
+                    if empty_streak >= 3:
+                        break
+                else:
+                    empty_streak = 0
+                    data.append(vals)
+                rr += 1
+
+            df_block = pd.DataFrame(data, columns=header_cells)
+            blocks.append({
+                "lppr": lppr,
+                "df": df_block,
+                "source_sheet": ws.title,
+                "source_row_lppr": r,
+            })
+            r = rr
+        else:
+            r += 1
+
+    return blocks
+
+def main():
+    xlsm_path = os.path.join(BASE_DIR, XLSM_NAME)
+    if not os.path.exists(xlsm_path):
+        raise FileNotFoundError(f"Fichier introuvable: {xlsm_path}")
+
+    wb = load_workbook(xlsm_path, data_only=True)
+
+    all_norm = []
+    all_raw = []
+
+    for ws in wb.worksheets:
+        blocks = extract_blocks_from_sheet(ws)
+        for b in blocks:
+            lppr = b["lppr"]
+            df_block = b["df"]
+
+            family = detect_family(df_block.columns)
+            df_norm = normalize_block(df_block, lppr=lppr, family=family)
+
+            # Ajoute trace source
+            df_norm["source_sheet"] = b["source_sheet"]
+            df_norm["source_row_lppr"] = b["source_row_lppr"]
+
+            # garde aussi un dump "raw" (optionnel) => utile si tu veux auditer
+            df_block_dump = df_block.copy()
+            df_block_dump["lppr"] = lppr
+            df_block_dump["source_sheet"] = b["source_sheet"]
+            df_block_dump["source_row_lppr"] = b["source_row_lppr"]
+            df_block_dump["source_format"] = family
+            all_raw.append(df_block_dump)
+
+            all_norm.append(df_norm)
+
+    if not all_norm:
+        raise RuntimeError("Aucun bloc LPPR détecté dans le classeur. Vérifie la présence des lignes 'LPPR = ...'.")
+
+    df_final = pd.concat(all_norm, ignore_index=True)
+
+    # Colonnes finales dans l’ordre voulu
+    final_cols = [
+        "lppr", "ipp", "nda", "date_pose",
+        "nom", "prenom", "date_naissance",
+        "fournisseur", "reference_commerciale",
+        "lot", "numero_serie", "designation",
+        "source_format", "source_sheet", "source_row_lppr",
+    ]
+    # Ajoute les colonnes manquantes si jamais
+    for c in final_cols:
+        if c not in df_final.columns:
+            df_final[c] = ""
+
+    df_final = df_final[final_cols]
+
+    # Contrôles simples
+    df_final["has_ipp"] = df_final["ipp"].astype(str).str.len() > 0
+    df_final["has_date"] = df_final["date_pose"].notna()
+
+    # Export
+    out_csv_path = os.path.join(BASE_DIR, OUT_CSV)
+    df_final.to_csv(out_csv_path, index=False, sep=";", encoding="utf-8-sig")
+
+    out_xlsx_path = os.path.join(BASE_DIR, OUT_XLSX)
+    try:
+        df_final.to_excel(out_xlsx_path, index=False)
+    except Exception as e:
+        print(f"[WARN] Export xlsx impossible ({e}). CSV OK.")
+
+    # petit résumé console
+    print("=== Résumé extraction ===")
+    print(f"Lignes finales: {len(df_final)}")
+    print("LPPR détectés:", sorted(df_final["lppr"].dropna().astype(str).unique().tolist()))
+    print("Familles:", df_final["source_format"].value_counts(dropna=False).to_dict())
+    print("Lignes avec IPP:", int(df_final["has_ipp"].sum()), "/", len(df_final))
+    print("Lignes avec date_pose:", int(df_final["has_date"].sum()), "/", len(df_final))
+    print("Export CSV:", out_csv_path)
+    print("Export XLSX:", out_xlsx_path)
+
+if __name__ == "__main__":
+    main()
