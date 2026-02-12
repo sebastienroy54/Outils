@@ -1,20 +1,25 @@
-# ===== DEBUG MERGE INTERVALLE pour idx 135/136 (sans IPP/NDA) =====
-sample_idx = [135, 136]
-sample = df_final.loc[sample_idx, ["ipp", "date_pose"]].copy().reset_index()
+[DEBUG] row 135 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
+[DEBUG] row 136 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
+c:\Users\4251352\projets\DMI_NCK.py:402: UserWarning: Parsing dates in %Y-%m-%d format when dayfirst=True was specified. Pass `dayfirst=False` or specify a format to silence this warning.
+  m["date_deb"] = pd.to_datetime(m["date_deb"], errors="coerce", dayfirst=True).dt.normalize()
 
-cand = sample.merge(mapping, left_on="ipp", right_on="nip", how="left")
+[DEBUG] candidats après merge (dates uniquement) pour idx 135/136:
+ index  date_pose   date_deb   date_fin  ge_deb  le_fin  in_interval
+   135 2025-01-09 2025-01-23 2025-11-02   False    True        False
+   136 2025-01-09 2025-01-23 2025-11-02   False    True        False
 
-# on ne montre pas ipp/nip/nas : seulement dates + bool
-cand["ge_deb"] = cand["date_pose"] >= cand["date_deb"]
-cand["le_fin"] = cand["date_pose"] <= cand["date_fin"]
-cand["in_interval"] = cand["ge_deb"] & cand["le_fin"]
+[DEBUG] nb de séjours récupérés par index:
+index
+135    1
+136    1
 
-print("\n[DEBUG] candidats après merge (dates uniquement) pour idx 135/136:")
-print(cand[["index", "date_pose", "date_deb", "date_fin", "ge_deb", "le_fin", "in_interval"]].to_string(index=False))
+[DEBUG] nb de séjours valides (date_deb/date_fin non nulles):
+index
+135    1
+136    1
 
-print("\n[DEBUG] nb de séjours récupérés par index:")
-print(cand.groupby("index").size().to_string())
+--- CSV ligne Excel 38884 (pandas iloc 38882) ---
+{'NIP': 'xxxxxxxxxx', 'NAS': 'yyyyyyyyy           ', 'type': 'hc', 'date.deb': '2025-01-08', 'date.fin': '2025-01-16'}
 
-print("\n[DEBUG] nb de séjours valides (date_deb/date_fin non nulles):")
-valid = cand[cand["date_deb"].notna() & cand["date_fin"].notna()]
-print(valid.groupby("index").size().to_string())
+--- CSV ligne Excel 38885 (pandas iloc 38883) ---
+{'NIP': 'xxxxxxxxxx', 'NAS': 'yyyyyyyyy           ', 'type': 'hc', 'date.deb': '2025-01-23', 'date.fin': '2025-02-11'}
