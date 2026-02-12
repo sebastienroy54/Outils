@@ -1,15 +1,185 @@
-def clean_header_name(x):
-    s = norm(x)
-    s = s.replace("\u00A0", " ")        # espace insécable
-    s = re.sub(r"\s+", " ", s).strip()  # espaces multiples
-    s = re.sub(r":\s*$", "", s)         # supprime ":" final
-    return s
+def normalize_block(df_block, lppr, family):
+    """
+    Normalise un bloc brut vers le schéma final.
 
-def trim_header(header_cells):
-    last = -1
-    for i, v in enumerate(header_cells):
-        if norm(v) != "":
-            last = i
-    if last == -1:
-        return []
-    return [clean_header_name(v) for v in header_cells[: last + 1]]
+    Colonnes finales:
+    lppr, ipp, nda, date_pose, nom, prenom, date_naissance,
+    fournisseur, reference_commerciale, lot, numero_serie, designation,
+    source_format
+    """
+
+    def norm(s):
+        if s is None:
+            return ""
+        return str(s).strip()
+
+    def excel_date_to_dt(x):
+        """Convertit différentes représentations (datetime, date Excel, texte) en pandas Timestamp."""
+        if x is None or (isinstance(x, str) and x.strip() == ""):
+            return pd.NaT
+        if isinstance(x, datetime):
+            return pd.to_datetime(x, errors="coerce")
+        if isinstance(x, pd.Timestamp):
+            return x
+        if isinstance(x, (int, float)):
+            # Excel epoch 1899-12-30
+            return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
+        return pd.to_datetime(str(x), errors="coerce", dayfirst=True)
+
+    def normalize_colname(s):
+        s = norm(s).lower()
+        s = s.replace("\u00A0", " ")             # espaces insécables
+        s = re.sub(r"\s+", " ", s).strip()       # espaces multiples
+        s = re.sub(r":\s*$", "", s)              # supprime ":" final
+        return s
+
+    # map {nom_normalisé -> nom_original}
+    col_map = {normalize_colname(c): c for c in df_block.columns}
+
+    def find_col(*candidates, contains=False, startswith=False):
+        """
+        Retourne le nom ORIGINAL de la colonne qui matche.
+        - candidates: textes attendus ("nom", "date d'intervention", ...)
+        - contains=True: match si candidate est contenue dans le nom normalisé
+        - startswith=True: match si le nom normalisé commence par candidate
+        """
+        keys = list(col_map.keys())
+
+        for cand in candidates:
+            cand_n = normalize_colname(cand)
+
+            # match exact d'abord
+            if cand_n in col_map:
+                return col_map[cand_n]
+
+            # sinon match contains / startswith
+            for k in keys:
+                if contains and cand_n in k:
+                    return col_map[k]
+                if startswith and k.startswith(cand_n):
+                    return col_map[k]
+
+        return None
+
+    # ====== DataFrame sortie ======
+    out = pd.DataFrame(index=df_block.index)
+    out["lppr"] = str(lppr)
+    out["source_format"] = family
+
+    # Colonnes finales standard
+    out["ipp"] = ""
+    out["nda"] = ""
+    out["date_pose"] = pd.NaT
+
+    out["nom"] = ""
+    out["prenom"] = ""
+    out["date_naissance"] = pd.NaT
+
+    out["fournisseur"] = ""
+    out["reference_commerciale"] = ""
+
+    out["lot"] = ""
+    out["numero_serie"] = ""
+    out["designation"] = ""
+
+    # ====== Famille A : format x_... (8127390 & 3299070) ======
+    if family == "A":
+        c_ipp = find_col("x_nip", "x_ipp")
+        c_nda = find_col("x_nda")
+        c_date = find_col("x_tpose", "x_date_pose", contains=True)
+        c_nom = find_col("x_nom")
+        c_prenom = find_col("x_prenom")
+        c_dn = find_col("x_dnaiss", contains=True)
+
+        c_fourn = find_col("x_societe", contains=True)
+        c_ref = find_col("x_ref", startswith=True)   # x_ref
+        c_lot = find_col("x_lot", startswith=True)
+        c_ns = find_col("x_no_serie", "x_noserie", contains=True)
+        c_des = find_col("x_desig", "x_desi", contains=True)
+
+        if c_ipp:
+            out["ipp"] = df_block[c_ipp].astype(str).str.strip()
+        if c_nda:
+            out["nda"] = df_block[c_nda].astype(str).str.strip()
+        if c_date:
+            out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
+
+        if c_nom:
+            out["nom"] = df_block[c_nom].astype(str).str.strip()
+        if c_prenom:
+            out["prenom"] = df_block[c_prenom].astype(str).str.strip()
+        if c_dn:
+            out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
+
+        if c_fourn:
+            out["fournisseur"] = df_block[c_fourn].astype(str).str.strip()
+        if c_ref:
+            out["reference_commerciale"] = df_block[c_ref].astype(str).str.strip()
+
+        if c_lot:
+            out["lot"] = df_block[c_lot].astype(str).str.strip()
+        if c_ns:
+            out["numero_serie"] = df_block[c_ns].astype(str).str.strip()
+        if c_des:
+            out["designation"] = df_block[c_des].astype(str).str.strip()
+
+    # ====== Famille B : "Reference / ... / IPP ou Nda" (3111645) ======
+    elif family == "B":
+        c_date = find_col("date d'intervention", "date intervention", contains=True)
+        c_nom = find_col("nom", startswith=True)
+        c_prenom = find_col("prénom", "prenom", startswith=True)
+        c_dn = find_col("date de naissance", contains=True)
+        c_ref = find_col("reference", "référence", startswith=True)
+        c_lot = find_col("lot", startswith=True)
+        c_mix = find_col("ipp ou nda", contains=True)
+
+        if c_date:
+            out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
+        if c_nom:
+            out["nom"] = df_block[c_nom].astype(str).str.strip()
+        if c_prenom:
+            out["prenom"] = df_block[c_prenom].astype(str).str.strip()
+        if c_dn:
+            out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
+
+        if c_ref:
+            out["reference_commerciale"] = df_block[c_ref].astype(str).str.strip()
+        if c_lot:
+            out["lot"] = df_block[c_lot].astype(str).str.strip()
+
+        # règle métier: 8... => IPP ; 61... => NDA
+        if c_mix:
+            vals = df_block[c_mix].astype(str).str.strip()
+            mask_ipp = vals.str.startswith("8", na=False)
+            mask_nda = vals.str.startswith("61", na=False)
+            out.loc[mask_ipp, "ipp"] = vals[mask_ipp]
+            out.loc[mask_nda, "nda"] = vals[mask_nda]
+
+    # ====== Famille C : "Nom Prénom / NIP / Date d'intervention" (3416095) ======
+    elif family == "C":
+        c_ipp = find_col("nip", startswith=True)
+        c_date = find_col("date d'intervention", contains=True)
+        c_dn = find_col("date de naissance", contains=True)
+        c_np = find_col("nom prénom", "nom prenom", contains=True)
+
+        if c_ipp:
+            out["ipp"] = df_block[c_ipp].astype(str).str.strip()
+        if c_date:
+            out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
+        if c_dn:
+            out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
+
+        # On garde le champ complet dans "nom" (split optionnel plus tard)
+        if c_np:
+            out["nom"] = df_block[c_np].astype(str).str.strip()
+
+    # ====== Nettoyage IPP/NDA (Excel peut mettre .0) ======
+    for k in ("ipp", "nda"):
+        out[k] = (
+            out[k].astype(str)
+            .str.replace(r"\.0$", "", regex=True)
+            .str.strip()
+            .replace({"nan": "", "None": ""})
+        )
+
+    return out
