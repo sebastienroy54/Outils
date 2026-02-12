@@ -1,1 +1,613 @@
-75010020802xxxxxxxxx                     31122024        3473791        00000000010013650000
+import os
+import re
+from datetime import datetime
+import pandas as pd
+from openpyxl import load_workbook
+
+# ========= CONFIG =========
+BASE_DIR = r"C:/Users/4251352/Documents/DMI_NCK"
+XLSM_NAME = "Copie de bilan DIM 2025.xlsm"
+
+MAP_CSV_NAME = "NCK.2024-2025.IPP.NAS.csv"   # IPP<->NDA avec dates de séjour
+
+OUT_XLSX = "pharma_flat_avec_NDA.xlsx"       # sortie finale
+
+EXPECTED_LPPRS = {"8127390", "3299070", "3111645", "3416095"}
+
+# ========= OUTILS =========
+def clean_digits_id(x) -> str:
+    """
+    Normalise un identifiant (IPP/NDA/NIP/NAS) :
+    - strip, supprime .0
+    - supprime H si H61...
+    - garde uniquement les chiffres
+    """
+    s = "" if x is None else str(x).strip()
+    if not s:
+        return ""
+    s = s.replace("\u00A0", " ").strip()
+    s = re.sub(r"\.0$", "", s)
+    s = s.upper()
+    s = re.sub(r"^H(?=61\d+)", "", s)  # H615... -> 615...
+    s = re.sub(r"\D+", "", s)         # digits only
+    return s
+
+def norm(s):
+    if s is None:
+        return ""
+    return str(s).strip()
+
+def norm_lc(s):
+    return norm(s).lower()
+
+def excel_date_to_dt(x):
+    """Convertit différentes représentations (datetime, date Excel, texte) en pandas Timestamp."""
+    if x is None or (isinstance(x, str) and x.strip() == ""):
+        return pd.NaT
+    if isinstance(x, (datetime,)):
+        return pd.to_datetime(x, errors="coerce")
+    if isinstance(x, pd.Timestamp):
+        return x
+    if isinstance(x, (int, float)):
+        # Excel epoch 1899-12-30
+        return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
+    return pd.to_datetime(str(x), errors="coerce", dayfirst=True)
+
+CODE_RE = re.compile(r"\b(\d{6,8})\b")
+
+def get_row_values(ws, r, max_col=120):
+    return [ws.cell(row=r, column=c).value for c in range(1, max_col + 1)]
+
+def is_lppr_line(ws, r, max_col=120):
+    """
+    Retourne le code LPPR si la ligne r (ou r+1) contient un bloc LPPR,
+    même si "LPPR" et le code sont dans des cellules différentes.
+    """
+    row = get_row_values(ws, r, max_col=max_col)
+
+    cells_txt = [norm(v) for v in row if v is not None]
+    if not any("lppr" in t.lower() for t in cells_txt):
+        return None
+
+    text_line = " ".join(cells_txt)
+    m = CODE_RE.search(text_line)
+    if m:
+        return m.group(1)
+
+    if r + 1 <= ws.max_row:
+        row2 = get_row_values(ws, r + 1, max_col=max_col)
+        cells2_txt = [norm(v) for v in row2 if v is not None]
+        text_line2 = " ".join(cells2_txt)
+        m2 = CODE_RE.search(text_line2)
+        if m2:
+            return m2.group(1)
+
+    return None
+
+def looks_like_header(row):
+    header_keywords = [
+        "x_pk", "x_nip", "x_nda", "x_nom", "x_prenom", "x_tpose", "x_societe", "x_ref",
+        "reference", "denomination", "lot", "date d'intervention", "nom", "prénom", "date de naissance", "ipp ou nda",
+        "nom prénom", "date de naissance", "nip", "date d'intervention"
+    ]
+    row_lc = [norm_lc(v) for v in row]
+
+    best = None
+    hits = 0
+    for i, cell in enumerate(row_lc):
+        if any(k in cell for k in header_keywords):
+            if best is None:
+                best = i
+            hits += 1
+    if best is None:
+        return False, None
+    return hits >= 2, best
+
+def clean_header_name(x):
+    s = norm(x)
+    s = s.replace("\u00A0", " ")
+    s = re.sub(r"\s+", " ", s).strip()
+    s = re.sub(r":\s*$", "", s)  # supprime ":" final
+    return s
+
+def trim_header(header_cells):
+    last = -1
+    for i, v in enumerate(header_cells):
+        if norm(v) != "":
+            last = i
+    if last == -1:
+        return []
+    return [clean_header_name(v) for v in header_cells[: last + 1]]
+
+def detect_family(columns):
+    cols_lc = [c.strip().lower() for c in columns]
+    if sum(c.startswith("x_") for c in cols_lc) >= 5:
+        return "A"
+    if any("ipp ou nda" in c for c in cols_lc) or any(c == "reference" for c in cols_lc):
+        return "B"
+    if any(c == "nip" for c in cols_lc) and any("date d'intervention" in c for c in cols_lc):
+        return "C"
+    return "UNK"
+
+def normalize_block(df_block, lppr, family):
+    def normalize_colname(s):
+        s = norm(s).lower()
+        s = s.replace("\u00A0", " ")
+        s = re.sub(r"\s+", " ", s).strip()
+        s = re.sub(r":\s*$", "", s)
+        return s
+
+    col_map = {normalize_colname(c): c for c in df_block.columns}
+
+    def find_col(*candidates, contains=False, startswith=False):
+        keys = list(col_map.keys())
+        for cand in candidates:
+            cand_n = normalize_colname(cand)
+            if cand_n in col_map:
+                return col_map[cand_n]
+            for k in keys:
+                if contains and cand_n in k:
+                    return col_map[k]
+                if startswith and k.startswith(cand_n):
+                    return col_map[k]
+        return None
+
+    out = pd.DataFrame(index=df_block.index)
+    out["lppr"] = str(lppr)
+    out["source_format"] = family
+
+    out["ipp"] = ""
+    out["nda"] = ""
+    out["date_pose"] = pd.NaT
+
+    out["nom"] = ""
+    out["prenom"] = ""
+    out["date_naissance"] = pd.NaT
+
+    out["fournisseur"] = ""
+    out["reference_commerciale"] = ""
+
+    out["lot"] = ""
+    out["numero_serie"] = ""
+    out["designation"] = ""
+
+    if family == "A":
+        c_ipp = find_col("x_nip", "x_ipp")
+        c_nda = find_col("x_nda")
+        c_date = find_col("x_tpose", "x_date_pose", contains=True)
+        c_nom = find_col("x_nom")
+        c_prenom = find_col("x_prenom")
+        c_dn = find_col("x_dnaiss", contains=True)
+
+        c_fourn = find_col("x_societe", contains=True)
+        c_ref = find_col("x_ref", startswith=True)
+        c_lot = find_col("x_lot", startswith=True)
+        c_ns = find_col("x_no_serie", "x_noserie", contains=True)
+        c_des = find_col("x_desig", "x_desi", contains=True)
+
+        if c_ipp:
+            out["ipp"] = df_block[c_ipp].astype(str).str.strip()
+        if c_nda:
+            out["nda"] = df_block[c_nda].astype(str).str.strip()
+        if c_date:
+            out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
+
+        if c_nom:
+            out["nom"] = df_block[c_nom].astype(str).str.strip()
+        if c_prenom:
+            out["prenom"] = df_block[c_prenom].astype(str).str.strip()
+        if c_dn:
+            out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
+
+        if c_fourn:
+            out["fournisseur"] = df_block[c_fourn].astype(str).str.strip()
+        if c_ref:
+            out["reference_commerciale"] = df_block[c_ref].astype(str).str.strip()
+
+        if c_lot:
+            out["lot"] = df_block[c_lot].astype(str).str.strip()
+        if c_ns:
+            out["numero_serie"] = df_block[c_ns].astype(str).str.strip()
+        if c_des:
+            out["designation"] = df_block[c_des].astype(str).str.strip()
+
+    elif family == "B":
+        c_date = find_col("date d'intervention", "date intervention", contains=True)
+        c_nom = find_col("nom", startswith=True)
+        c_prenom = find_col("prénom", "prenom", startswith=True)
+        c_dn = find_col("date de naissance", contains=True)
+        c_ref = find_col("reference", "référence", startswith=True)
+        c_lot = find_col("lot", startswith=True)
+        c_mix = find_col("ipp ou nda", contains=True)
+
+        if c_date:
+            out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
+        if c_nom:
+            out["nom"] = df_block[c_nom].astype(str).str.strip()
+        if c_prenom:
+            out["prenom"] = df_block[c_prenom].astype(str).str.strip()
+        if c_dn:
+            out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
+
+        if c_ref:
+            out["reference_commerciale"] = df_block[c_ref].astype(str).str.strip()
+        if c_lot:
+            out["lot"] = df_block[c_lot].astype(str).str.strip()
+
+        if c_mix:
+            vals = df_block[c_mix].astype(str).str.strip()
+            mask_ipp = vals.str.startswith("8", na=False)    # IPP commence par 8
+            mask_nda = vals.str.startswith("61", na=False)   # NDA commence par 61
+            out.loc[mask_ipp, "ipp"] = vals[mask_ipp]
+            out.loc[mask_nda, "nda"] = vals[mask_nda]
+
+    elif family == "C":
+        c_ipp = find_col("nip", startswith=True)
+        c_date = find_col("date d'intervention", contains=True)
+        c_dn = find_col("date de naissance", contains=True)
+        c_np = find_col("nom prénom", "nom prenom", contains=True)
+
+        if c_ipp:
+            out["ipp"] = df_block[c_ipp].astype(str).str.strip()
+        if c_date:
+            out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
+        if c_dn:
+            out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
+
+        # temporaire: stocke "Nom Prénom" dans nom, on split après
+        if c_np:
+            out["nom"] = df_block[c_np].astype(str).str.strip()
+
+    for k in ("ipp", "nda"):
+        out[k] = (
+            out[k].astype(str)
+            .str.replace(r"\.0$", "", regex=True)
+            .str.strip()
+            .replace({"nan": "", "None": ""})
+        )
+
+    return out
+
+def extract_blocks_from_sheet(ws, max_col=120):
+    max_row = ws.max_row
+    blocks = []
+    r = 1
+
+    while r <= max_row:
+        lppr = is_lppr_line(ws, r, max_col=max_col)
+        if lppr:
+            header_row = None
+            header_start = None
+            header = None
+            for rr in (r + 1, r + 2, r + 3):
+                if rr > max_row:
+                    break
+                cand = get_row_values(ws, rr, max_col=max_col)
+                ok, start = looks_like_header(cand)
+                if ok:
+                    header_row = rr
+                    header_start = start
+                    header = cand
+                    break
+            if header_row is None:
+                r += 1
+                continue
+
+            header_cells = trim_header(header[header_start:])
+            if not header_cells:
+                r += 1
+                continue
+
+            data = []
+            rr = header_row + 1
+            empty_streak = 0
+            width = len(header_cells)
+
+            while rr <= max_row:
+                # stop si prochain bloc LPPR
+                if is_lppr_line(ws, rr, max_col=max_col):
+                    break
+
+                row_rr = get_row_values(ws, rr, max_col=max_col)
+                vals = row_rr[header_start: header_start + width]
+
+                if all(norm(v) == "" for v in vals):
+                    empty_streak += 1
+                    if empty_streak >= 3:
+                        break
+                else:
+                    empty_streak = 0
+                    data.append(vals)
+
+                rr += 1
+
+            df_block = pd.DataFrame(data, columns=header_cells)
+            blocks.append({
+                "lppr": lppr,
+                "df": df_block,
+                "source_sheet": ws.title,
+                "source_row_lppr": r,
+            })
+            r = rr
+        else:
+            r += 1
+
+    return blocks
+
+# ========= POST-NETTOYAGE =========
+def post_clean(df_final: pd.DataFrame) -> pd.DataFrame:
+    # Identifiants
+    df_final["ipp"] = df_final["ipp"].apply(clean_digits_id)
+    df_final["nda"] = df_final["nda"].apply(clean_digits_id)
+
+    # Dates au jour
+    df_final["date_pose"] = pd.to_datetime(df_final["date_pose"], errors="coerce", dayfirst=True).dt.normalize()
+
+    # Split Nom/Prénom pour 3416095 si prenom vide (prénom en Title Case)
+    def is_titlecase_word(w: str) -> bool:
+        if not w:
+            return False
+        w2 = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ'\-]", "", w)
+        return bool(w2) and w2[0].isupper() and (w2[1:].islower() or w2[1:].replace("-", "").replace("'", "").islower())
+
+    def split_nom_prenom(full: str):
+        s = "" if full is None else str(full).strip()
+        if not s:
+            return "", ""
+        parts = s.split()
+        if len(parts) == 1:
+            return s, ""
+        idx = None
+        for i, w in enumerate(parts):
+            if is_titlecase_word(w):
+                idx = i
+                break
+        if idx is None or idx == 0:
+            return s, ""
+        return " ".join(parts[:idx]).strip(), " ".join(parts[idx:]).strip()
+
+    mask_3416095 = df_final["lppr"].astype(str).eq("3416095")
+    mask_need_split = mask_3416095 & df_final["prenom"].astype(str).str.strip().eq("") & df_final["nom"].astype(str).str.strip().ne("")
+    splits = df_final.loc[mask_need_split, "nom"].apply(split_nom_prenom)
+    df_final.loc[mask_need_split, "nom"] = splits.apply(lambda x: x[0])
+    df_final.loc[mask_need_split, "prenom"] = splits.apply(lambda x: x[1])
+
+    # Filtres lignes inutilisables
+    no_date_and_no_nda = df_final["date_pose"].isna() & df_final["nda"].eq("")
+    no_id = df_final["ipp"].eq("") & df_final["nda"].eq("")
+    df_final = df_final.loc[~(no_date_and_no_nda | no_id)].copy()
+    df_final.reset_index(drop=True, inplace=True)
+    return df_final
+
+# ========= REMPLISSAGE NDA VIA CSV (IPP↔NDA + dates) =========
+def read_mapping_csv(map_path: str) -> pd.DataFrame:
+    try:
+        m = pd.read_csv(map_path, sep=";", dtype=str)
+        if m.shape[1] == 1:
+            raise ValueError("Bad sep")
+    except Exception:
+        m = pd.read_csv(map_path, sep=",", dtype=str)
+
+    m = m.rename(columns={"NIP": "nip", "NAS": "nas", "date.deb": "date_deb", "date.fin": "date_fin"})
+
+    # fallback variantes
+    if "nip" not in m.columns and "NIP" in m.columns: m["nip"] = m["NIP"]
+    if "nas" not in m.columns and "NAS" in m.columns: m["nas"] = m["NAS"]
+    if "date_deb" not in m.columns and "date.deb" in m.columns: m["date_deb"] = m["date.deb"]
+    if "date_fin" not in m.columns and "date.fin" in m.columns: m["date_fin"] = m["date.fin"]
+
+    m["nip"] = m["nip"].apply(clean_digits_id)
+    m["nas"] = m["nas"].apply(clean_digits_id)
+
+    m["date_deb"] = pd.to_datetime(m["date_deb"].astype(str).str.strip(), errors="coerce", format="%Y-%m-%d").dt.normalize()
+    m["date_fin"] = pd.to_datetime(m["date_fin"].astype(str).str.strip(), errors="coerce", format="%Y-%m-%d").dt.normalize()
+
+    m = m[(m["nip"] != "") & (m["nas"] != "") & m["date_deb"].notna() & m["date_fin"].notna()].copy()
+    return m[["nip", "nas", "date_deb", "date_fin"]]
+
+def fill_ipp_from_nda(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    if "ipp_fill_status" not in df.columns:
+        df["ipp_fill_status"] = ""
+
+    mask = df["ipp"].eq("") & df["nda"].ne("")
+    if not mask.any():
+        return df
+
+    tmp = df.loc[mask].reset_index().merge(
+        mapping[["nip", "nas"]],
+        left_on="nda",
+        right_on="nas",
+        how="left"
+    )
+
+    tmp = tmp.drop_duplicates(subset=["index"], keep="first").set_index("index")
+
+    df.loc[tmp.index, "ipp"] = tmp["nip"].fillna("").values
+    df.loc[tmp.index, "ipp_fill_status"] = df.loc[tmp.index, "ipp"].ne("").map(
+        {True: "Rempli via CSV (NDA->IPP)", False: "IPP non trouvé via NDA"}
+    )
+    return df
+
+def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["nda_fill_status"] = ""
+
+    need_mask = df["nda"].eq("") & df["ipp"].ne("") & df["date_pose"].notna()
+    need = df.loc[need_mask].reset_index().copy()
+
+    if need.empty:
+        df.loc[df["nda_fill_status"].eq(""), "nda_fill_status"] = "Déjà rempli / pas concerné"
+        return df
+
+    # Merge IPP -> séjours
+    cand = need.merge(mapping, left_on="ipp", right_on="nip", how="left")
+
+    # Debug: nb séjours trouvés pour cet IPP
+    cnt_any = cand.groupby("index")["nas"].size()
+    df["nb_sejours_pour_ipp"] = 0
+    df.loc[cnt_any.index, "nb_sejours_pour_ipp"] = cnt_any.values
+
+    # Filtre intervalle
+    cand["in_interval"] = (cand["date_pose"] >= cand["date_deb"]) & (cand["date_pose"] <= cand["date_fin"])
+    cand = cand[cand["in_interval"]].copy()
+
+    # Debug: nb séjours matchants par date
+    cnt_in = cand.groupby("index")["nas"].size()
+    df["nb_sejours_dans_intervalle"] = 0
+    df.loc[cnt_in.index, "nb_sejours_dans_intervalle"] = cnt_in.values
+
+    if cand.empty:
+        df.loc[need_mask, "nda_fill_status"] = "NDA non trouvé (intervalle)"
+        return df
+
+    # Choix meilleur séjour si multiples
+    cand["stay_duration_days"] = (cand["date_fin"] - cand["date_deb"]).dt.days
+    cand["gap_start_days"] = (cand["date_pose"] - cand["date_deb"]).dt.days.abs()
+
+    cand = cand.sort_values(
+        by=["index", "stay_duration_days", "gap_start_days", "date_deb"],
+        ascending=[True, True, True, False]
+    )
+
+    best = cand.drop_duplicates(subset=["index"], keep="first").set_index("index")
+
+    if "nda_date_deb_match" not in df.columns:
+        df["nda_date_deb_match"] = pd.NaT
+    if "nda_date_fin_match" not in df.columns:
+        df["nda_date_fin_match"] = pd.NaT
+
+    df.loc[best.index, "nda"] = best["nas"].values
+    df.loc[best.index, "nda_fill_status"] = "Rempli via CSV (intervalle)"
+    df.loc[best.index, "nda_date_deb_match"] = best["date_deb"].values
+    df.loc[best.index, "nda_date_fin_match"] = best["date_fin"].values
+
+    still_empty = need_mask & df["nda"].eq("")
+    df.loc[still_empty, "nda_fill_status"] = "NDA non trouvé (intervalle)"
+    return df
+
+def main():
+    xlsm_path = os.path.join(BASE_DIR, XLSM_NAME)
+    map_path = os.path.join(BASE_DIR, MAP_CSV_NAME)
+    out_xlsx_path = os.path.join(BASE_DIR, OUT_XLSX)
+
+    if not os.path.exists(xlsm_path):
+        raise FileNotFoundError(f"Fichier introuvable: {xlsm_path}")
+    if not os.path.exists(map_path):
+        raise FileNotFoundError(f"Fichier mapping introuvable: {map_path}")
+
+    wb = load_workbook(xlsm_path, data_only=True)
+
+    all_norm = []
+    for ws in wb.worksheets:
+        blocks = extract_blocks_from_sheet(ws)
+        for b in blocks:
+            lppr = b["lppr"]
+            df_block = b["df"]
+            family = detect_family(df_block.columns)
+            df_norm = normalize_block(df_block, lppr=lppr, family=family)
+            df_norm["source_sheet"] = b["source_sheet"]
+            df_norm["source_row_lppr"] = b["source_row_lppr"]
+            all_norm.append(df_norm)
+
+    if not all_norm:
+        raise RuntimeError("Aucun bloc LPPR détecté dans le classeur.")
+
+    df_final = pd.concat(all_norm, ignore_index=True)
+
+    # Colonnes finales de base
+    final_cols = [
+        "lppr", "ipp", "nda", "date_pose",
+        "nom", "prenom", "date_naissance",
+        "fournisseur", "reference_commerciale",
+        "lot", "numero_serie", "designation",
+        "source_format", "source_sheet", "source_row_lppr",
+    ]
+    for c in final_cols:
+        if c not in df_final.columns:
+            df_final[c] = ""
+    df_final = df_final[final_cols]
+
+    # Nettoyage
+    df_final = post_clean(df_final)
+    # ===== DEBUG TEST 1: vérifier date_pose ligne 137/138 (index pandas) =====
+    for idx in [135, 136]:
+        if idx < len(df_final):
+            dp = df_final.loc[idx, "date_pose"]
+            print(f"[DEBUG] row {idx} date_pose pandas = {dp} (type={type(dp)})")
+    # Remplissage NDA via CSV (si NDA vide)
+    mapping = read_mapping_csv(map_path)
+
+    # DEBUG: vérifier que le mapping contient bien les 2 séjours pour cet IPP (sans afficher IPP/NDA)
+    # On prend l'IPP de la ligne 135 (sans l'afficher) et on compte combien de séjours existent dans mapping
+    ipp_key = df_final.loc[135, "ipp"]
+    n = (mapping["nip"] == ipp_key).sum()
+    print("[DEBUG] nb sejours dans mapping pour l'IPP de la ligne 135 =", int(n))
+
+    # afficher uniquement les dates correspondantes (aucun IPP/NDA affiché)
+    print(mapping.loc[mapping["nip"] == ipp_key, ["date_deb", "date_fin"]].to_string(index=False))
+
+    # ===== DEBUG MERGE INTERVALLE pour idx 135/136 (sans IPP/NDA) =====
+    sample_idx = [135, 136]
+    sample = df_final.loc[sample_idx, ["ipp", "date_pose"]].copy().reset_index()
+
+    cand = sample.merge(mapping, left_on="ipp", right_on="nip", how="left")
+
+    # on ne montre pas ipp/nip/nas : seulement dates + bool
+    cand["ge_deb"] = cand["date_pose"] >= cand["date_deb"]
+    cand["le_fin"] = cand["date_pose"] <= cand["date_fin"]
+    cand["in_interval"] = cand["ge_deb"] & cand["le_fin"]
+
+    print("\n[DEBUG] candidats après merge (dates uniquement) pour idx 135/136:")
+    print(cand[["index", "date_pose", "date_deb", "date_fin", "ge_deb", "le_fin", "in_interval"]].to_string(index=False))
+
+    print("\n[DEBUG] nb de séjours récupérés par index:")
+    print(cand.groupby("index").size().to_string())
+
+    print("\n[DEBUG] nb de séjours valides (date_deb/date_fin non nulles):")
+    valid = cand[cand["date_deb"].notna() & cand["date_fin"].notna()]
+    print(valid.groupby("index").size().to_string())
+
+
+    # DEBUG: afficher lignes 38884 et 38885 du CSV (sans filtrage)
+    raw = pd.read_csv(map_path, sep=";", dtype=str, keep_default_na=False)
+    # si jamais sep incorrect, bascule:
+    if raw.shape[1] == 1:
+        raw = pd.read_csv(map_path, sep=",", dtype=str, keep_default_na=False)
+
+    # Attention: numéro de ligne "Excel" ≠ index pandas. Ici on suppose 1 ligne = 1 enregistrement, en-tête exclu.
+    # Si tu parles de lignes Excel (avec entête en ligne 1), alors pandas iloc = ligne_excel-2.
+    for excel_line in [38884, 38885]:
+        i = excel_line - 2
+        print(f"\n--- CSV ligne Excel {excel_line} (pandas iloc {i}) ---")
+        print(raw.iloc[i].to_dict())
+
+    df_final = fill_ipp_from_nda(df_final, mapping)
+    df_final = fill_nda_from_intervals(df_final, mapping)
+
+    # Export XLSX
+    with pd.ExcelWriter(out_xlsx_path, engine="openpyxl") as writer:
+        df_final.to_excel(writer, index=False, sheet_name="flat")
+        ws = writer.sheets["flat"]
+
+        headers = [cell.value for cell in ws[1]]
+        date_cols = {"date_pose", "date_naissance", "nda_date_deb_match", "nda_date_fin_match"}
+        date_col_indexes = [i + 1 for i, h in enumerate(headers) if h in date_cols]
+
+        for col_idx in date_col_indexes:
+            for row in range(2, ws.max_row + 1):
+                cell = ws.cell(row=row, column=col_idx)
+                if cell.value is not None:
+                    cell.number_format = "DD/MM/YYYY"
+
+    # Résumé console
+    print("=== Résumé final ===")
+    print(f"Lignes finales: {len(df_final)}")
+    print("LPPR détectés:", sorted(df_final["lppr"].dropna().astype(str).unique().tolist()))
+    print("Familles:", df_final["source_format"].value_counts(dropna=False).to_dict())
+    print("NDA remplis via CSV:", int((df_final["nda_fill_status"] == "Rempli via CSV (intervalle)").sum()))
+    print("NDA non trouvés:", int((df_final["nda_fill_status"] == "NDA non trouvé (intervalle)").sum()))
+    print("Export XLSX:", out_xlsx_path)
+
+if __name__ == "__main__":
+    main()
