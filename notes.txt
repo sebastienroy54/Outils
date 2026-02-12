@@ -1,5 +1,2 @@
-# ===== DEBUG TEST 1: vérifier date_pose ligne 137/138 (index pandas) =====
-for idx in [137, 138]:
-    if idx < len(df_final):
-        dp = df_final.loc[idx, "date_pose"]
-        print(f"[DEBUG] row {idx} date_pose pandas = {dp} (type={type(dp)})")
+[DEBUG] row 137 date_pose pandas = 2025-01-23 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
+[DEBUG] row 138 date_pose pandas = 2025-01-31 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
