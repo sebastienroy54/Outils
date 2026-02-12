@@ -1,28 +1,15 @@
-CODE_RE = re.compile(r"\b(\d{6,8})\b")
+def clean_header_name(x):
+    s = norm(x)
+    s = s.replace("\u00A0", " ")        # espace insécable
+    s = re.sub(r"\s+", " ", s).strip()  # espaces multiples
+    s = re.sub(r":\s*$", "", s)         # supprime ":" final
+    return s
 
-def is_lppr_line(ws, r, max_col=120):
-    """
-    Retourne le code LPPR si la ligne r (ou r+1) contient un bloc LPPR.
-    """
-    row = get_row_values(ws, r, max_col=max_col)
-
-    # 1) détecte si "LPPR" apparaît quelque part
-    cells_txt = [norm(v) for v in row if v is not None]
-    if not any("lppr" in t.lower() for t in cells_txt):
-        return None
-
-    # 2) cherche un code sur la même ligne (dans n'importe quelle cellule)
-    text_line = " ".join(cells_txt)
-    m = CODE_RE.search(text_line)
-    if m:
-        return m.group(1)
-
-    # 3) sinon, cherche sur la ligne suivante (souvent le code est juste dessous)
-    row2 = get_row_values(ws, r + 1, max_col=max_col) if r + 1 <= ws.max_row else []
-    cells2_txt = [norm(v) for v in row2 if v is not None]
-    text_line2 = " ".join(cells2_txt)
-    m2 = CODE_RE.search(text_line2)
-    if m2:
-        return m2.group(1)
-
-    return None
+def trim_header(header_cells):
+    last = -1
+    for i, v in enumerate(header_cells):
+        if norm(v) != "":
+            last = i
+    if last == -1:
+        return []
+    return [clean_header_name(v) for v in header_cells[: last + 1]]
