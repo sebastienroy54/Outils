@@ -1,8 +1,1 @@
-# DEBUG: vérifier que le mapping contient bien les 2 séjours pour cet IPP (sans afficher IPP/NDA)
-# On prend l'IPP de la ligne 135 (sans l'afficher) et on compte combien de séjours existent dans mapping
-ipp_key = df_final.loc[135, "ipp"]
-n = (mapping["nip"] == ipp_key).sum()
-print("[DEBUG] nb sejours dans mapping pour l'IPP de la ligne 135 =", int(n))
-
-# afficher uniquement les dates correspondantes (aucun IPP/NDA affiché)
-print(mapping.loc[mapping["nip"] == ipp_key, ["date_deb", "date_fin"]].to_string(index=False))
+75010020802xxxxxxxxx                     31122024        3473791        00000000010013650000
