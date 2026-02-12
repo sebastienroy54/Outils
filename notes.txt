@@ -1,2 +1,2 @@
-[DEBUG] row 137 date_pose pandas = 2025-01-23 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
-[DEBUG] row 138 date_pose pandas = 2025-01-31 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
+[DEBUG] row 135 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
+[DEBUG] row 136 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
