@@ -1,12 +1,4 @@
-# DEBUG: afficher lignes 38884 et 38885 du CSV (sans filtrage)
-raw = pd.read_csv(map_path, sep=";", dtype=str, keep_default_na=False)
-# si jamais sep incorrect, bascule:
-if raw.shape[1] == 1:
-    raw = pd.read_csv(map_path, sep=",", dtype=str, keep_default_na=False)
-
-# Attention: numéro de ligne "Excel" ≠ index pandas. Ici on suppose 1 ligne = 1 enregistrement, en-tête exclu.
-# Si tu parles de lignes Excel (avec entête en ligne 1), alors pandas iloc = ligne_excel-2.
-for excel_line in [38884, 38885]:
-    i = excel_line - 2
-    print(f"\n--- CSV ligne Excel {excel_line} (pandas iloc {i}) ---")
-    print(raw.iloc[i].to_dict())
+ CSV ligne Excel 38884 (pandas iloc 38882)
+'type': 'hc', 'date.deb': '2025-01-08', 'date.fin': '2025-01-16'}
+--- CSV ligne Excel 38885 (pandas iloc 38883) ---
+ 'type': 'hc', 'date.deb': '2025-01-23', 'date.fin': '2025-02-11'}
