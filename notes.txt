@@ -1,65 +1,36 @@
-def post_clean(df_final: pd.DataFrame) -> pd.DataFrame:
-    # Nettoyage NDA : H devant NDA (H61....)
-    df_final["nda"] = (
-        df_final["nda"].astype(str).str.strip()
-        .str.replace(r"^H(?=61\d+)", "", regex=True)
-        .str.replace(r"\.0$", "", regex=True)
-        .replace({"nan": "", "None": ""})
-    )
-    # Nettoyage IPP
-    df_final["ipp"] = (
-        df_final["ipp"].astype(str).str.strip()
-        .str.replace(r"\.0$", "", regex=True)
-        .replace({"nan": "", "None": ""})
-    )
+def read_mapping_csv(map_path: str) -> pd.DataFrame:
+    # tente ; puis ,
+    try:
+        m = pd.read_csv(map_path, sep=";", dtype=str)
+        if m.shape[1] == 1:
+            raise ValueError("Bad sep")
+    except Exception:
+        m = pd.read_csv(map_path, sep=",", dtype=str)
 
-    # Date pose en datetime + normalisation au jour (supprime hh:mm:ss)
-    df_final["date_pose"] = (
-        pd.to_datetime(df_final["date_pose"], errors="coerce", dayfirst=True)
-          .dt.normalize()
-    )
+    # colonnes attendues: NIP NAS type date.deb date.fin
+    m = m.rename(columns={
+        "NIP": "nip",
+        "NAS": "nas",
+        "type": "type",
+        "date.deb": "date_deb",
+        "date.fin": "date_fin",
+    })
+    # fallback si déjà normalisées / variantes
+    if "nip" not in m.columns and "NIP" in m.columns:
+        m["nip"] = m["NIP"]
+    if "nas" not in m.columns and "NAS" in m.columns:
+        m["nas"] = m["NAS"]
+    if "date_deb" not in m.columns and "date.deb" in m.columns:
+        m["date_deb"] = m["date.deb"]
+    if "date_fin" not in m.columns and "date.fin" in m.columns:
+        m["date_fin"] = m["date.fin"]
 
-    # Split Nom/Prénom pour 3416095 si prenom vide (prénom en Title Case)
-    def is_titlecase_word(w: str) -> bool:
-        if not w:
-            return False
-        w2 = re.sub(r"[^A-Za-zÀ-ÖØ-öø-ÿ'\-]", "", w)
-        return bool(w2) and (w2[0].isupper()) and (
-            w2[1:].islower() or w2[1:].replace("-", "").replace("'", "").islower()
-        )
+    m["nip"] = m["nip"].fillna("").astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    m["nas"] = m["nas"].fillna("").astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
 
-    def split_nom_prenom(full: str):
-        if full is None:
-            return "", ""
-        s = str(full).strip()
-        if not s:
-            return "", ""
-        parts = s.split()
-        if len(parts) == 1:
-            return s, ""
-        idx = None
-        for i, w in enumerate(parts):
-            if is_titlecase_word(w):
-                idx = i
-                break
-        if idx is None or idx == 0:
-            return s, ""
-        return " ".join(parts[:idx]).strip(), " ".join(parts[idx:]).strip()
+    # Dates normalisées au jour (supprime hh:mm:ss) pour matcher proprement
+    m["date_deb"] = pd.to_datetime(m["date_deb"], errors="coerce", dayfirst=True).dt.normalize()
+    m["date_fin"] = pd.to_datetime(m["date_fin"], errors="coerce", dayfirst=True).dt.normalize()
 
-    mask_3416095 = df_final["lppr"].astype(str).eq("3416095")
-    mask_need_split = (
-        mask_3416095
-        & df_final["prenom"].astype(str).str.strip().eq("")
-        & df_final["nom"].astype(str).str.strip().ne("")
-    )
-    splits = df_final.loc[mask_need_split, "nom"].apply(split_nom_prenom)
-    df_final.loc[mask_need_split, "nom"] = splits.apply(lambda x: x[0])
-    df_final.loc[mask_need_split, "prenom"] = splits.apply(lambda x: x[1])
-
-    # Filtres lignes inutilisables:
-    no_date_and_no_nda = df_final["date_pose"].isna() & df_final["nda"].eq("")
-    no_id = df_final["ipp"].eq("") & df_final["nda"].eq("")
-    df_final = df_final.loc[~(no_date_and_no_nda | no_id)].copy()
-    df_final.reset_index(drop=True, inplace=True)
-
-    return df_final
+    m = m[(m["nip"] != "") & m["date_deb"].notna() & m["date_fin"].notna()].copy()
+    return m[["nip", "nas", "date_deb", "date_fin"]]
