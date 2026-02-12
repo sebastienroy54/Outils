@@ -1,25 +1,8 @@
-[DEBUG] row 135 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
-[DEBUG] row 136 date_pose pandas = 2025-01-09 00:00:00 (type=<class 'pandas._libs.tslibs.timestamps.Timestamp'>)
-c:\Users\4251352\projets\DMI_NCK.py:402: UserWarning: Parsing dates in %Y-%m-%d format when dayfirst=True was specified. Pass `dayfirst=False` or specify a format to silence this warning.
-  m["date_deb"] = pd.to_datetime(m["date_deb"], errors="coerce", dayfirst=True).dt.normalize()
+# DEBUG: vérifier que le mapping contient bien les 2 séjours pour cet IPP (sans afficher IPP/NDA)
+# On prend l'IPP de la ligne 135 (sans l'afficher) et on compte combien de séjours existent dans mapping
+ipp_key = df_final.loc[135, "ipp"]
+n = (mapping["nip"] == ipp_key).sum()
+print("[DEBUG] nb sejours dans mapping pour l'IPP de la ligne 135 =", int(n))
 
-[DEBUG] candidats après merge (dates uniquement) pour idx 135/136:
- index  date_pose   date_deb   date_fin  ge_deb  le_fin  in_interval
-   135 2025-01-09 2025-01-23 2025-11-02   False    True        False
-   136 2025-01-09 2025-01-23 2025-11-02   False    True        False
-
-[DEBUG] nb de séjours récupérés par index:
-index
-135    1
-136    1
-
-[DEBUG] nb de séjours valides (date_deb/date_fin non nulles):
-index
-135    1
-136    1
-
---- CSV ligne Excel 38884 (pandas iloc 38882) ---
-{'NIP': 'xxxxxxxxxx', 'NAS': 'yyyyyyyyy           ', 'type': 'hc', 'date.deb': '2025-01-08', 'date.fin': '2025-01-16'}
-
---- CSV ligne Excel 38885 (pandas iloc 38883) ---
-{'NIP': 'xxxxxxxxxx', 'NAS': 'yyyyyyyyy           ', 'type': 'hc', 'date.deb': '2025-01-23', 'date.fin': '2025-02-11'}
+# afficher uniquement les dates correspondantes (aucun IPP/NDA affiché)
+print(mapping.loc[mapping["nip"] == ipp_key, ["date_deb", "date_fin"]].to_string(index=False))
