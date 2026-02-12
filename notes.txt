@@ -1,93 +1,11 @@
-####### FORMATAGE DES RIM-P DIME POUR IMPORT DANS PMSIPilot ###############
-gc()
-# Loading libraries
-library(tidyr)
-library(dplyr)
-library(stringr)
-library("readxl")
+LPPR = 3299070
+idem que 8127390
 
-####### ********** A PARAMETRER A CHAQUE REMONTEE ************#############
+LPPR = 8127390
+x_pk	x_chrono	x_ref	x_lot	x_tperemp	x_dest	x_four	x_societe	x_no_serie	x_refour	x_user	x_poseur	x_id_traca	x_nip	x_nda	x_nom	x_secu	x_prenom	x_dnaiss	x_tpose	x_etat	x_type_indic	x_comment	x_dvalid	x_user_valid	x_dcde	x_treport	x_dest_pose	x_no_cde	x_no_liv	x_indic_gest	x_depot	x_prix_u	x_tva	x_t2a	x_cpt_budg	x_marche	x_lppr	x_ref_sap	x_cab	x_motif_fin	x_pk_it_s	x_renouveler	x_id_ext	x_statut_ext	x_localisation_ext	x_ddemande	x_gratuit	x_tstatut_ext	x_desig	x_depot1	x_sel	x_peremp	x_lib_dest	x_lib_etat
 
-chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/MCO"
-# DEPLACER LES 6 FICHIERS
-UMA_BRC = "CORREPONDANCE_UM_MCO_SITE_00016_APHP_202512.xls"
-MCO_BRC = "750801441.2025.12.rss.ini.txt"
-UMA_CCH = "CORREPONDANCE_UM_MCO_SITE_00021_APHP_202512.xls"
-MCO_CCH = "750100166.2025.12.rss.ini.txt"
-UMA_CCL = "CORREPONDANCE_UM_MCO_SITE_00022_APHP_202512.xls"
-MCO_CCL = "920100062.2025.12.rss.ini.txt"
-UMA_HTD = "CORREPONDANCE_UM_MCO_SITE_00041_APHP_202512.xls"
-MCO_HTD = "750100018.2025.12.rss.ini.txt"
+LPPR = 3111645
+Reference: 	Denomination:	Lot 	Date d'intervention:	Nom:	Prénom:	Date de naissance:	IPP ou Nda:
 
-taille_um = 4
-deb_pos_UM_RAA = 87  # 2025
-
-###########################################  FIN ZONE PARAMETRAGE ###################
-
-# chemin    
-setwd (chemin)
-# nom des fichiers de sortie
-MCO_BRC_SITE = paste(str_sub(MCO_BRC, start = 1, end = nchar(MCO_BRC)-4),".site",str_sub(MCO_BRC, start = nchar(MCO_BRC)-3),sep="")
-MCO_CCH_SITE = paste(str_sub(MCO_CCH, start = 1, end = nchar(MCO_CCH)-4),".site",str_sub(MCO_CCH, start = nchar(MCO_CCH)-3),sep="")
-MCO_CCL_SITE = paste(str_sub(MCO_CCL, start = 1, end = nchar(MCO_CCL)-4),".site",str_sub(MCO_CCL, start = nchar(MCO_CCL)-3),sep="")
-MCO_HTD_SITE = paste(str_sub(MCO_HTD, start = 1, end = nchar(MCO_HTD)-4),".site",str_sub(MCO_HTD, start = nchar(MCO_HTD)-3),sep="")
-
-# fichiers de travail
-UM_BRC<-read_excel(UMA_BRC, skip  = 2)
-UM_CCH<-read_excel(UMA_CCH, skip  = 2)
-UM_CCL<-read_excel(UMA_CCL, skip  = 2)
-UM_HTD<-read_excel(UMA_HTD, skip  = 2)
-
-# FORCER UNE ASSOCIATION 1->1 (une seule ligne par URM_APHP)
-UM_BRC <- UM_BRC %>% distinct(URM_APHP, .keep_all = TRUE)
-UM_CCH <- UM_CCH %>% distinct(URM_APHP, .keep_all = TRUE)
-UM_CCL <- UM_CCL %>% distinct(URM_APHP, .keep_all = TRUE)
-UM_HTD <- UM_HTD %>% distinct(URM_APHP, .keep_all = TRUE)
-
-############ RAA ################
-MCO_BRC<-read.csv2(MCO_BRC, header = FALSE)
-A<-str_replace_all(str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
-MCO_BRC<-MCO_BRC%>%mutate(URM_APHP = A)
-MCO_BRC<-left_join(MCO_BRC, UM_BRC)
-B<-str_sub(MCO_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(MCO_BRC[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(taille_um-nchar(MCO_BRC$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,MCO_BRC$URM_SITE,Z,C,sep="")
-write(D, file = MCO_BRC_SITE)
-
-MCO_CCH<-read.csv2(MCO_CCH, header = FALSE)
-A<-str_replace_all(str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
-MCO_CCH<-MCO_CCH%>%mutate(URM_APHP = A)
-MCO_CCH<-left_join(MCO_CCH, UM_CCH)
-B<-str_sub(MCO_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(MCO_CCH[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(taille_um-nchar(MCO_CCH$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,MCO_CCH$URM_SITE,Z,C,sep="")
-write(D, file = MCO_CCH_SITE)
-
-MCO_CCL<-read.csv2(MCO_CCL, header = FALSE)
-A<-str_replace_all(str_sub(MCO_CCL[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
-MCO_CCL<-MCO_CCL%>%mutate(URM_APHP = A)
-MCO_CCL<-left_join(MCO_CCL, UM_CCL)
-B<-str_sub(MCO_CCL[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(MCO_CCL[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(taille_um-nchar(MCO_CCL$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,MCO_CCL$URM_SITE,Z,C,sep="")
-write(D, file = MCO_CCL_SITE)
-
-MCO_HTD<-read.csv2(MCO_HTD, header = FALSE)
-A<-str_replace_all(str_sub(MCO_HTD[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
-MCO_HTD<-MCO_HTD%>%mutate(URM_APHP = A)
-MCO_HTD<-left_join(MCO_HTD, UM_HTD)
-B<-str_sub(MCO_HTD[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(MCO_HTD[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(taille_um-nchar(MCO_HTD$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,MCO_HTD$URM_SITE,Z,C,sep="")
-write(D, file = MCO_HTD_SITE)
-
-
-# FIN DE PROCEDURE
+LPPR = 3416095
+Nom Prénom	Date de Naissance	Coté	NIP	Date d'intervention	Chirurgien	Marque	Modèle implants	Date d'envoi du mail - fax	Modele de processeur	Date Achat	N° de Cde	Réception aux DM	N° série - implants	N° serie processeur	Récupération implants - bloc	Date de récupération processeur	Date d'activation processeur	Date de saisie dans le SAG	
