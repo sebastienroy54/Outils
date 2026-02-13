@@ -1,17 +1,20 @@
-MO ACTE_NON_CODE CHIR_SANS_AG CHIR_SOUS_AG MEDICAMENTEUX      TOTAL
--- ------------- ------------ ------------ ------------- ----------
-01             0          110            0            47        157
-02             0          105            0            65        170
-03             0          108            0            62        170
-04             0           93            0            54        147
-05             0           91            0            59        150
-06             2          115            0            41        158
-07             0           99            0            54        153
-08             0           94            0            37        131
-09             0          119            0            59        178
-10             0          113            0            58        171
-11             0          115            0            58        173
+SELECT SUBSTR(A.KYCDAC,1,4) AS PREFIXE, COUNT(*) AS NB
+FROM RAC A, RSM R
+WHERE A.KYRES = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND R.CDDNC9 LIKE 'O04%'
+GROUP BY SUBSTR(A.KYCDAC,1,4)
+ORDER BY NB DESC;
 
-MO ACTE_NON_CODE CHIR_SANS_AG CHIR_SOUS_AG MEDICAMENTEUX      TOTAL
--- ------------- ------------ ------------ ------------- ----------
-12             0          109            0            48        157
+
+SELECT COUNT(DISTINCT R.KYRES) AS NB_SEJOURS
+FROM RSM R, RAC A, DGN D
+WHERE A.KYRES(+) = R.KYRES
+AND D.KYRES = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND (R.CDDNC9 LIKE 'O04%' OR A.KYCDAC LIKE 'JNJ%')
+AND D.KYCDDG = 'O074';
