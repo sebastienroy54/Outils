@@ -1,5 +1,5 @@
 SELECT column_name
-FROM user_tab_columns
+FROM all_tab_columns
 WHERE table_name = 'RSM'
 AND (UPPER(column_name) LIKE '%SA%'
      OR UPPER(column_name) LIKE '%AMEN%'
