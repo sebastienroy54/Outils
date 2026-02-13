@@ -15,17 +15,28 @@ OUT_XLSX = "pharma_flat_avec_NDA.xlsx"                 # fichier flat final
 OUT_ABSENT_XLSX = "pharma_absents_dmi_fic.xlsx"        # patients absents du .fic
 
 # NDA en position fixe dans le .fic
-FIC_NDA_START_1 = 12   # position 1-based (comme tu l’indiques)
+FIC_NDA_START_1 = 12   # position 1-based
 FIC_NDA_LEN = 9        # NDA type 61xxxxxxxx (9 chiffres)
+
+# Colonnes finales à conserver + renommage
+FINAL_RENAME = {
+    "lppr": "LPPR",
+    "ipp": "IPP",
+    "nda": "NDA",
+    "date_pose": "Date de pose",
+    "nom": "Nom",
+    "prenom": "Prénom",
+    "date_naissance": "Date de naissance",
+    "fournisseur": "Fournisseur",
+    "reference_commerciale": "Référence commerciale",
+    "lot": "Numéro de lot",
+    "numero_serie": "Numéro de série",
+    "designation": "Désignation",
+}
+FINAL_COLS = list(FINAL_RENAME.keys())
 
 # ========= OUTILS =========
 def clean_digits_id(x) -> str:
-    """
-    Normalise un identifiant (IPP/NDA/NIP/NAS) :
-    - strip, supprime .0
-    - supprime H si H61...
-    - garde uniquement les chiffres
-    """
     s = "" if x is None else str(x).strip()
     if not s:
         return ""
@@ -240,7 +251,6 @@ def normalize_block(df_block, lppr, family):
 
     elif family == "C":
         c_ipp = find_col("nip", startswith=True)
-        # un peu plus strict pour éviter de prendre une autre "Date ..."
         c_date = find_col("date d'intervention") or find_col("date intervention", contains=True)
         c_dn = find_col("date de naissance", contains=True)
         c_np = find_col("nom prénom", "nom prenom", contains=True)
@@ -389,7 +399,6 @@ def read_mapping_csv(map_path: str) -> pd.DataFrame:
     m["nip"] = m["nip"].apply(clean_digits_id)
     m["nas"] = m["nas"].apply(clean_digits_id)
 
-    # parsing strict ISO (résout les inversions 02/11 vs 11/02)
     m["date_deb"] = pd.to_datetime(m["date_deb"].astype(str).str.strip(), errors="coerce", format="%Y-%m-%d").dt.normalize()
     m["date_fin"] = pd.to_datetime(m["date_fin"].astype(str).str.strip(), errors="coerce", format="%Y-%m-%d").dt.normalize()
 
@@ -398,9 +407,6 @@ def read_mapping_csv(map_path: str) -> pd.DataFrame:
 
 def fill_ipp_from_nda(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    if "ipp_fill_status" not in df.columns:
-        df["ipp_fill_status"] = ""
-
     mask = df["ipp"].eq("") & df["nda"].ne("")
     if not mask.any():
         return df
@@ -414,20 +420,14 @@ def fill_ipp_from_nda(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
 
     tmp = tmp.drop_duplicates(subset=["index"], keep="first").set_index("index")
     df.loc[tmp.index, "ipp"] = tmp["nip"].fillna("").values
-    df.loc[tmp.index, "ipp_fill_status"] = df.loc[tmp.index, "ipp"].ne("").map(
-        {True: "Rempli via CSV (NDA->IPP)", False: "IPP non trouvé via NDA"}
-    )
     return df
 
 def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["nda_fill_status"] = ""
 
     need_mask = df["nda"].eq("") & df["ipp"].ne("") & df["date_pose"].notna()
     need = df.loc[need_mask].reset_index().copy()
-
     if need.empty:
-        df.loc[df["nda_fill_status"].eq(""), "nda_fill_status"] = "Déjà rempli / pas concerné"
         return df
 
     cand = need.merge(mapping, left_on="ipp", right_on="nip", how="left")
@@ -435,9 +435,7 @@ def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataF
 
     cand["in_interval"] = (cand["date_pose"] >= cand["date_deb"]) & (cand["date_pose"] <= cand["date_fin"])
     cand = cand[cand["in_interval"]].copy()
-
     if cand.empty:
-        df.loc[need_mask, "nda_fill_status"] = "NDA non trouvé (intervalle)"
         return df
 
     cand["stay_duration_days"] = (cand["date_fin"] - cand["date_deb"]).dt.days
@@ -447,33 +445,16 @@ def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataF
         by=["index", "stay_duration_days", "gap_start_days", "date_deb"],
         ascending=[True, True, True, False]
     )
-
     best = cand.drop_duplicates(subset=["index"], keep="first").set_index("index")
 
-    if "nda_date_deb_match" not in df.columns:
-        df["nda_date_deb_match"] = pd.NaT
-    if "nda_date_fin_match" not in df.columns:
-        df["nda_date_fin_match"] = pd.NaT
-
     df.loc[best.index, "nda"] = best["nas"].values
-    df.loc[best.index, "nda_fill_status"] = "Rempli via CSV (intervalle)"
-    df.loc[best.index, "nda_date_deb_match"] = best["date_deb"].values
-    df.loc[best.index, "nda_date_fin_match"] = best["date_fin"].values
-
-    still_empty = need_mask & df["nda"].eq("")
-    df.loc[still_empty, "nda_fill_status"] = "NDA non trouvé (intervalle)"
     return df
 
 # ========= LECTURE .FIC + COMPARAISON =========
 def read_fic_ndas(fic_path: str, nda_start_1: int, nda_len: int) -> set[str]:
-    """
-    Extrait les NDA du fichier .fic.
-    NDA commence à nda_start_1 (1-based) et fait nda_len caractères.
-    """
     ndas = set()
     start0 = nda_start_1 - 1
 
-    # encodage: on tente utf-8 puis latin-1
     for enc in ("utf-8", "cp1252", "latin-1"):
         try:
             with open(fic_path, "r", encoding=enc, errors="ignore") as f:
@@ -496,7 +477,7 @@ def export_excel_with_date_formats(df: pd.DataFrame, out_path: str, sheet_name: 
         ws = writer.sheets[sheet_name]
 
         headers = [cell.value for cell in ws[1]]
-        date_cols = {"date_pose", "date_naissance", "nda_date_deb_match", "nda_date_fin_match"}
+        date_cols = {"Date de pose", "Date de naissance"}
         date_col_indexes = [i + 1 for i, h in enumerate(headers) if h in date_cols]
 
         for col_idx in date_col_indexes:
@@ -531,8 +512,6 @@ def main():
             df_block = b["df"]
             family = detect_family(df_block.columns)
             df_norm = normalize_block(df_block, lppr=lppr, family=family)
-            df_norm["source_sheet"] = b["source_sheet"]
-            df_norm["source_row_lppr"] = b["source_row_lppr"]
             all_norm.append(df_norm)
 
     if not all_norm:
@@ -540,18 +519,11 @@ def main():
 
     df_final = pd.concat(all_norm, ignore_index=True)
 
-    # Colonnes finales
-    final_cols = [
-        "lppr", "ipp", "nda", "date_pose",
-        "nom", "prenom", "date_naissance",
-        "fournisseur", "reference_commerciale",
-        "lot", "numero_serie", "designation",
-        "source_format", "source_sheet", "source_row_lppr",
-    ]
-    for c in final_cols:
+    # Colonnes nécessaires au pipeline (avant renommage)
+    needed = list(set(FINAL_COLS + ["date_pose", "date_naissance"]))
+    for c in needed:
         if c not in df_final.columns:
             df_final[c] = ""
-    df_final = df_final[final_cols]
 
     # 2) Nettoyage + remplissages via CSV
     df_final = post_clean(df_final)
@@ -559,26 +531,30 @@ def main():
     df_final = fill_ipp_from_nda(df_final, mapping)
     df_final = fill_nda_from_intervals(df_final, mapping)
 
-    # 3) Export flat final
-    export_excel_with_date_formats(df_final, out_xlsx_path, sheet_name="flat")
+    # 3) Garder uniquement les colonnes finales + renommage
+    df_final = df_final[FINAL_COLS].copy()
+    df_final = df_final.rename(columns=FINAL_RENAME)
 
     # 4) Lecture .fic + comparaison
     ndas_fic = read_fic_ndas(fic_path, FIC_NDA_START_1, FIC_NDA_LEN)
 
-    df_final["present_dans_fic"] = df_final["nda"].apply(lambda x: x in ndas_fic if x else False)
+    present_mask = df_final["NDA"].apply(lambda x: x in ndas_fic if x else False)
+    df_absent = df_final[(df_final["NDA"] != "") & (~present_mask)].copy()
 
-    # Patients/poses absents du fic
-    df_absent = df_final[(df_final["nda"] != "") & (~df_final["present_dans_fic"])].copy()
+    # dédoublonnage sur NDA+LPPR+Date de pose
+    df_absent = df_absent.drop_duplicates(subset=["NDA", "LPPR", "Date de pose"])
 
-    # Optionnel : dédoublonnage (si tu veux 1 ligne par NDA+LPPR+date_pose)
-    df_absent = df_absent.drop_duplicates(subset=["nda", "lppr", "date_pose"])
+    # tri demandé
+    df_absent = df_absent.sort_values(by=["LPPR", "Date de pose", "Nom", "Prénom"], ascending=[True, True, True, True])
 
+    # 5) Exports
+    export_excel_with_date_formats(df_final, out_xlsx_path, sheet_name="flat")
     export_excel_with_date_formats(df_absent, out_absent_path, sheet_name="absents")
 
     # Résumé console
     print("=== Résumé ===")
     print("Flat total:", len(df_final))
-    print("NDA vides:", int((df_final["nda"] == "").sum()))
+    print("NDA vides:", int((df_final["NDA"] == "").sum()))
     print("NDA absents du .fic (lignes):", len(df_absent))
     print("Export flat:", out_xlsx_path)
     print("Export absents:", out_absent_path)
