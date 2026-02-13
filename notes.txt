@@ -1,102 +1,22 @@
-MO SA NB_SEJOURS
--- -- ----------
-01 10         13
-01 11         12
-01 12          6
-01 13          3
-01 14          4
-01 15          4
-02 10         10
-02 11         10
-02 12          5
-02 13          6
-02 14          7
+SELECT R.AGEGEST, COUNT(DISTINCT R.KYRES) AS NB_SEJOURS
+FROM RSM R, RAC A
+WHERE A.KYRES(+) = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND (R.CDDNC9 LIKE 'O04%' OR A.KYCDAC LIKE 'JNJ%')
+GROUP BY R.AGEGEST
+ORDER BY R.AGEGEST;
 
-MO SA NB_SEJOURS
--- -- ----------
-02 15          4
-03 10         13
-03 11          6
-03 12         10
-03 13          6
-03 14          4
-03 15          2
-03 16          2
-04 10          7
-04 11          9
-04 12          5
-
-MO SA NB_SEJOURS
--- -- ----------
-04 13          5
-04 14          1
-04 15          3
-04 16          1
-05 10          8
-05 11          7
-05 12          6
-05 13          3
-05 14          1
-05 15          2
-05 16          1
-
-MO SA NB_SEJOURS
--- -- ----------
-06 10          5
-06 11          3
-06 13          1
-06 14          2
-06 15          4
-06 16          1
-07 10          2
-07 11          4
-07 12          6
-07 13          7
-07 14          1
-
-MO SA NB_SEJOURS
--- -- ----------
-07 15          3
-08 10          6
-08 11          2
-08 12          3
-08 13          4
-08 14          3
-08 15          1
-08 16          1
-09 10         12
-09 11          5
-09 12          3
-
-MO SA NB_SEJOURS
--- -- ----------
-09 13          2
-09 14          2
-09 15          3
-10 10         11
-10 11          4
-10 12          5
-10 13          6
-10 14          7
-10 15          2
-10 16          1
-11 10          6
-
-MO SA NB_SEJOURS
--- -- ----------
-11 11          3
-11 12          1
-11 13          3
-11 14          5
-11 15          7
-11 16          2
-12 10          5
-12 11          4
-12 12          2
-12 13          1
-12 14          4
-
-MO SA NB_SEJOURS
--- -- ----------
-12 15          4
-12 16          3
+SELECT
+  SUM(CASE WHEN R.AGEGEST IS NULL OR TRIM(R.AGEGEST) IS NULL THEN 1 ELSE 0 END) AS NB_SANS_AGEGEST,
+  SUM(CASE WHEN R.AGEGEST IS NOT NULL AND TRIM(R.AGEGEST) IS NOT NULL THEN 1 ELSE 0 END) AS NB_AVEC_AGEGEST
+FROM (
+  SELECT DISTINCT R.KYRES, R.AGEGEST
+  FROM RSM R, RAC A
+  WHERE A.KYRES(+) = R.KYRES
+  AND R.CDURM_P IN ('140J','142J')
+  AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND (R.CDDNC9 LIKE 'O04%' OR A.KYCDAC LIKE 'JNJ%')
+) R;
