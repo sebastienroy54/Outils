@@ -1,40 +1,14 @@
-SELECT MOIS,
-       SUM(CASE WHEN METHODE = 'NON_CODE' THEN 1 ELSE 0 END) AS ACTE_NON_CODE,
-       SUM(CASE WHEN METHODE = 'CHIR_SANS_AG' THEN 1 ELSE 0 END) AS CHIR_SANS_AG,
-       SUM(CASE WHEN METHODE = 'CHIR_SOUS_AG' THEN 1 ELSE 0 END) AS CHIR_SOUS_AG,
-       SUM(CASE WHEN METHODE = 'MEDICAMENTEUX' THEN 1 ELSE 0 END) AS MEDICAMENTEUX,
-       COUNT(*) AS TOTAL
-FROM (
-  SELECT DISTINCT
-         TO_CHAR(R.D8EEUE,'MM') AS MOIS,
-         R.KYRES,
-         CASE
-           WHEN EXISTS (SELECT 1 FROM RAC A1 WHERE A1.KYRES = R.KYRES AND A1.KYCDAC LIKE 'JNJP%')
-             THEN 'MEDICAMENTEUX'
-           WHEN EXISTS (SELECT 1 FROM RAC A2 WHERE A2.KYRES = R.KYRES AND A2.KYCDAC LIKE 'JNJD%')
-             THEN CASE
-                    WHEN EXISTS (
-                      SELECT 1
-                      FROM RAC AZ
-                      WHERE AZ.KYRES = R.KYRES
-                      AND (
-                        AZ.KYCDAC LIKE 'JKLD%' OR
-                        AZ.KYCDAC LIKE 'JKHD%' OR
-                        AZ.KYCDAC LIKE 'QZLA%' OR
-                        AZ.KYCDAC LIKE 'ZZQX%'
-                      )
-                    )
-                      THEN 'CHIR_SOUS_AG'
-                    ELSE 'CHIR_SANS_AG'
-                  END
-           ELSE 'NON_CODE'
-         END AS METHODE
-  FROM RSM R, RAC A
-  WHERE A.KYRES(+) = R.KYRES
-    AND R.CDURM_P IN ('140J','142J')
-    AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
-    AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
-    AND (R.CDDNC9 LIKE 'O04%' OR A.KYCDAC LIKE 'JNJ%')
-)
-GROUP BY MOIS
-ORDER BY MOIS;
+MO ACTE_NON_CODE CHIR_SANS_AG CHIR_SOUS_AG MEDICAMENTEUX      TOTAL
+-- ------------- ------------ ------------ ------------- ----------
+01             0           72           38            47        157
+02             0           65           40            65        170
+03             0           68           40            62        170
+04             0           60           33            54        147
+05             0           60           31            59        150
+06             2           71           44            41        158
+07             0           69           30            54        153
+08             0           58           36            37        131
+09             0           78           41            59        178
+10             0           79           34            58        171
+11             0           78           37            58        173
+12             0           75           34            48        157
