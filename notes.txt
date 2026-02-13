@@ -1,18 +1,8 @@
-PREF NB_SEJOURS
----- ----------
-JNJD       1272
-JKLD        314
-QZLA        120
-ZZQX          6
-JQQX          5
-JKKD          4
-JNQM          3
-JKGD          2
-JKCD          1
-JKHD          1
-ZBQK          1
-
-PREF NB_SEJOURS
----- ----------
-JNJP          1
-JKQX          1
+SELECT NBIVG, COUNT(DISTINCT KYRES)
+FROM RSM
+WHERE CDURM_P IN ('140J','142J')
+AND D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND (CDDNC9 LIKE 'O04%')
+GROUP BY NBIVG
+ORDER BY NBIVG;
