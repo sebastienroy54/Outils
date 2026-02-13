@@ -1,10 +1,21 @@
-SELECT A2.KYCDAC, COUNT(DISTINCT A2.KYRES) AS NB_SEJOURS
-FROM RAC A1, RAC A2, RSM R
-WHERE A1.KYRES = A2.KYRES
-AND A1.KYRES = R.KYRES
-AND R.CDURM_P IN ('140J','142J')
-AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
-AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
-AND A1.KYCDAC = 'JNJD002'
-GROUP BY A2.KYCDAC
-ORDER BY NB_SEJOURS DESC;
+KYCDAC     NB_SEJOURS
+---------- ----------
+JNJD002          1272
+JKLD001           314
+QZLA004           120
+JQQX109             5
+JKKD001             4
+JNQM001             3
+ZZQX029             3
+ZZQX069             3
+ZZQX123             3
+JKGD004             2
+ZZQX188             2
+
+KYCDAC     NB_SEJOURS
+---------- ----------
+JKCD001             1
+JKHD001             1
+ZBQK002             1
+JNJP001             1
+JKQX347             1
