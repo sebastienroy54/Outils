@@ -1,14 +1,9 @@
-MO ACTE_NON_CODE CHIR_SANS_AG CHIR_SOUS_AG MEDICAMENTEUX      TOTAL
--- ------------- ------------ ------------ ------------- ----------
-01             0           72           38            47        157
-02             0           65           40            65        170
-03             0           68           40            62        170
-04             0           60           33            54        147
-05             0           60           31            59        150
-06             2           71           44            41        158
-07             0           69           30            54        153
-08             0           58           36            37        131
-09             0           78           41            59        178
-10             0           79           34            58        171
-11             0           78           37            58        173
-12             0           75           34            48        157
+SELECT A.KYCDAC, COUNT(DISTINCT R.KYRES) AS NB
+FROM RSM R, RAC A
+WHERE A.KYRES = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND A.KYCDAC LIKE 'JNJD%'
+GROUP BY A.KYCDAC
+ORDER BY NB DESC;
