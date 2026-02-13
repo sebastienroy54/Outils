@@ -1,61 +1,27 @@
-J’aurai besoin d’informations pour réaliser le bilan d’activité 2025 de l’UF de planification.
-Le Dr Reboul Marty m’envoyait en début d’année les chiffres des IVG réalisées dans l’unité par mois, par terme de grossesse en semaines d’aménorrhée et patientes mineures ou majeures. Voir tableau 2024 ci-joint.
-Ainsi que le nombre d’IVG codées avec un DAS O074 (échec d’IVG médicamenteuse).
-
-Données 2024 du Planning Familial			
-			
-	Majeure	Mineure	Total
-	Séjours	Séjours	Séjours
-Mois	151	6	157
-1			
-2	165	5	170
-3	165	5	170
-4	141	7	148
-5	145	6	151
-6	152	6	158
-7	145	8	153
-8	120	11	131
-9	173	5	178
-10	167	5	172
-11	169	4	173
-12	152	6	158
-Total	1845	74	1919
+SELECT COUNT(DISTINCT R.KYRES)
+FROM RSM R
+WHERE R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND R.CDDNC9 LIKE 'O04%';
 
 
-	Age Gestationel														Total
-		4	5	6	7	8	9	10	11	12	13	14	15	16	
-	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours	Séjours
-Mois	10	.	16	27	31	15	16	13	12	6	3	4	4	.	157
-1															
-2	12	.	26	35	27	20	8	10	10	5	6	7	4	.	170
-3	9	.	29	31	26	17	15	13	6	10	6	4	2	2	170
-4	3	3	26	26	23	23	13	7	9	5	5	1	3	1	148
-5	41	.	27	23	11	11	9	8	7	6	3	2	2	1	151
-6	100	1	15	8	9	3	6	5	3	.	1	2	4	1	158
-7	59	.	24	21	12	7	7	2	4	6	7	1	3	.	153
-8	61	.	16	10	11	10	3	6	2	3	4	3	1	1	131
-9	29	.	22	34	27	23	16	12	5	3	2	2	3	.	178
-10	32	3	25	21	33	13	8	12	4	5	6	7	2	1	172
-11	43	2	39	17	21	17	7	6	3	1	3	5	7	2	173
-12	39	1	29	23	27	8	8	5	4	2	1	4	4	3	158
-Total	438	10	294	276	258	167	116	99	69	52	47	42	39	12	1919
+SELECT COUNT(DISTINCT R.KYRES)
+FROM RSM R, RAC A
+WHERE A.KYRES = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND A.KYCDAC LIKE 'JNJ%';
 
 
-	Méthode IVG				Total
-	Acte non codé	Chir SANS AG	Chir SOUS AG	Médicamenteux	
-	Séjours	Séjours	Séjours	Séjours	Séjours
-Mois	.	59	51	47	157
-1					
-2	.	43	62	65	170
-3	.	47	61	62	170
-4	1	35	59	54	149
-5	.	39	53	59	151
-6	2	49	66	41	158
-7	.	52	47	54	153
-8	.	38	56	37	131
-9	.	51	68	59	178
-10	1	57	56	58	172
-11	.	54	61	58	173
-12	1	44	65	48	158
-Total	5	568	705	642	1920
-
+SELECT COUNT(DISTINCT R.KYRES)
+FROM RSM R, RAC A
+WHERE A.KYRES(+) = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND (
+    R.CDDNC9 LIKE 'O04%'
+    OR A.KYCDAC LIKE 'JNJ%'
+);
