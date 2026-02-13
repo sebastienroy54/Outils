@@ -7,12 +7,16 @@ from openpyxl import load_workbook
 # ========= CONFIG =========
 BASE_DIR = r"C:/Users/4251352/Documents/DMI_NCK"
 XLSM_NAME = "Copie de bilan DIM 2025.xlsm"
+MAP_CSV_NAME = "NCK.2024-2025.IPP.NAS.csv"
 
-MAP_CSV_NAME = "NCK.2024-2025.IPP.NAS.csv"   # IPP<->NDA avec dates de séjour
+FIC_NAME = "2025M12.dmi.fic"
 
-OUT_XLSX = "pharma_flat_avec_NDA.xlsx"       # sortie finale
+OUT_XLSX = "pharma_flat_avec_NDA.xlsx"                 # fichier flat final
+OUT_ABSENT_XLSX = "pharma_absents_dmi_fic.xlsx"        # patients absents du .fic
 
-EXPECTED_LPPRS = {"8127390", "3299070", "3111645", "3416095"}
+# NDA en position fixe dans le .fic
+FIC_NDA_START_1 = 12   # position 1-based (comme tu l’indiques)
+FIC_NDA_LEN = 9        # NDA type 61xxxxxxxx (9 chiffres)
 
 # ========= OUTILS =========
 def clean_digits_id(x) -> str:
@@ -28,7 +32,7 @@ def clean_digits_id(x) -> str:
     s = s.replace("\u00A0", " ").strip()
     s = re.sub(r"\.0$", "", s)
     s = s.upper()
-    s = re.sub(r"^H(?=61\d+)", "", s)  # H615... -> 615...
+    s = re.sub(r"^H(?=61\d+)", "", s)  # H61... -> 61...
     s = re.sub(r"\D+", "", s)         # digits only
     return s
 
@@ -41,7 +45,6 @@ def norm_lc(s):
     return norm(s).lower()
 
 def excel_date_to_dt(x):
-    """Convertit différentes représentations (datetime, date Excel, texte) en pandas Timestamp."""
     if x is None or (isinstance(x, str) and x.strip() == ""):
         return pd.NaT
     if isinstance(x, (datetime,)):
@@ -49,7 +52,6 @@ def excel_date_to_dt(x):
     if isinstance(x, pd.Timestamp):
         return x
     if isinstance(x, (int, float)):
-        # Excel epoch 1899-12-30
         return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
     return pd.to_datetime(str(x), errors="coerce", dayfirst=True)
 
@@ -59,12 +61,7 @@ def get_row_values(ws, r, max_col=120):
     return [ws.cell(row=r, column=c).value for c in range(1, max_col + 1)]
 
 def is_lppr_line(ws, r, max_col=120):
-    """
-    Retourne le code LPPR si la ligne r (ou r+1) contient un bloc LPPR,
-    même si "LPPR" et le code sont dans des cellules différentes.
-    """
     row = get_row_values(ws, r, max_col=max_col)
-
     cells_txt = [norm(v) for v in row if v is not None]
     if not any("lppr" in t.lower() for t in cells_txt):
         return None
@@ -107,7 +104,7 @@ def clean_header_name(x):
     s = norm(x)
     s = s.replace("\u00A0", " ")
     s = re.sub(r"\s+", " ", s).strip()
-    s = re.sub(r":\s*$", "", s)  # supprime ":" final
+    s = re.sub(r":\s*$", "", s)
     return s
 
 def trim_header(header_cells):
@@ -236,14 +233,15 @@ def normalize_block(df_block, lppr, family):
 
         if c_mix:
             vals = df_block[c_mix].astype(str).str.strip()
-            mask_ipp = vals.str.startswith("8", na=False)    # IPP commence par 8
-            mask_nda = vals.str.startswith("61", na=False)   # NDA commence par 61
+            mask_ipp = vals.str.startswith("8", na=False)
+            mask_nda = vals.str.startswith("61", na=False)
             out.loc[mask_ipp, "ipp"] = vals[mask_ipp]
             out.loc[mask_nda, "nda"] = vals[mask_nda]
 
     elif family == "C":
         c_ipp = find_col("nip", startswith=True)
-        c_date = find_col("date d'intervention", contains=True)
+        # un peu plus strict pour éviter de prendre une autre "Date ..."
+        c_date = find_col("date d'intervention") or find_col("date intervention", contains=True)
         c_dn = find_col("date de naissance", contains=True)
         c_np = find_col("nom prénom", "nom prenom", contains=True)
 
@@ -253,8 +251,6 @@ def normalize_block(df_block, lppr, family):
             out["date_pose"] = df_block[c_date].apply(excel_date_to_dt)
         if c_dn:
             out["date_naissance"] = df_block[c_dn].apply(excel_date_to_dt)
-
-        # temporaire: stocke "Nom Prénom" dans nom, on split après
         if c_np:
             out["nom"] = df_block[c_np].astype(str).str.strip()
 
@@ -304,7 +300,6 @@ def extract_blocks_from_sheet(ws, max_col=120):
             width = len(header_cells)
 
             while rr <= max_row:
-                # stop si prochain bloc LPPR
                 if is_lppr_line(ws, rr, max_col=max_col):
                     break
 
@@ -336,14 +331,11 @@ def extract_blocks_from_sheet(ws, max_col=120):
 
 # ========= POST-NETTOYAGE =========
 def post_clean(df_final: pd.DataFrame) -> pd.DataFrame:
-    # Identifiants
     df_final["ipp"] = df_final["ipp"].apply(clean_digits_id)
     df_final["nda"] = df_final["nda"].apply(clean_digits_id)
 
-    # Dates au jour
     df_final["date_pose"] = pd.to_datetime(df_final["date_pose"], errors="coerce", dayfirst=True).dt.normalize()
 
-    # Split Nom/Prénom pour 3416095 si prenom vide (prénom en Title Case)
     def is_titlecase_word(w: str) -> bool:
         if not w:
             return False
@@ -372,25 +364,23 @@ def post_clean(df_final: pd.DataFrame) -> pd.DataFrame:
     df_final.loc[mask_need_split, "nom"] = splits.apply(lambda x: x[0])
     df_final.loc[mask_need_split, "prenom"] = splits.apply(lambda x: x[1])
 
-    # Filtres lignes inutilisables
     no_date_and_no_nda = df_final["date_pose"].isna() & df_final["nda"].eq("")
     no_id = df_final["ipp"].eq("") & df_final["nda"].eq("")
     df_final = df_final.loc[~(no_date_and_no_nda | no_id)].copy()
     df_final.reset_index(drop=True, inplace=True)
     return df_final
 
-# ========= REMPLISSAGE NDA VIA CSV (IPP↔NDA + dates) =========
+# ========= REMPLISSAGE NDA VIA CSV =========
 def read_mapping_csv(map_path: str) -> pd.DataFrame:
     try:
-        m = pd.read_csv(map_path, sep=";", dtype=str)
+        m = pd.read_csv(map_path, sep=";", dtype=str, keep_default_na=False)
         if m.shape[1] == 1:
             raise ValueError("Bad sep")
     except Exception:
-        m = pd.read_csv(map_path, sep=",", dtype=str)
+        m = pd.read_csv(map_path, sep=",", dtype=str, keep_default_na=False)
 
     m = m.rename(columns={"NIP": "nip", "NAS": "nas", "date.deb": "date_deb", "date.fin": "date_fin"})
 
-    # fallback variantes
     if "nip" not in m.columns and "NIP" in m.columns: m["nip"] = m["NIP"]
     if "nas" not in m.columns and "NAS" in m.columns: m["nas"] = m["NAS"]
     if "date_deb" not in m.columns and "date.deb" in m.columns: m["date_deb"] = m["date.deb"]
@@ -399,6 +389,7 @@ def read_mapping_csv(map_path: str) -> pd.DataFrame:
     m["nip"] = m["nip"].apply(clean_digits_id)
     m["nas"] = m["nas"].apply(clean_digits_id)
 
+    # parsing strict ISO (résout les inversions 02/11 vs 11/02)
     m["date_deb"] = pd.to_datetime(m["date_deb"].astype(str).str.strip(), errors="coerce", format="%Y-%m-%d").dt.normalize()
     m["date_fin"] = pd.to_datetime(m["date_fin"].astype(str).str.strip(), errors="coerce", format="%Y-%m-%d").dt.normalize()
 
@@ -422,7 +413,6 @@ def fill_ipp_from_nda(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
     )
 
     tmp = tmp.drop_duplicates(subset=["index"], keep="first").set_index("index")
-
     df.loc[tmp.index, "ipp"] = tmp["nip"].fillna("").values
     df.loc[tmp.index, "ipp_fill_status"] = df.loc[tmp.index, "ipp"].ne("").map(
         {True: "Rempli via CSV (NDA->IPP)", False: "IPP non trouvé via NDA"}
@@ -440,28 +430,16 @@ def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataF
         df.loc[df["nda_fill_status"].eq(""), "nda_fill_status"] = "Déjà rempli / pas concerné"
         return df
 
-    # Merge IPP -> séjours
     cand = need.merge(mapping, left_on="ipp", right_on="nip", how="left")
+    cand = cand[cand["nas"].notna()].copy()
 
-    # Debug: nb séjours trouvés pour cet IPP
-    cnt_any = cand.groupby("index")["nas"].size()
-    df["nb_sejours_pour_ipp"] = 0
-    df.loc[cnt_any.index, "nb_sejours_pour_ipp"] = cnt_any.values
-
-    # Filtre intervalle
     cand["in_interval"] = (cand["date_pose"] >= cand["date_deb"]) & (cand["date_pose"] <= cand["date_fin"])
     cand = cand[cand["in_interval"]].copy()
-
-    # Debug: nb séjours matchants par date
-    cnt_in = cand.groupby("index")["nas"].size()
-    df["nb_sejours_dans_intervalle"] = 0
-    df.loc[cnt_in.index, "nb_sejours_dans_intervalle"] = cnt_in.values
 
     if cand.empty:
         df.loc[need_mask, "nda_fill_status"] = "NDA non trouvé (intervalle)"
         return df
 
-    # Choix meilleur séjour si multiples
     cand["stay_duration_days"] = (cand["date_fin"] - cand["date_deb"]).dt.days
     cand["gap_start_days"] = (cand["date_pose"] - cand["date_deb"]).dt.days.abs()
 
@@ -486,16 +464,63 @@ def fill_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataF
     df.loc[still_empty, "nda_fill_status"] = "NDA non trouvé (intervalle)"
     return df
 
+# ========= LECTURE .FIC + COMPARAISON =========
+def read_fic_ndas(fic_path: str, nda_start_1: int, nda_len: int) -> set[str]:
+    """
+    Extrait les NDA du fichier .fic.
+    NDA commence à nda_start_1 (1-based) et fait nda_len caractères.
+    """
+    ndas = set()
+    start0 = nda_start_1 - 1
+
+    # encodage: on tente utf-8 puis latin-1
+    for enc in ("utf-8", "cp1252", "latin-1"):
+        try:
+            with open(fic_path, "r", encoding=enc, errors="ignore") as f:
+                for line in f:
+                    if len(line) < start0 + nda_len:
+                        continue
+                    raw_nda = line[start0:start0 + nda_len]
+                    nda = clean_digits_id(raw_nda)
+                    if nda:
+                        ndas.add(nda)
+            break
+        except Exception:
+            continue
+
+    return ndas
+
+def export_excel_with_date_formats(df: pd.DataFrame, out_path: str, sheet_name: str = "data"):
+    with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+        ws = writer.sheets[sheet_name]
+
+        headers = [cell.value for cell in ws[1]]
+        date_cols = {"date_pose", "date_naissance", "nda_date_deb_match", "nda_date_fin_match"}
+        date_col_indexes = [i + 1 for i, h in enumerate(headers) if h in date_cols]
+
+        for col_idx in date_col_indexes:
+            for row in range(2, ws.max_row + 1):
+                cell = ws.cell(row=row, column=col_idx)
+                if cell.value is not None:
+                    cell.number_format = "DD/MM/YYYY"
+
 def main():
     xlsm_path = os.path.join(BASE_DIR, XLSM_NAME)
     map_path = os.path.join(BASE_DIR, MAP_CSV_NAME)
+    fic_path = os.path.join(BASE_DIR, FIC_NAME)
+
     out_xlsx_path = os.path.join(BASE_DIR, OUT_XLSX)
+    out_absent_path = os.path.join(BASE_DIR, OUT_ABSENT_XLSX)
 
     if not os.path.exists(xlsm_path):
         raise FileNotFoundError(f"Fichier introuvable: {xlsm_path}")
     if not os.path.exists(map_path):
         raise FileNotFoundError(f"Fichier mapping introuvable: {map_path}")
+    if not os.path.exists(fic_path):
+        raise FileNotFoundError(f"Fichier .fic introuvable: {fic_path}")
 
+    # 1) Extraction + normalisation depuis XLSM
     wb = load_workbook(xlsm_path, data_only=True)
 
     all_norm = []
@@ -515,7 +540,7 @@ def main():
 
     df_final = pd.concat(all_norm, ignore_index=True)
 
-    # Colonnes finales de base
+    # Colonnes finales
     final_cols = [
         "lppr", "ipp", "nda", "date_pose",
         "nom", "prenom", "date_naissance",
@@ -528,86 +553,35 @@ def main():
             df_final[c] = ""
     df_final = df_final[final_cols]
 
-    # Nettoyage
+    # 2) Nettoyage + remplissages via CSV
     df_final = post_clean(df_final)
-    # ===== DEBUG TEST 1: vérifier date_pose ligne 137/138 (index pandas) =====
-    for idx in [135, 136]:
-        if idx < len(df_final):
-            dp = df_final.loc[idx, "date_pose"]
-            print(f"[DEBUG] row {idx} date_pose pandas = {dp} (type={type(dp)})")
-    # Remplissage NDA via CSV (si NDA vide)
     mapping = read_mapping_csv(map_path)
-
-    # DEBUG: vérifier que le mapping contient bien les 2 séjours pour cet IPP (sans afficher IPP/NDA)
-    # On prend l'IPP de la ligne 135 (sans l'afficher) et on compte combien de séjours existent dans mapping
-    ipp_key = df_final.loc[135, "ipp"]
-    n = (mapping["nip"] == ipp_key).sum()
-    print("[DEBUG] nb sejours dans mapping pour l'IPP de la ligne 135 =", int(n))
-
-    # afficher uniquement les dates correspondantes (aucun IPP/NDA affiché)
-    print(mapping.loc[mapping["nip"] == ipp_key, ["date_deb", "date_fin"]].to_string(index=False))
-
-    # ===== DEBUG MERGE INTERVALLE pour idx 135/136 (sans IPP/NDA) =====
-    sample_idx = [135, 136]
-    sample = df_final.loc[sample_idx, ["ipp", "date_pose"]].copy().reset_index()
-
-    cand = sample.merge(mapping, left_on="ipp", right_on="nip", how="left")
-
-    # on ne montre pas ipp/nip/nas : seulement dates + bool
-    cand["ge_deb"] = cand["date_pose"] >= cand["date_deb"]
-    cand["le_fin"] = cand["date_pose"] <= cand["date_fin"]
-    cand["in_interval"] = cand["ge_deb"] & cand["le_fin"]
-
-    print("\n[DEBUG] candidats après merge (dates uniquement) pour idx 135/136:")
-    print(cand[["index", "date_pose", "date_deb", "date_fin", "ge_deb", "le_fin", "in_interval"]].to_string(index=False))
-
-    print("\n[DEBUG] nb de séjours récupérés par index:")
-    print(cand.groupby("index").size().to_string())
-
-    print("\n[DEBUG] nb de séjours valides (date_deb/date_fin non nulles):")
-    valid = cand[cand["date_deb"].notna() & cand["date_fin"].notna()]
-    print(valid.groupby("index").size().to_string())
-
-
-    # DEBUG: afficher lignes 38884 et 38885 du CSV (sans filtrage)
-    raw = pd.read_csv(map_path, sep=";", dtype=str, keep_default_na=False)
-    # si jamais sep incorrect, bascule:
-    if raw.shape[1] == 1:
-        raw = pd.read_csv(map_path, sep=",", dtype=str, keep_default_na=False)
-
-    # Attention: numéro de ligne "Excel" ≠ index pandas. Ici on suppose 1 ligne = 1 enregistrement, en-tête exclu.
-    # Si tu parles de lignes Excel (avec entête en ligne 1), alors pandas iloc = ligne_excel-2.
-    for excel_line in [38884, 38885]:
-        i = excel_line - 2
-        print(f"\n--- CSV ligne Excel {excel_line} (pandas iloc {i}) ---")
-        print(raw.iloc[i].to_dict())
-
     df_final = fill_ipp_from_nda(df_final, mapping)
     df_final = fill_nda_from_intervals(df_final, mapping)
 
-    # Export XLSX
-    with pd.ExcelWriter(out_xlsx_path, engine="openpyxl") as writer:
-        df_final.to_excel(writer, index=False, sheet_name="flat")
-        ws = writer.sheets["flat"]
+    # 3) Export flat final
+    export_excel_with_date_formats(df_final, out_xlsx_path, sheet_name="flat")
 
-        headers = [cell.value for cell in ws[1]]
-        date_cols = {"date_pose", "date_naissance", "nda_date_deb_match", "nda_date_fin_match"}
-        date_col_indexes = [i + 1 for i, h in enumerate(headers) if h in date_cols]
+    # 4) Lecture .fic + comparaison
+    ndas_fic = read_fic_ndas(fic_path, FIC_NDA_START_1, FIC_NDA_LEN)
 
-        for col_idx in date_col_indexes:
-            for row in range(2, ws.max_row + 1):
-                cell = ws.cell(row=row, column=col_idx)
-                if cell.value is not None:
-                    cell.number_format = "DD/MM/YYYY"
+    df_final["present_dans_fic"] = df_final["nda"].apply(lambda x: x in ndas_fic if x else False)
+
+    # Patients/poses absents du fic
+    df_absent = df_final[(df_final["nda"] != "") & (~df_final["present_dans_fic"])].copy()
+
+    # Optionnel : dédoublonnage (si tu veux 1 ligne par NDA+LPPR+date_pose)
+    df_absent = df_absent.drop_duplicates(subset=["nda", "lppr", "date_pose"])
+
+    export_excel_with_date_formats(df_absent, out_absent_path, sheet_name="absents")
 
     # Résumé console
-    print("=== Résumé final ===")
-    print(f"Lignes finales: {len(df_final)}")
-    print("LPPR détectés:", sorted(df_final["lppr"].dropna().astype(str).unique().tolist()))
-    print("Familles:", df_final["source_format"].value_counts(dropna=False).to_dict())
-    print("NDA remplis via CSV:", int((df_final["nda_fill_status"] == "Rempli via CSV (intervalle)").sum()))
-    print("NDA non trouvés:", int((df_final["nda_fill_status"] == "NDA non trouvé (intervalle)").sum()))
-    print("Export XLSX:", out_xlsx_path)
+    print("=== Résumé ===")
+    print("Flat total:", len(df_final))
+    print("NDA vides:", int((df_final["nda"] == "").sum()))
+    print("NDA absents du .fic (lignes):", len(df_absent))
+    print("Export flat:", out_xlsx_path)
+    print("Export absents:", out_absent_path)
 
 if __name__ == "__main__":
     main()
