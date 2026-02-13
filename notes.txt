@@ -1,14 +1,11 @@
-MO CHIR_SOUS_AG CHIR_SANS_AG
--- ------------ ------------
-01          103           58
-02          121           46
-03          121           48
-04          114           39
-05          108           35
-06          125           56
-07           93           53
-08           79           71
-09          125           62
-10          110           59
-11          108           68
-12          119           55
+SELECT TO_CHAR(R.D8EEUE,'MM') AS MOIS,
+       SUM(CASE WHEN ROUND((R.D8SOUE - R.D8EEUE) * 24) >= 6 THEN 1 ELSE 0 END) AS CHIR_SOUS_AG,
+       SUM(CASE WHEN ROUND((R.D8SOUE - R.D8EEUE) * 24) <= 5 THEN 1 ELSE 0 END) AS CHIR_SANS_AG
+FROM RSM R, RAC A
+WHERE A.KYRES = R.KYRES
+AND A.KYCDAC = 'JNJD002'
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+GROUP BY TO_CHAR(R.D8EEUE,'MM')
+ORDER BY TO_CHAR(R.D8EEUE,'MM');
