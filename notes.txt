@@ -1,89 +1,13 @@
-KYRES                                     NOT NULL VARCHAR2(8)
-CDURM                                     NOT NULL VARCHAR2(4)
-NOIP                                      NOT NULL VARCHAR2(10)
-NODA                                      NOT NULL VARCHAR2(10)
-NMMED                                              VARCHAR2(40)
-INHP24                                             VARCHAR2(1)
-PAHP1                                              VARCHAR2(1)
-CDCIAC                                             VARCHAR2(6)
-CDDNTH                                             VARCHAR2(10)
-CDDNC9                                             VARCHAR2(6)
-NBSEAN                                             NUMBER(3)
-NBEPI                                              NUMBER(4)
-UE                                                 VARCHAR2(3)
-D8EEUE                                             DATE
-MDEEUE                                             VARCHAR2(1)
-D8SOUE                                             DATE
-MDSOUE                                             VARCHAR2(1)
-INETAT                                             VARCHAR2(1)
-CDTRAI                                             VARCHAR2(2)
-INNIV2                                             VARCHAR2(1)
-D8NIV2                                             DATE
-INVERI                                             VARCHAR2(1)
-D8VERI                                             DATE
-INRES                                              VARCHAR2(1)
-D8RES                                              DATE
-INOTAR                                             VARCHAR2(1)
-D8OTAR                                             DATE
-INRSS                                              VARCHAR2(1)
-D8RSS                                              DATE
-INCLEH                                             VARCHAR2(1)
-D8CLEH                                             DATE
-INGRP                                              VARCHAR2(1)
-D8GRP                                              DATE
-CDDIAG                                             VARCHAR2(5)
-ZNCOM                                              VARCHAR2(150)
-SEQFIG                                             VARCHAR2(8)
-AGERES                                             NUMBER(3)
-D8MJ                                               DATE
-TYTRPR                                             VARCHAR2(1)
-TYTRDS                                             VARCHAR2(1)
-MDENTR                                             VARCHAR2(2)
-MDSOR                                              VARCHAR2(2)
-TYTRGI                                             VARCHAR2(1)
-CDVER                                              VARCHAR2(10)
-NOROR                                              VARCHAR2(9)
-CDDNSP                                             VARCHAR2(10)
-INTROT                                             VARCHAR2(1)
-D8TROT                                             DATE
-NBEPOR                                             NUMBER(4)
-TYCIM                                              VARCHAR2(4)
-IGS                                                NUMBER(3)
-VERRAP                                             VARCHAR2(5)
-NBHJO                                              NUMBER(3)
-INDSPE                                             VARCHAR2(1)
-CODEOR                                             VARCHAR2(3)
-CHPPMSI                                            VARCHAR2(3)
-CDRELIE                                            VARCHAR2(10)
-CDDNSPR                                            VARCHAR2(10)
-CDDNTHR                                            VARCHAR2(10)
-KYRSP                                              VARCHAR2(8)
-CDDNSS                                             VARCHAR2(10)
-KYTYPAUTLIT                                        VARCHAR2(2)
-INSIMBA                                            VARCHAR2(6)
-D8SIMBA                                            DATE
-AGEGEST                                            VARCHAR2(2)
-RDT_TYPEMACHINE                                    VARCHAR2(1)
-RDT_TYPEDOSIMETRIE                                 VARCHAR2(1)
-CONF_RSS                                           VARCHAR2(1)
-RDT_NB_FAISCEAU                                    VARCHAR2(1)
-POIDS                                              NUMBER(4)
-DDR                                                DATE
-NUM_INNOVATION                                     VARCHAR2(15)
-CDURM_P                                            VARCHAR2(4)
-NBIVG                                              VARCHAR2(2)
-ANNEEIVG                                           VARCHAR2(4)
-NBVIVANT                                           VARCHAR2(2)
-ORIGSIMPA                                          VARCHAR2(1)
-CONVERSIONHC                                       VARCHAR2(1)
-PECRAAC                                            VARCHAR2(1)
-SURV_PART                                          VARCHAR2(1)
-ADMIN_PROD_RH                                      VARCHAR2(1)
-RESCRIT                                            VARCHAR2(1)
-CAT_INTERVENTION                                   VARCHAR2(1)
-NP                                                 VARCHAR2(1)
-PASPSTRUCTURG                                      VARCHAR2(1)
-PATCOMPRAD                                         VARCHAR2(1)
-NBTUMTRTRAD                                        VARCHAR2(2)
-RADADAPT                                           VARCHAR2(1)
-TRTRADHYPOFRAC                                     VARCHAR2(1)
+SELECT
+  TO_CHAR(R.D8EEUE,'MM') AS MOIS,
+  R.AGEGEST AS SA,
+  COUNT(DISTINCT R.KYRES) AS NB_SEJOURS
+FROM RSM R, RAC A
+WHERE A.KYRES(+) = R.KYRES
+AND R.CDURM_P IN ('140J','142J')
+AND R.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND R.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+AND (R.CDDNC9 LIKE 'O04%' OR A.KYCDAC LIKE 'JNJ%')
+AND R.AGEGEST IN ('4','5','6','7','8','9','10','11','12','13','14','15','16')
+GROUP BY TO_CHAR(R.D8EEUE,'MM'), R.AGEGEST
+ORDER BY MOIS, TO_NUMBER(R.AGEGEST);
