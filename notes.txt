@@ -1,2 +1,28 @@
-desc <- readLines(file.path(pkgdir, "DESCRIPTION"))
-cat(desc, sep = "\n")
+ desc <- readLines(file.path(pkgdir, "DESCRIPTION"))
+> cat(desc, sep = "\n")
+Package: rAphpQueries
+Title: Accès
+Version: 0.0.0.9000
+Authors@R: 
+   c( person("Département d'information médicale AP-HP", role=c("aut", "cre")),
+    person(given = "Rémi",
+           family = "Flicoteaux",
+           role = c("aut"),
+           email = "remi.flicoteaux@aphp.fr") )
+Author: Département d'information médicale AP-HP [aut, cre],
+        Rémi Flicoteaux [aut]
+Maintainer: Rémi Flicoteaux <remi.flicoteaux@aphp.fr>
+Description: Outil de requêtage dans les bases de données du système d'information de l'AP-HP.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.1
+Suggests: knitr, rmarkdown, testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports: DBI, dbplyr, dplyr, purrr, rlang, stringr, tidyr, usethis,
+        RPostgreSQL, yaml, RODBC, tictoc, referime
+VignetteBuilder: knitr
+Depends: R (>= 2.10)
+Built: R 4.5.1; ; 2026-02-16 13:56:24 UTC; windows
+> 
