@@ -1,4 +1,6 @@
-> version$arch
-[1] "x86_64"
-> .libPaths()
-[1] "C:/Users/4251352/AppData/Local/Programs/R/R-4.5.1/library"
+pkg <- file.path(.libPaths()[1], "rAphpQueries")
+dir.exists(pkg)
+list.files(pkg)
+
+# regarde l'arborescence "libs"
+list.files(file.path(pkg, "libs"), recursive = TRUE)
