@@ -1,2 +1,7 @@
-> Sys.getenv("PATH")
-[1] "c:/rtools45/x86_64-w64-mingw32.static.posix/bin;c:/rtools45/usr/bin;C:\\Users\\4251352\\AppData\\Local\\Programs\\R\\R-4.5.1\\bin\\x64;C:\\oracle\\ora81\\bin;C:\\Program Files (x86)\\Oracle\\jre\\1.1.7\\bin;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\;C:\\WINDOWS\\System32\\OpenSSH\\;C:\\Program Files\\dotnet\\;C:\\Program Files\\PuTTY\\;C:\\Program Files\\PowerShell\\7\\;C:\\Program Files\\Docker\\Docker\\resources\\bin;C:\\Users\\4251352\\AppData\\Local\\Programs\\Python\\Python312\\Scripts\\;C:\\Users\\4251352\\AppData\\Local\\Programs\\Python\\Python312\\;C:\\Users\\4251352\\AppData\\Local\\Programs\\Python\\Launcher\\;C:\\Users\\4251352\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Users\\4251352\\AppData\\Local\\Programs\\Microsoft VS Code\\bin"
+candidates <- c("C:/", "C:/Program Files", "C:/Program Files (x86)", "C:/Users/4251352/AppData/Local")
+found <- unlist(lapply(candidates, function(p) {
+  if (!dir.exists(p)) return(character())
+  list.files(p, pattern = "^make\\.exe$", recursive = TRUE, full.names = TRUE)
+}))
+head(found, 20)
+length(found)
