@@ -1,26 +1,2 @@
-> list.files(file.path(src, "inst", "java"))
-[1] "ojdbc8.jar"
-> dir.exists(file.path(src, "inst", "libs"))
-[1] FALSE
-> install.packages(
-+     "C:/Users/4251352/Documents/Code R/rAphpQueries-main",
-+     repos = NULL,
-+     type = "source"
-+ )
-* installing *source* package 'rAphpQueries' ...
-** this is package 'rAphpQueries' version '0.0.0.9000'
-** using staged installation
-** R
-** demo
-** inst
-** byte-compile and prepare package for lazy loading
-** help
-*** installing help indices
-** building package indices
-** installing vignettes
-** testing if installed package can be loaded from temporary location
-** testing if installed package can be loaded from final location
-** testing if installed package keeps a record of temporary installation path
-* DONE (rAphpQueries)
-> 
-> library(rAphpQueries)
+system.file("java", "ojdbc8.jar", package = "rAphpQueries")
+file.exists(system.file("java", "ojdbc8.jar", package = "rAphpQueries"))
