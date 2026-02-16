@@ -1,179 +1,180 @@
-####### FORMATAGE DES RIM-P DIME POUR IMPORT DANS PMSIPilot ###############
-gc()
-# Loading libraries
-library(tidyr)
-library(dplyr)
-library(stringr)
-library("readxl")
+===== DIAG EXCEL =====
+> cat("UM_BRC: nrow=", nrow(UM_BRC), " | type(URM_APHP)=", paste(class(UM_BRC$URM_APHP), collapse="/"),
++     " | exemples=", paste(head(unique(UM_BRC$URM_APHP), 10), collapse=","), "\n")
+UM_BRC: nrow= 6  | type(URM_APHP)= character  | exemples= 206,126,128,127,130,129 
+> cat("UM_CCH: nrow=", nrow(UM_CCH), " | type(URM_APHP)=", paste(class(UM_CCH$URM_APHP), collapse="/"),
++     " | exemples=", paste(head(unique(UM_CCH$URM_APHP), 10), collapse=","), "\n")
+UM_CCH: nrow= 10  | type(URM_APHP)= character  | exemples= 18,20,22,182,19,17,16,21,23,24 
+> cat("UM_CCL: nrow=", nrow(UM_CCL), " | type(URM_APHP)=", paste(class(UM_CCL$URM_APHP), collapse="/"),
++     " | exemples=", paste(head(unique(UM_CCL$URM_APHP), 10), collapse=","), "\n")
+UM_CCL: nrow= 10  | type(URM_APHP)= character  | exemples= 18,20,22,182,19,17,16,21,23,24 
+> cat("UM_VGR: nrow=", nrow(UM_VGR), " | type(URM_APHP)=", paste(class(UM_VGR$URM_APHP), collapse="/"),
++     " | exemples=", paste(head(unique(UM_VGR$URM_APHP), 10), collapse=","), "\n")
+UM_VGR: nrow= 6  | type(URM_APHP)= character  | exemples= 206,126,128,127,130,129 
+> 
+> ############ RAA ################
+> SSR_BRC<-read.csv2(SSR_BRC, header = FALSE)
+> 
+> ##### DIAG BRC AVANT JOIN #####
+> cat("\n===== DIAG BRC TEXTE =====\n")
 
-####### ********** A PARAMETRER A CHAQUE REMONTEE ************#############
+===== DIAG BRC TEXTE =====
+> cat("SSR_BRC: nrow=", nrow(SSR_BRC), " | nchar(ligne1)=", nchar(SSR_BRC[1,1]), "\n")
+SSR_BRC: nrow= 5987  | nchar(ligne1)= 307 
+> # un contexte autour de la zone UM (positions)
+> cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
++     str_sub(SSR_BRC[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
+Extrait ligne1 autour UM (120->150): 024000011111  59A              
+> 
+> # extraction brute + extraction nettoyée
+> A_raw <- str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
+> A <- str_replace_all(A_raw, " ", "")
+> SSR_BRC<-SSR_BRC%>%mutate(URM_APHP = A)
+> 
+> cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
+A_raw (10 premiers)  : 11   | 11   | 11   | 11   | 11   | 11   | 11   | 11   | 11   | 11   
+> cat("A_nettoye (10 prem.) :", paste(head(SSR_BRC$URM_APHP, 10), collapse=" | "), "\n")
+A_nettoye (10 prem.) : 11 | 11 | 11 | 11 | 11 | 11 | 11 | 11 | 11 | 11 
+> cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_BRC$URM_APHP), 10), collapse=" | "), "\n")
+nchar(A_nettoye) (10 prem.) : 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 
+> 
+> # vérifier l'intersection des clés entre texte et excel
+> keys_txt_brc <- unique(SSR_BRC$URM_APHP)
+> keys_xls_brc <- unique(UM_BRC$URM_APHP)
+> cat("Nb clés uniques texte BRC:", length(keys_txt_brc), " | Nb clés uniques excel BRC:", length(keys_xls_brc), "\n")
+Nb clés uniques texte BRC: 3  | Nb clés uniques excel BRC: 6 
+> cat("Nb clés texte présentes dans excel (BRC):", sum(keys_txt_brc %in% keys_xls_brc), "\n")
+Nb clés texte présentes dans excel (BRC): 0 
+> cat("Exemples clés texte ABSENTES de l'excel (BRC):", paste(head(keys_txt_brc[!(keys_txt_brc %in% keys_xls_brc)], 20), collapse=","), "\n")
+Exemples clés texte ABSENTES de l'excel (BRC): 11,10,237 
+> 
+> # faire la jointure EN EXPLICITE sur URM_APHP pour diagnostiquer (sans changer la logique métier)
+> SSR_BRC<-left_join(SSR_BRC, UM_BRC, by = "URM_APHP")
+> 
+> # stats NA sur URM_SITE
+> cat("URM_SITE NA après join (BRC):", sum(is.na(SSR_BRC$URM_SITE)), " / ", nrow(SSR_BRC), "\n")
+URM_SITE NA après join (BRC): 5987  /  5987 
+> 
+> # montrer quelques lignes problématiques (non matchées) avec contexte
+> pb_brc <- SSR_BRC %>%
++   mutate(.row_id = row_number(),
++          .ctx = str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
++          .um_raw = A_raw) %>%
++   filter(is.na(URM_SITE)) %>%
++   select(.row_id, URM_APHP, .um_raw, .ctx) %>%
++   head(30)
+> 
+> cat("Exemples lignes non matchées BRC (30 max):\n")
+Exemples lignes non matchées BRC (30 max):
+> print(pb_brc)
+   .row_id URM_APHP .um_raw                            .ctx
+1        1       11    11   024000011111  59A              
+2        2       11    11   024111111111  59A              
+3        3       11    11   024111111111  59A              
+4        4       11    11   024111111111  59A              
+5        5       11    11   024111111111  59A              
+6        6       11    11   024011111111  59A              
+7        7       11    11   024111111111  59A              
+8        8       11    11   024111111111  59A              
+9        9       11    11   024000011111  59A              
+10      10       11    11   024111111111  59A              
+11      11       11    11   024111111111  59A              
+12      12       11    11   024111111111  59A              
+13      13       11    11   024001111111  59A10032024      
+14      14       11    11   024000011111  59A              
+15      15       11    11   024111111111  59A              
+16      16       11    11   024111111111  59A              
+17      17       11    11   024111111111  59A              
+18      18       11    11   024111111111  59A10032024      
+19      19       11    11   024111111111  59A              
+20      20       11    11   024011111111  59A              
+21      21       11    11   024111111111  59A              
+22      22       11    11   024111111111  59A              
+23      23       11    11   024111111111  59A              
+24      24       11    11   024111111111  59A10032024      
+25      25       11    11   024111111111  59A              
+26      26       11    11   024111111111  59A              
+27      27       11    11   024111111111  59A              
+28      28       11    11   024011111111  59A              
+29      29       11    11   024011111111  59A              
+30      30       11    11   024000111111  59A 
+> ##### FIN DIAG BRC #####
 
-chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR"
-# DEPLACER LES 6 FICHIERS
-UMA_BRC = "CORREPONDANCE_UM_SSR_SITE_00090_APHP_202512.xls"
-SSR_BRC = "750801441.2025.12.rhs.ini.txt"
-UMA_CCH = "CORREPONDANCE_UM_SSR_SITE_00022_APHP_202512.xls"
-SSR_CCH = "750100166.2025.12.rhs.ini.txt"
-UMA_CCL = "CORREPONDANCE_UM_SSR_SITE_00022_APHP_202512.xls"
-SSR_CCL = "920100062.2025.12.rhs.ini.txt"
-UMA_VGR = "CORREPONDANCE_UM_SSR_SITE_00090_APHP_202512.xls"
-SSR_VGR = "750100216.2025.12.rhs.ini.txt"
+> ##### DIAG CCH AVANT JOIN #####
+> cat("\n===== DIAG CCH TEXTE =====\n")
 
-taille_um = 4
-deb_pos_UM_RAA = 130  # 2023
-
-###########################################  FIN ZONE PARAMETRAGE ###################
-
-# chemin    
-setwd (chemin)
-# nom des fichiers de sortie
-SSR_BRC_SITE = paste(str_sub(SSR_BRC, start = 1, end = nchar(SSR_BRC)-4),".site",str_sub(SSR_BRC, start = nchar(SSR_BRC)-3),sep="")
-SSR_CCH_SITE = paste(str_sub(SSR_CCH, start = 1, end = nchar(SSR_CCH)-4),".site",str_sub(SSR_CCH, start = nchar(SSR_CCH)-3),sep="")
-SSR_CCL_SITE = paste(str_sub(SSR_CCL, start = 1, end = nchar(SSR_CCL)-4),".site",str_sub(SSR_CCL, start = nchar(SSR_CCL)-3),sep="")
-SSR_VGR_SITE = paste(str_sub(SSR_VGR, start = 1, end = nchar(SSR_VGR)-4),".site",str_sub(SSR_VGR, start = nchar(SSR_VGR)-3),sep="")
-
-# fichiers de travail
-UM_BRC<-read_excel(UMA_BRC, skip  = 2)
-UM_CCH<-read_excel(UMA_CCH, skip  = 2)
-UM_CCL<-read_excel(UMA_CCL, skip  = 2)
-UM_VGR<-read_excel(UMA_VGR, skip  = 2)
-
-# FORCER UNE ASSOCIATION 1->1 (une seule ligne par URM_APHP)
-UM_BRC <- UM_BRC %>% distinct(URM_APHP, .keep_all = TRUE)
-UM_CCH <- UM_CCH %>% distinct(URM_APHP, .keep_all = TRUE)
-UM_CCL <- UM_CCL %>% distinct(URM_APHP, .keep_all = TRUE)
-UM_VGR <- UM_VGR %>% distinct(URM_APHP, .keep_all = TRUE)
-
-############ DIAGNOSTIC GLOBAL SUR LES TABLES EXCEL ############
-cat("\n===== DIAG EXCEL =====\n")
-cat("UM_BRC: nrow=", nrow(UM_BRC), " | type(URM_APHP)=", paste(class(UM_BRC$URM_APHP), collapse="/"),
-    " | exemples=", paste(head(unique(UM_BRC$URM_APHP), 10), collapse=","), "\n")
-cat("UM_CCH: nrow=", nrow(UM_CCH), " | type(URM_APHP)=", paste(class(UM_CCH$URM_APHP), collapse="/"),
-    " | exemples=", paste(head(unique(UM_CCH$URM_APHP), 10), collapse=","), "\n")
-cat("UM_CCL: nrow=", nrow(UM_CCL), " | type(URM_APHP)=", paste(class(UM_CCL$URM_APHP), collapse="/"),
-    " | exemples=", paste(head(unique(UM_CCL$URM_APHP), 10), collapse=","), "\n")
-cat("UM_VGR: nrow=", nrow(UM_VGR), " | type(URM_APHP)=", paste(class(UM_VGR$URM_APHP), collapse="/"),
-    " | exemples=", paste(head(unique(UM_VGR$URM_APHP), 10), collapse=","), "\n")
-
-############ RAA ################
-SSR_BRC<-read.csv2(SSR_BRC, header = FALSE)
-
-##### DIAG BRC AVANT JOIN #####
-cat("\n===== DIAG BRC TEXTE =====\n")
-cat("SSR_BRC: nrow=", nrow(SSR_BRC), " | nchar(ligne1)=", nchar(SSR_BRC[1,1]), "\n")
-# un contexte autour de la zone UM (positions)
-cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
-    str_sub(SSR_BRC[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
-
-# extraction brute + extraction nettoyée
-A_raw <- str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
-A <- str_replace_all(A_raw, " ", "")
-SSR_BRC<-SSR_BRC%>%mutate(URM_APHP = A)
-
-cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
-cat("A_nettoye (10 prem.) :", paste(head(SSR_BRC$URM_APHP, 10), collapse=" | "), "\n")
-cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_BRC$URM_APHP), 10), collapse=" | "), "\n")
-
-# vérifier l'intersection des clés entre texte et excel
-keys_txt_brc <- unique(SSR_BRC$URM_APHP)
-keys_xls_brc <- unique(UM_BRC$URM_APHP)
-cat("Nb clés uniques texte BRC:", length(keys_txt_brc), " | Nb clés uniques excel BRC:", length(keys_xls_brc), "\n")
-cat("Nb clés texte présentes dans excel (BRC):", sum(keys_txt_brc %in% keys_xls_brc), "\n")
-cat("Exemples clés texte ABSENTES de l'excel (BRC):", paste(head(keys_txt_brc[!(keys_txt_brc %in% keys_xls_brc)], 20), collapse=","), "\n")
-
-# faire la jointure EN EXPLICITE sur URM_APHP pour diagnostiquer (sans changer la logique métier)
-SSR_BRC<-left_join(SSR_BRC, UM_BRC, by = "URM_APHP")
-
-# stats NA sur URM_SITE
-cat("URM_SITE NA après join (BRC):", sum(is.na(SSR_BRC$URM_SITE)), " / ", nrow(SSR_BRC), "\n")
-
-# montrer quelques lignes problématiques (non matchées) avec contexte
-pb_brc <- SSR_BRC %>%
-  mutate(.row_id = row_number(),
-         .ctx = str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
-         .um_raw = A_raw) %>%
-  filter(is.na(URM_SITE)) %>%
-  select(.row_id, URM_APHP, .um_raw, .ctx) %>%
-  head(30)
-
-cat("Exemples lignes non matchées BRC (30 max):\n")
-print(pb_brc)
-##### FIN DIAG BRC #####
-
-B<-str_sub(SSR_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(SSR_BRC[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(4-nchar(SSR_BRC$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,SSR_BRC$URM_SITE,Z,C,sep="")
-write(D, file = SSR_BRC_SITE)
-
-
-SSR_CCH<-read.csv2(SSR_CCH, header = FALSE)
-
-##### DIAG CCH AVANT JOIN #####
-cat("\n===== DIAG CCH TEXTE =====\n")
-cat("SSR_CCH: nrow=", nrow(SSR_CCH), " | nchar(ligne1)=", nchar(SSR_CCH[1,1]), "\n")
-cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
-    str_sub(SSR_CCH[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
-
-A_raw <- str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
-A <- str_replace_all(A_raw, " ", "")
-SSR_CCH<-SSR_CCH%>%mutate(URM_APHP = A)
-
-cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
-cat("A_nettoye (10 prem.) :", paste(head(SSR_CCH$URM_APHP, 10), collapse=" | "), "\n")
-cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_CCH$URM_APHP), 10), collapse=" | "), "\n")
-
-keys_txt_cch <- unique(SSR_CCH$URM_APHP)
-keys_xls_cch <- unique(UM_CCH$URM_APHP)
-cat("Nb clés uniques texte CCH:", length(keys_txt_cch), " | Nb clés uniques excel CCH:", length(keys_xls_cch), "\n")
-cat("Nb clés texte présentes dans excel (CCH):", sum(keys_txt_cch %in% keys_xls_cch), "\n")
-cat("Exemples clés texte ABSENTES de l'excel (CCH):", paste(head(keys_txt_cch[!(keys_txt_cch %in% keys_xls_cch)], 20), collapse=","), "\n")
-
-SSR_CCH<-left_join(SSR_CCH, UM_CCH, by = "URM_APHP")
-
-cat("URM_SITE NA après join (CCH):", sum(is.na(SSR_CCH$URM_SITE)), " / ", nrow(SSR_CCH), "\n")
-
-pb_cch <- SSR_CCH %>%
-  mutate(.row_id = row_number(),
-         .ctx = str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
-         .um_raw = A_raw) %>%
-  filter(is.na(URM_SITE)) %>%
-  select(.row_id, URM_APHP, .um_raw, .ctx) %>%
-  head(30)
-
-cat("Exemples lignes non matchées CCH (30 max):\n")
-print(pb_cch)
-##### FIN DIAG CCH #####
-
-B<-str_sub(SSR_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(SSR_CCH[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(4-nchar(SSR_CCH$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,SSR_CCH$URM_SITE,Z,C,sep="")
-write(D, file = SSR_CCH_SITE)
-
-
-SSR_CCL<-read.csv2(SSR_CCL, header = FALSE)
-A<-str_replace_all(str_sub(SSR_CCL[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
-SSR_CCL<-SSR_CCL%>%mutate(URM_APHP = A)
-SSR_CCL<-left_join(SSR_CCL, UM_CCL, by = "URM_APHP")
-B<-str_sub(SSR_CCL[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(SSR_CCL[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(4-nchar(SSR_CCL$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,SSR_CCL$URM_SITE,Z,C,sep="")
-write(D, file = SSR_CCL_SITE)
-
-SSR_VGR<-read.csv2(SSR_VGR, header = FALSE)
-A<-str_replace_all(str_sub(SSR_VGR[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
-SSR_VGR<-SSR_VGR%>%mutate(URM_APHP = A)
-SSR_VGR<-left_join(SSR_VGR, UM_VGR, by = "URM_APHP")
-B<-str_sub(SSR_VGR[,1],start = 1, end = deb_pos_UM_RAA-1)
-C<-str_sub(SSR_VGR[,1],start = deb_pos_UM_RAA + taille_um)
-X<-(4-nchar(SSR_VGR$URM_SITE))
-Z<-strrep(" ",X)
-D<-paste(B,SSR_VGR$URM_SITE,Z,C,sep="")
-write(D, file = SSR_VGR_SITE)
-
-# FIN DE PROCEDURE
+===== DIAG CCH TEXTE =====
+> cat("SSR_CCH: nrow=", nrow(SSR_CCH), " | nchar(ligne1)=", nchar(SSR_CCH[1,1]), "\n")
+SSR_CCH: nrow= 2840  | nchar(ligne1)= 378 
+> cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
++     str_sub(SSR_CCH[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
+Extrait ligne1 autour UM (120->150): 025000100015  51A              
+> 
+> A_raw <- str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
+> A <- str_replace_all(A_raw, " ", "")
+> SSR_CCH<-SSR_CCH%>%mutate(URM_APHP = A)
+> 
+> cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
+A_raw (10 premiers)  : 15   | 15   | 15   | 15   | 15   | 15   | 15   | 15   | 15   | 15   
+> cat("A_nettoye (10 prem.) :", paste(head(SSR_CCH$URM_APHP, 10), collapse=" | "), "\n")
+A_nettoye (10 prem.) : 15 | 15 | 15 | 15 | 15 | 15 | 15 | 15 | 15 | 15 
+> cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_CCH$URM_APHP), 10), collapse=" | "), "\n")
+nchar(A_nettoye) (10 prem.) : 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 
+> 
+> keys_txt_cch <- unique(SSR_CCH$URM_APHP)
+> keys_xls_cch <- unique(UM_CCH$URM_APHP)
+> cat("Nb clés uniques texte CCH:", length(keys_txt_cch), " | Nb clés uniques excel CCH:", length(keys_xls_cch), "\n")
+Nb clés uniques texte CCH: 1  | Nb clés uniques excel CCH: 10 
+> cat("Nb clés texte présentes dans excel (CCH):", sum(keys_txt_cch %in% keys_xls_cch), "\n")
+Nb clés texte présentes dans excel (CCH): 0 
+> cat("Exemples clés texte ABSENTES de l'excel (CCH):", paste(head(keys_txt_cch[!(keys_txt_cch %in% keys_xls_cch)], 20), collapse=","), "\n")
+Exemples clés texte ABSENTES de l'excel (CCH): 15 
+> 
+> SSR_CCH<-left_join(SSR_CCH, UM_CCH, by = "URM_APHP")
+> 
+> cat("URM_SITE NA après join (CCH):", sum(is.na(SSR_CCH$URM_SITE)), " / ", nrow(SSR_CCH), "\n")
+URM_SITE NA après join (CCH): 2840  /  2840 
+> 
+> pb_cch <- SSR_CCH %>%
++   mutate(.row_id = row_number(),
++          .ctx = str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
++          .um_raw = A_raw) %>%
++   filter(is.na(URM_SITE)) %>%
++   select(.row_id, URM_APHP, .um_raw, .ctx) %>%
++   head(30)
+> 
+> cat("Exemples lignes non matchées CCH (30 max):\n")
+Exemples lignes non matchées CCH (30 max):
+> print(pb_cch)
+   .row_id URM_APHP .um_raw                            .ctx
+1        1       15    15   025000100015  51A              
+2        2       15    15   025000010015  51A              
+3        3       15    15   025001000015  51A              
+4        4       15    15   025010000015  51A              
+5        5       15    15   025001000015  51A              
+6        6       15    15   025000100015  51A              
+7        7       15    15   025001000015  51A              
+8        8       15    15   025000100015  51A              
+9        9       15    15   025001000015  51A              
+10      10       15    15   025000100015  51A              
+11      11       15    15   025001000015  51A              
+12      12       15    15   025000100015  51A              
+13      13       15    15   025000010015  51A              
+14      14       15    15   025110110015  51A              
+15      15       15    15   025110110015  51A              
+16      16       15    15   025001000015  51A              
+17      17       15    15   025010000015  51A              
+18      18       15    15   025000100015  51A              
+19      19       15    15   025010000015  51A              
+20      20       15    15   025000100015  51A              
+21      21       15    15   025100000015  51A              
+22      22       15    15   025010000015  51A              
+23      23       15    15   025100000015  51A              
+24      24       15    15   025010000015  51A              
+25      25       15    15   025000010015  51A              
+26      26       15    15   025000100015  51A              
+27      27       15    15   025100000015  51A              
+28      28       15    15   025110110015  51A              
+29      29       15    15   025100000015  51A              
+30      30       15    15   025100000015  51A              
+> ##### FIN DIAG CCH #####
