@@ -1,7 +1,14 @@
-candidates <- c("C:/", "C:/Program Files", "C:/Program Files (x86)", "C:/Users/4251352/AppData/Local")
-found <- unlist(lapply(candidates, function(p) {
-  if (!dir.exists(p)) return(character())
-  list.files(p, pattern = "^make\\.exe$", recursive = TRUE, full.names = TRUE)
-}))
-head(found, 20)
-length(found)
+> dir.exists("C:/rtools45")
+[1] FALSE
+> dir.exists("C:/rtools44")
+[1] FALSE
+> candidates <- c("C:/", "C:/Program Files", "C:/Program Files (x86)", "C:/Users/4251352/AppData/Local")
+> found <- unlist(lapply(candidates, function(p) {
++     if (!dir.exists(p)) return(character())
++     list.files(p, pattern = "^make\\.exe$", recursive = TRUE, full.names = TRUE)
++ }))
+> head(found, 20)
+character(0)
+> length(found)
+[1] 0
+> 
