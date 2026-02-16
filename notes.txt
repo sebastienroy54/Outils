@@ -1,1 +1,7 @@
-https://adoptium.net/temurin/releases/?version=8
+> Sys.which("java")
+                                                                                 java 
+"C:\\Users\\4251352\\AppData\\Local\\Programs\\ECLIPS~1\\JDK-80~1.8-H\\bin\\java.exe" 
+Warning message:
+R graphics engine version 16 is not supported by this version of RStudio. The Plots tab will be disabled until a newer version of RStudio is installed. 
+> Sys.getenv("JAVA_HOME")
+[1] ""
