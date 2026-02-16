@@ -1,7 +1,2 @@
-java <- Sys.which("java")
-java_home <- normalizePath(file.path(dirname(dirname(java))), winslash = "/")
-java_home
-Sys.setenv(JAVA_HOME = java_home)
-Sys.getenv("JAVA_HOME")
-
-library(rJava)
+> library(rAphpQueries)
+Error: le package ‘rAphpQueries’ n'a pas été installé pour 'arch = x64'
