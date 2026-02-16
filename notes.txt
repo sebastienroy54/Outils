@@ -1,9 +1,16 @@
-> candidates <- c("C:/Users/4251352", "C:/Program Files", "C:/Program Files (x86)")
-> found <- unlist(lapply(candidates, function(p) {
-+     if (!dir.exists(p)) return(character())
-+     list.files(p, pattern = "^ojdbc8\\.jar$", recursive = TRUE, full.names = TRUE)
-+ }))
-> found
-[1] "C:/Users/4251352/Documents/Code R/rAphpQueries-main/inst/libs/ojdbc8.jar"
-> length(found)
-[1] 1
+src <- "C:/Users/4251352/Documents/Code R/rAphpQueries-main"
+
+dir.create(file.path(src, "inst", "java"), recursive = TRUE, showWarnings = FALSE)
+
+file.rename(
+  file.path(src, "inst", "libs", "ojdbc8.jar"),
+  file.path(src, "inst", "java", "ojdbc8.jar")
+)
+
+# supprimer inst/libs si vide
+if (dir.exists(file.path(src, "inst", "libs")) && length(list.files(file.path(src, "inst", "libs"))) == 0) {
+  unlink(file.path(src, "inst", "libs"), recursive = TRUE)
+}
+
+list.files(file.path(src, "inst", "java"))
+dir.exists(file.path(src, "inst", "libs"))
