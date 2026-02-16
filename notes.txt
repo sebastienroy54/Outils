@@ -1,21 +1,9 @@
- install.packages("C:/Users/4251352/Documents/Code R/rAphpQueries-main", repos = NULL, type = "source", dependencies = TRUE)
-* installing *source* package 'rAphpQueries' ...
-** this is package 'rAphpQueries' version '0.0.0.9000'
-** using staged installation
-** R
-** demo
-** inst
-** byte-compile and prepare package for lazy loading
-** help
-*** installing help indices
-** building package indices
-** installing vignettes
-** testing if installed package can be loaded from temporary location
-Error : le package 'rAphpQueries' n'a pas été installé pour 'arch = x64'
-Erreur : le chargement a échoué
-Exécution arrêtée
-ERROR: loading failed
-* removing 'C:/Users/4251352/AppData/Local/Programs/R/R-4.5.1/library/rAphpQueries'
-Warning in install.packages :
-  l'installation du package ‘C:/Users/4251352/DOCUME~1/CODER~1/rAphpQueries-main’ a eu un statut de sortie non nul
-> 
+install.packages(
+  "C:/Users/4251352/Documents/Code R/rAphpQueries-main",
+  repos = NULL,
+  type = "source",
+  dependencies = TRUE,
+  INSTALL_opts = c("--no-test-load", "--no-build-vignettes")
+)
+
+library(rAphpQueries)
