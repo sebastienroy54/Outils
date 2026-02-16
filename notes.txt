@@ -1,2 +1,8 @@
-system.file("java", "ojdbc8.jar", package = "rAphpQueries")
-file.exists(system.file("java", "ojdbc8.jar", package = "rAphpQueries"))
+#!/bin/bash
+
+docker run --rm --name doublons-batch \
+  -v /home/python/doublons/app:/app \
+  -v /home/python/doublons/sql:/app/sql \
+  -v /home/python/doublons/output:/app/output \
+  -v /home/python/automatisation:/config \
+  monouhcd-image
