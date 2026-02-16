@@ -44,11 +44,62 @@ UM_CCH <- UM_CCH %>% distinct(URM_APHP, .keep_all = TRUE)
 UM_CCL <- UM_CCL %>% distinct(URM_APHP, .keep_all = TRUE)
 UM_VGR <- UM_VGR %>% distinct(URM_APHP, .keep_all = TRUE)
 
+############ DIAGNOSTIC GLOBAL SUR LES TABLES EXCEL ############
+cat("\n===== DIAG EXCEL =====\n")
+cat("UM_BRC: nrow=", nrow(UM_BRC), " | type(URM_APHP)=", paste(class(UM_BRC$URM_APHP), collapse="/"),
+    " | exemples=", paste(head(unique(UM_BRC$URM_APHP), 10), collapse=","), "\n")
+cat("UM_CCH: nrow=", nrow(UM_CCH), " | type(URM_APHP)=", paste(class(UM_CCH$URM_APHP), collapse="/"),
+    " | exemples=", paste(head(unique(UM_CCH$URM_APHP), 10), collapse=","), "\n")
+cat("UM_CCL: nrow=", nrow(UM_CCL), " | type(URM_APHP)=", paste(class(UM_CCL$URM_APHP), collapse="/"),
+    " | exemples=", paste(head(unique(UM_CCL$URM_APHP), 10), collapse=","), "\n")
+cat("UM_VGR: nrow=", nrow(UM_VGR), " | type(URM_APHP)=", paste(class(UM_VGR$URM_APHP), collapse="/"),
+    " | exemples=", paste(head(unique(UM_VGR$URM_APHP), 10), collapse=","), "\n")
+
 ############ RAA ################
 SSR_BRC<-read.csv2(SSR_BRC, header = FALSE)
-A<-str_replace_all(str_sub(SSR_BRC[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+
+##### DIAG BRC AVANT JOIN #####
+cat("\n===== DIAG BRC TEXTE =====\n")
+cat("SSR_BRC: nrow=", nrow(SSR_BRC), " | nchar(ligne1)=", nchar(SSR_BRC[1,1]), "\n")
+# un contexte autour de la zone UM (positions)
+cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
+    str_sub(SSR_BRC[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
+
+# extraction brute + extraction nettoyée
+A_raw <- str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
+A <- str_replace_all(A_raw, " ", "")
 SSR_BRC<-SSR_BRC%>%mutate(URM_APHP = A)
-SSR_BRC<-left_join(SSR_BRC, UM_BRC)
+
+cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
+cat("A_nettoye (10 prem.) :", paste(head(SSR_BRC$URM_APHP, 10), collapse=" | "), "\n")
+cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_BRC$URM_APHP), 10), collapse=" | "), "\n")
+
+# vérifier l'intersection des clés entre texte et excel
+keys_txt_brc <- unique(SSR_BRC$URM_APHP)
+keys_xls_brc <- unique(UM_BRC$URM_APHP)
+cat("Nb clés uniques texte BRC:", length(keys_txt_brc), " | Nb clés uniques excel BRC:", length(keys_xls_brc), "\n")
+cat("Nb clés texte présentes dans excel (BRC):", sum(keys_txt_brc %in% keys_xls_brc), "\n")
+cat("Exemples clés texte ABSENTES de l'excel (BRC):", paste(head(keys_txt_brc[!(keys_txt_brc %in% keys_xls_brc)], 20), collapse=","), "\n")
+
+# faire la jointure EN EXPLICITE sur URM_APHP pour diagnostiquer (sans changer la logique métier)
+SSR_BRC<-left_join(SSR_BRC, UM_BRC, by = "URM_APHP")
+
+# stats NA sur URM_SITE
+cat("URM_SITE NA après join (BRC):", sum(is.na(SSR_BRC$URM_SITE)), " / ", nrow(SSR_BRC), "\n")
+
+# montrer quelques lignes problématiques (non matchées) avec contexte
+pb_brc <- SSR_BRC %>%
+  mutate(.row_id = row_number(),
+         .ctx = str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
+         .um_raw = A_raw) %>%
+  filter(is.na(URM_SITE)) %>%
+  select(.row_id, URM_APHP, .um_raw, .ctx) %>%
+  head(30)
+
+cat("Exemples lignes non matchées BRC (30 max):\n")
+print(pb_brc)
+##### FIN DIAG BRC #####
+
 B<-str_sub(SSR_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
 C<-str_sub(SSR_BRC[,1],start = deb_pos_UM_RAA + taille_um)
 X<-(4-nchar(SSR_BRC$URM_SITE))
@@ -56,10 +107,45 @@ Z<-strrep(" ",X)
 D<-paste(B,SSR_BRC$URM_SITE,Z,C,sep="")
 write(D, file = SSR_BRC_SITE)
 
+
 SSR_CCH<-read.csv2(SSR_CCH, header = FALSE)
-A<-str_replace_all(str_sub(SSR_CCH[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+
+##### DIAG CCH AVANT JOIN #####
+cat("\n===== DIAG CCH TEXTE =====\n")
+cat("SSR_CCH: nrow=", nrow(SSR_CCH), " | nchar(ligne1)=", nchar(SSR_CCH[1,1]), "\n")
+cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
+    str_sub(SSR_CCH[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
+
+A_raw <- str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
+A <- str_replace_all(A_raw, " ", "")
 SSR_CCH<-SSR_CCH%>%mutate(URM_APHP = A)
-SSR_CCH<-left_join(SSR_CCH, UM_CCH)
+
+cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
+cat("A_nettoye (10 prem.) :", paste(head(SSR_CCH$URM_APHP, 10), collapse=" | "), "\n")
+cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_CCH$URM_APHP), 10), collapse=" | "), "\n")
+
+keys_txt_cch <- unique(SSR_CCH$URM_APHP)
+keys_xls_cch <- unique(UM_CCH$URM_APHP)
+cat("Nb clés uniques texte CCH:", length(keys_txt_cch), " | Nb clés uniques excel CCH:", length(keys_xls_cch), "\n")
+cat("Nb clés texte présentes dans excel (CCH):", sum(keys_txt_cch %in% keys_xls_cch), "\n")
+cat("Exemples clés texte ABSENTES de l'excel (CCH):", paste(head(keys_txt_cch[!(keys_txt_cch %in% keys_xls_cch)], 20), collapse=","), "\n")
+
+SSR_CCH<-left_join(SSR_CCH, UM_CCH, by = "URM_APHP")
+
+cat("URM_SITE NA après join (CCH):", sum(is.na(SSR_CCH$URM_SITE)), " / ", nrow(SSR_CCH), "\n")
+
+pb_cch <- SSR_CCH %>%
+  mutate(.row_id = row_number(),
+         .ctx = str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
+         .um_raw = A_raw) %>%
+  filter(is.na(URM_SITE)) %>%
+  select(.row_id, URM_APHP, .um_raw, .ctx) %>%
+  head(30)
+
+cat("Exemples lignes non matchées CCH (30 max):\n")
+print(pb_cch)
+##### FIN DIAG CCH #####
+
 B<-str_sub(SSR_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
 C<-str_sub(SSR_CCH[,1],start = deb_pos_UM_RAA + taille_um)
 X<-(4-nchar(SSR_CCH$URM_SITE))
@@ -67,10 +153,11 @@ Z<-strrep(" ",X)
 D<-paste(B,SSR_CCH$URM_SITE,Z,C,sep="")
 write(D, file = SSR_CCH_SITE)
 
+
 SSR_CCL<-read.csv2(SSR_CCL, header = FALSE)
 A<-str_replace_all(str_sub(SSR_CCL[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
 SSR_CCL<-SSR_CCL%>%mutate(URM_APHP = A)
-SSR_CCL<-left_join(SSR_CCL, UM_CCL)
+SSR_CCL<-left_join(SSR_CCL, UM_CCL, by = "URM_APHP")
 B<-str_sub(SSR_CCL[,1],start = 1, end = deb_pos_UM_RAA-1)
 C<-str_sub(SSR_CCL[,1],start = deb_pos_UM_RAA + taille_um)
 X<-(4-nchar(SSR_CCL$URM_SITE))
@@ -81,7 +168,7 @@ write(D, file = SSR_CCL_SITE)
 SSR_VGR<-read.csv2(SSR_VGR, header = FALSE)
 A<-str_replace_all(str_sub(SSR_VGR[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
 SSR_VGR<-SSR_VGR%>%mutate(URM_APHP = A)
-SSR_VGR<-left_join(SSR_VGR, UM_VGR)
+SSR_VGR<-left_join(SSR_VGR, UM_VGR, by = "URM_APHP")
 B<-str_sub(SSR_VGR[,1],start = 1, end = deb_pos_UM_RAA-1)
 C<-str_sub(SSR_VGR[,1],start = deb_pos_UM_RAA + taille_um)
 X<-(4-nchar(SSR_VGR$URM_SITE))
@@ -89,4 +176,4 @@ Z<-strrep(" ",X)
 D<-paste(B,SSR_VGR$URM_SITE,Z,C,sep="")
 write(D, file = SSR_VGR_SITE)
 
-# FIN DE PROCEDURE 
+# FIN DE PROCEDURE
