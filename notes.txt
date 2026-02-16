@@ -1,180 +1,78 @@
-===== DIAG EXCEL =====
-> cat("UM_BRC: nrow=", nrow(UM_BRC), " | type(URM_APHP)=", paste(class(UM_BRC$URM_APHP), collapse="/"),
-+     " | exemples=", paste(head(unique(UM_BRC$URM_APHP), 10), collapse=","), "\n")
-UM_BRC: nrow= 6  | type(URM_APHP)= character  | exemples= 206,126,128,127,130,129 
-> cat("UM_CCH: nrow=", nrow(UM_CCH), " | type(URM_APHP)=", paste(class(UM_CCH$URM_APHP), collapse="/"),
-+     " | exemples=", paste(head(unique(UM_CCH$URM_APHP), 10), collapse=","), "\n")
-UM_CCH: nrow= 10  | type(URM_APHP)= character  | exemples= 18,20,22,182,19,17,16,21,23,24 
-> cat("UM_CCL: nrow=", nrow(UM_CCL), " | type(URM_APHP)=", paste(class(UM_CCL$URM_APHP), collapse="/"),
-+     " | exemples=", paste(head(unique(UM_CCL$URM_APHP), 10), collapse=","), "\n")
-UM_CCL: nrow= 10  | type(URM_APHP)= character  | exemples= 18,20,22,182,19,17,16,21,23,24 
-> cat("UM_VGR: nrow=", nrow(UM_VGR), " | type(URM_APHP)=", paste(class(UM_VGR$URM_APHP), collapse="/"),
-+     " | exemples=", paste(head(unique(UM_VGR$URM_APHP), 10), collapse=","), "\n")
-UM_VGR: nrow= 6  | type(URM_APHP)= character  | exemples= 206,126,128,127,130,129 
-> 
-> ############ RAA ################
-> SSR_BRC<-read.csv2(SSR_BRC, header = FALSE)
-> 
-> ##### DIAG BRC AVANT JOIN #####
-> cat("\n===== DIAG BRC TEXTE =====\n")
+dockerfile :
+FROM debian:9-slim
 
-===== DIAG BRC TEXTE =====
-> cat("SSR_BRC: nrow=", nrow(SSR_BRC), " | nchar(ligne1)=", nchar(SSR_BRC[1,1]), "\n")
-SSR_BRC: nrow= 5987  | nchar(ligne1)= 307 
-> # un contexte autour de la zone UM (positions)
-> cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
-+     str_sub(SSR_BRC[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
-Extrait ligne1 autour UM (120->150): 024000011111  59A              
-> 
-> # extraction brute + extraction nettoyée
-> A_raw <- str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
-> A <- str_replace_all(A_raw, " ", "")
-> SSR_BRC<-SSR_BRC%>%mutate(URM_APHP = A)
-> 
-> cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
-A_raw (10 premiers)  : 11   | 11   | 11   | 11   | 11   | 11   | 11   | 11   | 11   | 11   
-> cat("A_nettoye (10 prem.) :", paste(head(SSR_BRC$URM_APHP, 10), collapse=" | "), "\n")
-A_nettoye (10 prem.) : 11 | 11 | 11 | 11 | 11 | 11 | 11 | 11 | 11 | 11 
-> cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_BRC$URM_APHP), 10), collapse=" | "), "\n")
-nchar(A_nettoye) (10 prem.) : 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 
-> 
-> # vérifier l'intersection des clés entre texte et excel
-> keys_txt_brc <- unique(SSR_BRC$URM_APHP)
-> keys_xls_brc <- unique(UM_BRC$URM_APHP)
-> cat("Nb clés uniques texte BRC:", length(keys_txt_brc), " | Nb clés uniques excel BRC:", length(keys_xls_brc), "\n")
-Nb clés uniques texte BRC: 3  | Nb clés uniques excel BRC: 6 
-> cat("Nb clés texte présentes dans excel (BRC):", sum(keys_txt_brc %in% keys_xls_brc), "\n")
-Nb clés texte présentes dans excel (BRC): 0 
-> cat("Exemples clés texte ABSENTES de l'excel (BRC):", paste(head(keys_txt_brc[!(keys_txt_brc %in% keys_xls_brc)], 20), collapse=","), "\n")
-Exemples clés texte ABSENTES de l'excel (BRC): 11,10,237 
-> 
-> # faire la jointure EN EXPLICITE sur URM_APHP pour diagnostiquer (sans changer la logique métier)
-> SSR_BRC<-left_join(SSR_BRC, UM_BRC, by = "URM_APHP")
-> 
-> # stats NA sur URM_SITE
-> cat("URM_SITE NA après join (BRC):", sum(is.na(SSR_BRC$URM_SITE)), " / ", nrow(SSR_BRC), "\n")
-URM_SITE NA après join (BRC): 5987  /  5987 
-> 
-> # montrer quelques lignes problématiques (non matchées) avec contexte
-> pb_brc <- SSR_BRC %>%
-+   mutate(.row_id = row_number(),
-+          .ctx = str_sub(SSR_BRC[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
-+          .um_raw = A_raw) %>%
-+   filter(is.na(URM_SITE)) %>%
-+   select(.row_id, URM_APHP, .um_raw, .ctx) %>%
-+   head(30)
-> 
-> cat("Exemples lignes non matchées BRC (30 max):\n")
-Exemples lignes non matchées BRC (30 max):
-> print(pb_brc)
-   .row_id URM_APHP .um_raw                            .ctx
-1        1       11    11   024000011111  59A              
-2        2       11    11   024111111111  59A              
-3        3       11    11   024111111111  59A              
-4        4       11    11   024111111111  59A              
-5        5       11    11   024111111111  59A              
-6        6       11    11   024011111111  59A              
-7        7       11    11   024111111111  59A              
-8        8       11    11   024111111111  59A              
-9        9       11    11   024000011111  59A              
-10      10       11    11   024111111111  59A              
-11      11       11    11   024111111111  59A              
-12      12       11    11   024111111111  59A              
-13      13       11    11   024001111111  59A10032024      
-14      14       11    11   024000011111  59A              
-15      15       11    11   024111111111  59A              
-16      16       11    11   024111111111  59A              
-17      17       11    11   024111111111  59A              
-18      18       11    11   024111111111  59A10032024      
-19      19       11    11   024111111111  59A              
-20      20       11    11   024011111111  59A              
-21      21       11    11   024111111111  59A              
-22      22       11    11   024111111111  59A              
-23      23       11    11   024111111111  59A              
-24      24       11    11   024111111111  59A10032024      
-25      25       11    11   024111111111  59A              
-26      26       11    11   024111111111  59A              
-27      27       11    11   024111111111  59A              
-28      28       11    11   024011111111  59A              
-29      29       11    11   024011111111  59A              
-30      30       11    11   024000111111  59A 
-> ##### FIN DIAG BRC #####
+RUN sed -i 's|deb.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i 's|security.debian.org|archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i '/stretch-updates/d' /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid
 
-> ##### DIAG CCH AVANT JOIN #####
-> cat("\n===== DIAG CCH TEXTE =====\n")
+RUN apt-get update && apt-get install -y \
+    libaio1 \
+    unzip \
+    ca-certificates \
+    build-essential \
+    wget \
+    libssl-dev \
+    libffi-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libgdbm-dev \
+    libdb5.3-dev \
+    libbz2-dev \
+    libexpat1-dev \
+    liblzma-dev \
+    tk-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-===== DIAG CCH TEXTE =====
-> cat("SSR_CCH: nrow=", nrow(SSR_CCH), " | nchar(ligne1)=", nchar(SSR_CCH[1,1]), "\n")
-SSR_CCH: nrow= 2840  | nchar(ligne1)= 378 
-> cat("Extrait ligne1 autour UM (", deb_pos_UM_RAA-10, "->", deb_pos_UM_RAA+20, "): ",
-+     str_sub(SSR_CCH[1,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20), "\n", sep="")
-Extrait ligne1 autour UM (120->150): 025000100015  51A              
-> 
-> A_raw <- str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1)
-> A <- str_replace_all(A_raw, " ", "")
-> SSR_CCH<-SSR_CCH%>%mutate(URM_APHP = A)
-> 
-> cat("A_raw (10 premiers)  :", paste(head(A_raw, 10), collapse=" | "), "\n")
-A_raw (10 premiers)  : 15   | 15   | 15   | 15   | 15   | 15   | 15   | 15   | 15   | 15   
-> cat("A_nettoye (10 prem.) :", paste(head(SSR_CCH$URM_APHP, 10), collapse=" | "), "\n")
-A_nettoye (10 prem.) : 15 | 15 | 15 | 15 | 15 | 15 | 15 | 15 | 15 | 15 
-> cat("nchar(A_nettoye) (10 prem.) :", paste(head(nchar(SSR_CCH$URM_APHP), 10), collapse=" | "), "\n")
-nchar(A_nettoye) (10 prem.) : 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 | 2 
-> 
-> keys_txt_cch <- unique(SSR_CCH$URM_APHP)
-> keys_xls_cch <- unique(UM_CCH$URM_APHP)
-> cat("Nb clés uniques texte CCH:", length(keys_txt_cch), " | Nb clés uniques excel CCH:", length(keys_xls_cch), "\n")
-Nb clés uniques texte CCH: 1  | Nb clés uniques excel CCH: 10 
-> cat("Nb clés texte présentes dans excel (CCH):", sum(keys_txt_cch %in% keys_xls_cch), "\n")
-Nb clés texte présentes dans excel (CCH): 0 
-> cat("Exemples clés texte ABSENTES de l'excel (CCH):", paste(head(keys_txt_cch[!(keys_txt_cch %in% keys_xls_cch)], 20), collapse=","), "\n")
-Exemples clés texte ABSENTES de l'excel (CCH): 15 
-> 
-> SSR_CCH<-left_join(SSR_CCH, UM_CCH, by = "URM_APHP")
-> 
-> cat("URM_SITE NA après join (CCH):", sum(is.na(SSR_CCH$URM_SITE)), " / ", nrow(SSR_CCH), "\n")
-URM_SITE NA après join (CCH): 2840  /  2840 
-> 
-> pb_cch <- SSR_CCH %>%
-+   mutate(.row_id = row_number(),
-+          .ctx = str_sub(SSR_CCH[,1], start = deb_pos_UM_RAA-10, end = deb_pos_UM_RAA+20),
-+          .um_raw = A_raw) %>%
-+   filter(is.na(URM_SITE)) %>%
-+   select(.row_id, URM_APHP, .um_raw, .ctx) %>%
-+   head(30)
-> 
-> cat("Exemples lignes non matchées CCH (30 max):\n")
-Exemples lignes non matchées CCH (30 max):
-> print(pb_cch)
-   .row_id URM_APHP .um_raw                            .ctx
-1        1       15    15   025000100015  51A              
-2        2       15    15   025000010015  51A              
-3        3       15    15   025001000015  51A              
-4        4       15    15   025010000015  51A              
-5        5       15    15   025001000015  51A              
-6        6       15    15   025000100015  51A              
-7        7       15    15   025001000015  51A              
-8        8       15    15   025000100015  51A              
-9        9       15    15   025001000015  51A              
-10      10       15    15   025000100015  51A              
-11      11       15    15   025001000015  51A              
-12      12       15    15   025000100015  51A              
-13      13       15    15   025000010015  51A              
-14      14       15    15   025110110015  51A              
-15      15       15    15   025110110015  51A              
-16      16       15    15   025001000015  51A              
-17      17       15    15   025010000015  51A              
-18      18       15    15   025000100015  51A              
-19      19       15    15   025010000015  51A              
-20      20       15    15   025000100015  51A              
-21      21       15    15   025100000015  51A              
-22      22       15    15   025010000015  51A              
-23      23       15    15   025100000015  51A              
-24      24       15    15   025010000015  51A              
-25      25       15    15   025000010015  51A              
-26      26       15    15   025000100015  51A              
-27      27       15    15   025100000015  51A              
-28      28       15    15   025110110015  51A              
-29      29       15    15   025100000015  51A              
-30      30       15    15   025100000015  51A              
-> ##### FIN DIAG CCH #####
+WORKDIR /usr/src
+
+RUN wget https://www.python.org/ftp/python/3.7.17/Python-3.7.17.tgz && \
+    tar xzf Python-3.7.17.tgz && \
+    cd Python-3.7.17 && \
+    ./configure --enable-optimizations && \
+    make -j$(nproc) && \
+    make altinstall
+
+RUN python3.7 -m ensurepip && \
+    python3.7 -m pip install --upgrade pip
+
+WORKDIR /opt/oracle
+
+COPY basic-10.2.0.5.0-linux-x64.zip .
+COPY sqlplus-10.2.0.5.0-linux-x64.zip .
+
+RUN unzip basic-10.2.0.5.0-linux-x64.zip && \
+    unzip sqlplus-10.2.0.5.0-linux-x64.zip && \
+    rm -f *.zip && \
+    ln -sf instantclient_10_2/libclntsh.so.10.1 instantclient_10_2/libclntsh.so && \
+    ln -sf instantclient_10_2/libocci.so.10.1 instantclient_10_2/libocci.so
+
+ENV ORACLE_HOME=/opt/oracle/instantclient_10_2
+ENV LD_LIBRARY_PATH=/opt/oracle/instantclient_10_2
+ENV PATH=/opt/oracle/instantclient_10_2:$PATH
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN python3.7 -m pip install --no-cache-dir -r requirements.txt
+
+COPY app /app
+COPY sql /app/sql
+
+RUN mkdir -p /app/output
+
+CMD ["python3.7", "/app/main.py"]
+
+
+script .sh:
+#!/bin/bash
+
+docker run --rm \
+    -v /home/python/monouhcd/app:/app \
+    -v /home/python/monouhcd/sql:/app/sql \
+    -v /home/python/automatisation:/config \
+    -v /home/github:/github \
+    monouhcd-image
