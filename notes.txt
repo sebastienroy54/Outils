@@ -1,6 +1,12 @@
-pkg <- file.path(.libPaths()[1], "rAphpQueries")
-dir.exists(pkg)
-list.files(pkg)
-
-# regarde l'arborescence "libs"
-list.files(file.path(pkg, "libs"), recursive = TRUE)
+> pkg <- file.path(.libPaths()[1], "rAphpQueries")
+> dir.exists(pkg)
+[1] TRUE
+> list.files(pkg)
+ [1] "demo"         "DESCRIPTION"  "help"         "html"         "INDEX"        "libs"        
+ [7] "LICENSE"      "Meta"         "NAMESPACE"    "params"       "R"            "referentiels"
+[13] "sql"          "sql_test"    
+> 
+> # regarde l'arborescence "libs"
+> list.files(file.path(pkg, "libs"), recursive = TRUE)
+[1] "ojdbc8.jar"
+> 
