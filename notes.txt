@@ -1,6 +1,23 @@
-docker run --rm --name doublons-batch \
-  -v /media/sf_python/doublons/app:/app \
-  -v /media/sf_python/doublons/sql:/app/sql \
-  -v /media/sf_python/doublons/output:/app/output \
-  -v /media/sf_python/automatisation:/config \
-  monouhcd-image
+> install.packages("C:/Users/4251352/Documents/Code R/rAphpQueries-main", repos = NULL, type = "source")
+WARNING: Rtools is required to build R packages but is not currently installed. Please download and install the appropriate version of Rtools before proceeding:
+
+https://cran.rstudio.com/bin/windows/Rtools/
+* installing *source* package 'rAphpQueries' ...
+** this is package 'rAphpQueries' version '0.0.0.9000'
+** using staged installation
+** R
+** demo
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+Error : le package 'rAphpQueries' n'a pas été installé pour 'arch = x64'
+Erreur : le chargement a échoué
+Exécution arrêtée
+ERROR: loading failed
+* removing 'C:/Users/4251352/AppData/Local/Programs/R/R-4.5.1/library/rAphpQueries'
+Warning in install.packages :
+  l'installation du package ‘C:/Users/4251352/DOCUME~1/CODER~1/rAphpQueries-main’ a eu un statut de sortie non nul
