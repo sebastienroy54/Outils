@@ -1,18 +1,92 @@
-SELECT MOIS,
-       SUM(CASE WHEN AGE_ANNEES >= 18 THEN 1 ELSE 0 END) AS MAJEURE,
-       SUM(CASE WHEN AGE_ANNEES <  18 THEN 1 ELSE 0 END) AS MINEURE,
-       COUNT(*) AS TOTAL
-FROM (
-  SELECT DISTINCT
-         TO_CHAR(R.D8EEUE,'MM') AS MOIS,
-         R.KYRES,
-         TRUNC(MONTHS_BETWEEN(R.D8EEUE, S.DANAIS) / 12) AS AGE_ANNEES
-  FROM RSM R, SDO S
-  WHERE S.KYNODA = R.NODA
-    AND R.CDURM_P IN ('140J','142J')
-    AND R.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-    AND R.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-    AND R.CDDNC9 LIKE 'O04%'
-)
-GROUP BY MOIS
-ORDER BY MOIS;
+####### FORMATAGE DES RIM-P DIME POUR IMPORT DANS PMSIPilot ###############
+gc()
+# Loading libraries
+library(tidyr)
+library(dplyr)
+library(stringr)
+library("readxl")
+
+####### ********** A PARAMETRER A CHAQUE REMONTEE ************#############
+
+chemin = "//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR"
+# DEPLACER LES 6 FICHIERS
+UMA_BRC = "CORREPONDANCE_UM_SSR_SITE_00090_APHP_202512.xls"
+SSR_BRC = "750801441.2025.12.rhs.ini.txt"
+UMA_CCH = "CORREPONDANCE_UM_SSR_SITE_00022_APHP_202512.xls"
+SSR_CCH = "750100166.2025.12.rhs.ini.txt"
+UMA_CCL = "CORREPONDANCE_UM_SSR_SITE_00022_APHP_202512.xls"
+SSR_CCL = "920100062.2025.12.rhs.ini.txt"
+UMA_VGR = "CORREPONDANCE_UM_SSR_SITE_00090_APHP_202512.xls"
+SSR_VGR = "750100216.2025.12.rhs.ini.txt"
+
+taille_um = 4
+deb_pos_UM_RAA = 130  # 2023
+
+###########################################  FIN ZONE PARAMETRAGE ###################
+
+# chemin    
+setwd (chemin)
+# nom des fichiers de sortie
+SSR_BRC_SITE = paste(str_sub(SSR_BRC, start = 1, end = nchar(SSR_BRC)-4),".site",str_sub(SSR_BRC, start = nchar(SSR_BRC)-3),sep="")
+SSR_CCH_SITE = paste(str_sub(SSR_CCH, start = 1, end = nchar(SSR_CCH)-4),".site",str_sub(SSR_CCH, start = nchar(SSR_CCH)-3),sep="")
+SSR_CCL_SITE = paste(str_sub(SSR_CCL, start = 1, end = nchar(SSR_CCL)-4),".site",str_sub(SSR_CCL, start = nchar(SSR_CCL)-3),sep="")
+SSR_VGR_SITE = paste(str_sub(SSR_VGR, start = 1, end = nchar(SSR_VGR)-4),".site",str_sub(SSR_VGR, start = nchar(SSR_VGR)-3),sep="")
+
+# fichiers de travail
+UM_BRC<-read_excel(UMA_BRC, skip  = 2)
+UM_CCH<-read_excel(UMA_CCH, skip  = 2)
+UM_CCL<-read_excel(UMA_CCL, skip  = 2)
+UM_VGR<-read_excel(UMA_VGR, skip  = 2)
+
+# FORCER UNE ASSOCIATION 1->1 (une seule ligne par URM_APHP)
+UM_BRC <- UM_BRC %>% distinct(URM_APHP, .keep_all = TRUE)
+UM_CCH <- UM_CCH %>% distinct(URM_APHP, .keep_all = TRUE)
+UM_CCL <- UM_CCL %>% distinct(URM_APHP, .keep_all = TRUE)
+UM_VGR <- UM_VGR %>% distinct(URM_APHP, .keep_all = TRUE)
+
+############ RAA ################
+SSR_BRC<-read.csv2(SSR_BRC, header = FALSE)
+A<-str_replace_all(str_sub(SSR_BRC[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+SSR_BRC<-SSR_BRC%>%mutate(URM_APHP = A)
+SSR_BRC<-left_join(SSR_BRC, UM_BRC)
+B<-str_sub(SSR_BRC[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(SSR_BRC[,1],start = deb_pos_UM_RAA + taille_um)
+X<-(4-nchar(SSR_BRC$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,SSR_BRC$URM_SITE,Z,C,sep="")
+write(D, file = SSR_BRC_SITE)
+
+SSR_CCH<-read.csv2(SSR_CCH, header = FALSE)
+A<-str_replace_all(str_sub(SSR_CCH[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+SSR_CCH<-SSR_CCH%>%mutate(URM_APHP = A)
+SSR_CCH<-left_join(SSR_CCH, UM_CCH)
+B<-str_sub(SSR_CCH[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(SSR_CCH[,1],start = deb_pos_UM_RAA + taille_um)
+X<-(4-nchar(SSR_CCH$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,SSR_CCH$URM_SITE,Z,C,sep="")
+write(D, file = SSR_CCH_SITE)
+
+SSR_CCL<-read.csv2(SSR_CCL, header = FALSE)
+A<-str_replace_all(str_sub(SSR_CCL[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+SSR_CCL<-SSR_CCL%>%mutate(URM_APHP = A)
+SSR_CCL<-left_join(SSR_CCL, UM_CCL)
+B<-str_sub(SSR_CCL[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(SSR_CCL[,1],start = deb_pos_UM_RAA + taille_um)
+X<-(4-nchar(SSR_CCL$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,SSR_CCL$URM_SITE,Z,C,sep="")
+write(D, file = SSR_CCL_SITE)
+
+SSR_VGR<-read.csv2(SSR_VGR, header = FALSE)
+A<-str_replace_all(str_sub(SSR_VGR[,1],start = deb_pos_UM_RAA, end = deb_pos_UM_RAA + taille_um - 1), " ", "")
+SSR_VGR<-SSR_VGR%>%mutate(URM_APHP = A)
+SSR_VGR<-left_join(SSR_VGR, UM_VGR)
+B<-str_sub(SSR_VGR[,1],start = 1, end = deb_pos_UM_RAA-1)
+C<-str_sub(SSR_VGR[,1],start = deb_pos_UM_RAA + taille_um)
+X<-(4-nchar(SSR_VGR$URM_SITE))
+Z<-strrep(" ",X)
+D<-paste(B,SSR_VGR$URM_SITE,Z,C,sep="")
+write(D, file = SSR_VGR_SITE)
+
+# FIN DE PROCEDURE 
