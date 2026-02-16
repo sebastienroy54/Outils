@@ -1,16 +1,19 @@
-src <- "C:/Users/4251352/Documents/Code R/rAphpQueries-main"
-
-dir.create(file.path(src, "inst", "java"), recursive = TRUE, showWarnings = FALSE)
-
-file.rename(
-  file.path(src, "inst", "libs", "ojdbc8.jar"),
-  file.path(src, "inst", "java", "ojdbc8.jar")
-)
-
-# supprimer inst/libs si vide
-if (dir.exists(file.path(src, "inst", "libs")) && length(list.files(file.path(src, "inst", "libs"))) == 0) {
-  unlink(file.path(src, "inst", "libs"), recursive = TRUE)
-}
-
-list.files(file.path(src, "inst", "java"))
-dir.exists(file.path(src, "inst", "libs"))
+> src <- "C:/Users/4251352/Documents/Code R/rAphpQueries-main"
+> 
+> dir.create(file.path(src, "inst", "java"), recursive = TRUE, showWarnings = FALSE)
+> 
+> file.rename(
++     file.path(src, "inst", "libs", "ojdbc8.jar"),
++     file.path(src, "inst", "java", "ojdbc8.jar")
++ )
+[1] TRUE
+> 
+> # supprimer inst/libs si vide
+> if (dir.exists(file.path(src, "inst", "libs")) && length(list.files(file.path(src, "inst", "libs"))) == 0) {
++     unlink(file.path(src, "inst", "libs"), recursive = TRUE)
++ }
+> 
+> list.files(file.path(src, "inst", "java"))
+[1] "ojdbc8.jar"
+> dir.exists(file.path(src, "inst", "libs"))
+[1] FALSE
