@@ -1,2 +1,7 @@
-> library(rAphpQueries)
-Error: le package ‘rAphpQueries’ n'a pas été installé pour 'arch = x64'
+pkgdir <- system.file(package = "rAphpQueries")
+pkgdir
+
+cat(readLines(file.path(pkgdir, "NAMESPACE")), sep = "\n")
+
+file.exists(file.path(pkgdir, "libs", paste0("rAphpQueries", .Platform$dynlib.ext)))
+list.files(file.path(pkgdir, "libs"))
