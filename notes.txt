@@ -1,25 +1,7 @@
-> src <- "C:/Users/4251352/Documents/Code R/rAphpQueries-main"
-> 
-> # créer inst/java si besoin
-> dir.create(file.path(src, "inst", "java"), recursive = TRUE, showWarnings = FALSE)
-> 
-> # déplacer le jar
-> file.rename(
-+     file.path(src, "libs", "ojdbc8.jar"),
-+     file.path(src, "inst", "java", "ojdbc8.jar")
-+ )
-[1] FALSE
-Warning message:
-In file.rename(file.path(src, "libs", "ojdbc8.jar"), file.path(src,  :
-  cannot rename file 'C:/Users/4251352/Documents/Code R/rAphpQueries-main/libs/ojdbc8.jar' to 'C:/Users/4251352/Documents/Code R/rAphpQueries-main/inst/java/ojdbc8.jar', reason 'Le chemin d’accès spécifié est introuvable'
-> 
-> # supprimer le dossier libs s'il est vide
-> if (dir.exists(file.path(src, "libs")) && length(list.files(file.path(src, "libs"))) == 0) {
-+     unlink(file.path(src, "libs"), recursive = TRUE)
-+ }
-> 
-> # vérifier
-> list.files(file.path(src, "inst", "java"))
-character(0)
-> dir.exists(file.path(src, "libs"))
-[1] FALSE
+candidates <- c("C:/Users/4251352", "C:/Program Files", "C:/Program Files (x86)")
+found <- unlist(lapply(candidates, function(p) {
+  if (!dir.exists(p)) return(character())
+  list.files(p, pattern = "^ojdbc8\\.jar$", recursive = TRUE, full.names = TRUE)
+}))
+found
+length(found)
