@@ -1,8 +1,146 @@
-#!/bin/bash
+import json
+from pathlib import Path
+from datetime import datetime, date
+import pandas as pd
 
-docker run --rm --name doublons-batch \
-  -v /home/python/doublons/app:/app \
-  -v /home/python/doublons/sql:/app/sql \
-  -v /home/python/doublons/output:/app/output \
-  -v /home/python/automatisation:/config \
-  monouhcd-image
+from oracle_runner import run_sqlplus
+from mailer import send_mail
+from doublons_logic import (
+    compute_window_m2_to_end_m1,
+    analyze_csv_and_build_relations,
+    build_rows_instead_of_columns,
+)
+
+ORACLE_USER = "consult"
+ORACLE_PASSWORD = "consult"
+
+BASE_DIR = Path(__file__).resolve().parent
+SQL_FILE = BASE_DIR / "sql" / "contigus.sql"
+OUTPUT_DIR = BASE_DIR / "output"
+
+TNS_MAP = {
+    "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH",
+    "BRC": "//o-simpa-b1.brc.aphp.fr:8105/SIP1BRC",
+    "HTD": "//o-simpa-b1.htd.aphp.fr:8855/SIP1HTD"
+}
+
+MAIL_CONFIG_PATH = Path("/config/mail_doublons.json")
+
+
+def main():
+    for p in OUTPUT_DIR.glob("resultat_*.csv"):
+        try:
+            p.unlink()
+        except Exception:
+            pass
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    start, end = compute_window_m2_to_end_m1(date.today())
+    start_str = start.strftime("%d/%m/%Y")
+    end_str = end.strftime("%d/%m/%Y")
+
+    print(f"[INFO] Période: {start_str} -> {end_str}")
+
+    results_by_type = {k: [] for k in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]}
+
+    for site_label, dsn in TNS_MAP.items():
+        print(f"[INFO] Site {site_label}: SQL*Plus ...")
+
+        csv_path = OUTPUT_DIR / f"resultat_{site_label}.csv"
+        if csv_path.exists():
+            try:
+                csv_path.unlink()
+            except Exception:
+                pass
+
+        # contigus.sql attend &1 &2 &3
+        run_sqlplus(
+            sql_file=SQL_FILE,
+            dsn=dsn,
+            user=ORACLE_USER,
+            password=ORACLE_PASSWORD,
+            args=[start_str, end_str, str(csv_path)],
+            timeout=900,
+        )
+
+        if not csv_path.exists():
+            raise RuntimeError(f"CSV manquant après spool: {csv_path}")
+
+        res = analyze_csv_and_build_relations(csv_path)
+
+        # stockage
+        for groupe in results_by_type.keys():
+            if "TYPE_RELATION" not in res.columns:
+                continue
+            subset = res[res["TYPE_RELATION"] == groupe].copy()
+            subset = subset.drop(columns=["TYPE_RELATION"], errors="ignore")
+            if not subset.empty:
+                results_by_type[groupe].append((site_label, subset))
+
+        try:
+            csv_path.unlink()
+        except Exception:
+            pass
+
+        print(f"[INFO] Site {site_label}: OK")
+
+    out_xlsx = OUTPUT_DIR / f"doublons_CCH_HTD_BRC.xlsx"
+    if out_xlsx.exists():
+        out_xlsx.unlink()
+
+    with pd.ExcelWriter(out_xlsx, engine="openpyxl") as writer:
+        for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
+            keep_ghm = (groupe == "CONTIGUS")
+
+            if not results_by_type[groupe]:
+                if keep_ghm:
+                    df_to_write = pd.DataFrame([{
+                        "IPP": "N/A", "DATE_NAISSANCE": "N/A",
+                        "NDA": "N/A", "UMA": "N/A", "GHM": "N/A",
+                        "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A",
+                        "SITE": "N/A", "COMMENTAIRE": ""
+                    }])
+                else:
+                    df_to_write = pd.DataFrame([{
+                        "IPP": "N/A", "DATE_NAISSANCE": "N/A",
+                        "NDA": "N/A", "UMA": "N/A",
+                        "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A",
+                        "SITE": "N/A", "COMMENTAIRE": ""
+                    }])
+            else:
+                blocks = []
+                for site_label, subset in results_by_type[groupe]:
+                    blocks.append(build_rows_instead_of_columns(subset, keep_ghm=keep_ghm, site_label=site_label))
+                df_to_write = pd.concat(blocks, ignore_index=True)
+
+            df_to_write.to_excel(writer, sheet_name=groupe, index=False)
+
+            ws = writer.sheets[groupe]
+            for i, col in enumerate(df_to_write.columns):
+                max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
+                ws.column_dimensions[ws.cell(row=1, column=i + 1).column_letter].width = max_len
+
+    print(f"[INFO] Excel généré: {out_xlsx}")
+
+    # Mail
+    if not MAIL_CONFIG_PATH.exists():
+        raise RuntimeError(f"Config mail introuvable: {MAIL_CONFIG_PATH}")
+
+    cfg = json.loads(MAIL_CONFIG_PATH.read_text(encoding="utf-8"))
+    mail_from = cfg["from"]
+    to = cfg["to"]
+    cc = cfg.get("cc", [])
+    subject = cfg.get("subject", f"Liste doublons {start_str} -> {end_str}")
+    body = cfg.get("body", f"Bonjour,\n\nVeuillez trouver ci-joint la liste des doublons à traiter.\nPériode : {start_str} -> {end_str}\n\n"
+                    "---\n"
+                    "Mail généré automatiquement.")
+
+    send_mail(
+        mail_from=mail_from,
+        recipients=to,
+        cc=cc,
+        subject=subject,
+        body=body,
+        attachments=[str(out_xlsx)]
+    )
