@@ -1,7 +1,9 @@
-candidates <- c("C:/Users/4251352", "C:/Program Files", "C:/Program Files (x86)")
-found <- unlist(lapply(candidates, function(p) {
-  if (!dir.exists(p)) return(character())
-  list.files(p, pattern = "^ojdbc8\\.jar$", recursive = TRUE, full.names = TRUE)
-}))
-found
-length(found)
+> candidates <- c("C:/Users/4251352", "C:/Program Files", "C:/Program Files (x86)")
+> found <- unlist(lapply(candidates, function(p) {
++     if (!dir.exists(p)) return(character())
++     list.files(p, pattern = "^ojdbc8\\.jar$", recursive = TRUE, full.names = TRUE)
++ }))
+> found
+[1] "C:/Users/4251352/Documents/Code R/rAphpQueries-main/inst/libs/ojdbc8.jar"
+> length(found)
+[1] 1
