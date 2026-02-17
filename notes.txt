@@ -1,17 +1,12 @@
-print("\n=== Synthèse absents ===")
-print("Total lignes contrôle:", len(ctrl_export))
+=== Synthèse absents ===
+Total lignes contrôle: 227
+Absents stricts (LPP non trouvé): 0
+Absents via montant: 117
+Absents total: 117
 
-# Absents stricts
-abs_strict = ctrl_export[ctrl_export["Statut"].eq("ABSENT (LPP non trouvé)")]
-print("Absents stricts (LPP non trouvé):", len(abs_strict))
-
-# Absents montant (Nemost etc.)
-abs_amt = ctrl_export[ctrl_export["Statut"].eq("ABSENT (montant trop faible)")]
-print("Absents via montant:", len(abs_amt))
-
-# Total absents
-abs_total = ctrl_export[ctrl_export["Statut"].str.startswith("ABSENT")]
-print("Absents total:", len(abs_total))
-
-print("\n=== Répartition par LPPR (absents) ===")
-print(abs_total["LPPR"].value_counts().to_string())
+=== Répartition par LPPR (absents) ===
+LPPR
+3111645    60
+8127390    47
+3299070     8
+3416095     2
