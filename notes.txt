@@ -1,146 +1,93 @@
-import json
-from pathlib import Path
-from datetime import datetime, date
-import pandas as pd
+Alors, cela ne va pas être simple, mais c’est normal, les DMI ce n’est pas simple… !
 
-from oracle_runner import run_sqlplus
-from mailer import send_mail
-from doublons_logic import (
-    compute_window_m2_to_end_m1,
-    analyze_csv_and_build_relations,
-    build_rows_instead_of_columns,
-)
+J’ai regardé liste de la PUI. (J’ai fait quelques corrections ad hoc des données de la PUI : 3 IPP faux, deux dates de pose fausses (erreur d’années), suppression de 4 lignes (annulations de poses ou aucun identifiant indiqué, et 3 lignes « hors sujet » pour nous : 1 séjour sorti en 2024 et 2 en 2026))
 
-ORACLE_USER = "consult"
-ORACLE_PASSWORD = "consult"
+Je l’ai croisé avec le fichcomp M12. Résultat ci-joint.
 
-BASE_DIR = Path(__file__).resolve().parent
-SQL_FILE = BASE_DIR / "sql" / "contigus.sql"
-OUTPUT_DIR = BASE_DIR / "output"
+Je n’ai pas produit seulement une liste de DMI absents,  j’ai gardé (presque) toutes lignes de la PUI et j’ai indiqué ce que je trouvais pour chaque ligne.
+Dans mon fichier les DMI absents correspondent a priori à « qté de ce LPP dans fichcomp sur ce NAS  » = 0 …sauf quand il y a un LPP analogue à celui ciblé (qui correspond à un DMI semblable) que j’ai alors mis en vert.
 
-TNS_MAP = {
-    "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH",
-    "BRC": "//o-simpa-b1.brc.aphp.fr:8105/SIP1BRC",
-    "HTD": "//o-simpa-b1.htd.aphp.fr:8855/SIP1HTD"
-}
+Puis j’ai comparé avec la liste d’absents que vous avez produite.
 
-MAIL_CONFIG_PATH = Path("/config/mail_doublons.json")
+Si j’essaie de conclure :
+
+1.	Il y a beaucoup d’absents non repérés : je crois que vous avez considéré que c’était OK dès que vous trouviez le NAS dans le fichcomp, mais on ne peut pas procéder comme cela ++++
+a.	Très souvent, surtout en orthopédie, des petits DMI T2A seront codés et masqueront l’absence des gros DMI ciblés. C’est le cas ici pour une cinquantaine de poses (bilatérale en plus) du DMI Nemost, donc la liste rate environ 900 k€.
+b.	Toutefois quand il y a un LPP équivalent à celui ciblé dans le fichcomp, il ne faut effectivement pas signaler un absent…
+c.	Donc il faut regarder si les LPP présents sont les bons.
+i.	C’est parfois trop compliqué (ex : orthopédie) dans ce cas au moins regarder le total des € présents dans le fichcomp (si < au tarif du DMI ciblé, il manque).
+ii.	C’est parfois faisable (comme ici : implants cochléaires, valves percutanées)
+2.	Il y a parfois des absents listés à tort ++. C’est à chaque fois quand le NDA de la PUI est faux.
+a.	Il faut en 1ère intention chercher soi-même le NAS à partir des IPP + date de pose, même quand la PUI fourni un NDA.
+b.	Si on a que le NDA de la PUI il faut chercher l’IPP avec leur NDA, pour ensuite chercher un NAS…
+c.	Si après cela le DMI n’est pas trouvé on peut regarder via le NDA fourni.
+3.	La notion de quantité est absente du rendu ++.
+a.	Mais c’est important. Certains DMI (ici les 3111645 Nemost) sont toujours posés par 2, et d’autres (implants cochléaires ) parfois posés par 2, il faudrait que cette notion apparaisse. (Ce que j’ai moi-même fait de façon impropre ci-joint faute de temps (j’ai mis quantité = 2 dans chaque ligne en doublon)).
+4.	Moins important : certaines lignes de la PUI sont sur des séjours sortis en 2024 ou 2026 donc à ne pas conserver.
+
+Enfin pour faire tout bien il faudrait comparer aussi au contenu de l’édition des DMI du SAG. Car il n’est pas impossible que des DMI soient correctement saisis mais pour x raison ne soient pas arrivés dans le fichcomp. Mais je crois que c’est rare en hospitalisations.
 
 
-def main():
-    for p in OUTPUT_DIR.glob("resultat_*.csv"):
-        try:
-            p.unlink()
-        except Exception:
-            pass
+Les détails par LPP sont ci-dessous.
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+LPP 3111645 (orthopédie tiges de croissance Nemost) (8900€ pièce, posé par paire)
 
-    start, end = compute_window_m2_to_end_m1(date.today())
-    start_str = start.strftime("%d/%m/%Y")
-    end_str = end.strftime("%d/%m/%Y")
+N=66 lignes dans la liste PUI.
 
-    print(f"[INFO] Période: {start_str} -> {end_str}")
+Votre liste signale 3 absents.
 
-    results_by_type = {k: [] for k in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]}
+Parmi vos 3 absents 1 ne manque peut-être pas car c’est un patient sorti en février 2026 donc son DMI devra être sur un prochain fichcomp 2026. 
 
-    for site_label, dsn in TNS_MAP.items():
-        print(f"[INFO] Site {site_label}: SQL*Plus ...")
+Pour vos deux autres lignes d’absents : notez que pour chaque ligne il y a deux poses (ce DMI se pose en général par paire), c’est pour cela qu’il y avait deux ligne à chaque fois dans le fichier de la PUI, ce n’était pas par erreur.
 
-        csv_path = OUTPUT_DIR / f"resultat_{site_label}.csv"
-        if csv_path.exists():
-            try:
-                csv_path.unlink()
-            except Exception:
-                pass
+Pour ma part je trouve 54 absents.
 
-        # contigus.sql attend &1 &2 &3
-        run_sqlplus(
-            sql_file=SQL_FILE,
-            dsn=dsn,
-            user=ORACLE_USER,
-            password=ORACLE_PASSWORD,
-            args=[start_str, end_str, str(csv_path)],
-            timeout=900,
-        )
+Les lignes pour lesquels nous divergeons sont celles qui ont des LPP dans le fichcomp, autres que le 3111645. Mais les DMI qui sont sur le fichcomp sont des « petits » DMI, les gros DMI ciblés manquent bien. On peut le voir sur le total des € qui sont sur le fichcomp, les montants sont tous très inférieurs à e qui devrait le DMI coutant 8900€ et à chaque fois on en pose 2 dont on devrait toujours avoir > 17800 € au moins.
 
-        if not csv_path.exists():
-            raise RuntimeError(f"CSV manquant après spool: {csv_path}")
+Il ne faut pas de contenter de retrouver le NAS dans le fichcomp, il faut que ce soit aussi le bon LPP +++. (Sauf… quand c’est un LPP qui correspond à un DMI analogue… cf. plus loin ) 
 
-        res = analyze_csv_and_build_relations(csv_path)
 
-        # stockage
-        for groupe in results_by_type.keys():
-            if "TYPE_RELATION" not in res.columns:
-                continue
-            subset = res[res["TYPE_RELATION"] == groupe].copy()
-            subset = subset.drop(columns=["TYPE_RELATION"], errors="ignore")
-            if not subset.empty:
-                results_by_type[groupe].append((site_label, subset))
+LPP 3299070 (cardio interventionnelle) (14 600€)
 
-        try:
-            csv_path.unlink()
-        except Exception:
-            pass
+N=16 lignes dans la liste PUI.
+Pour moi les DMI sont tous manquants pour toute la liste de la PUI pour ce LPP précis.
+Mais il y a souvent un LPP équivalent 3239865 à la place.
+En tenant compte de cela il reste selon moi 8 manquants.
 
-        print(f"[INFO] Site {site_label}: OK")
+Votre liste signale 10 absents.
+Dont 8 sont idem les miens, + 2 autres (Raiau et Wieclaw).
+Les deux autres sont des lignes où le NDA de la PUI est faux.
+Mais ils ont en fait bien un 3239865, à la bonne date.
 
-    out_xlsx = OUTPUT_DIR / f"doublons_CCH_HTD_BRC.xlsx"
-    if out_xlsx.exists():
-        out_xlsx.unlink()
+Pour les retrouver il faut en 1ère intention utiliser un NDA que l’on recherche soit même, à partir de IPP + date de pose et des données de mouvements (actuellement extraites de SIMPA)
 
-    with pd.ExcelWriter(out_xlsx, engine="openpyxl") as writer:
-        for groupe in ["VRAI_DOUBLON", "DOUBLON_0_NUIT", "CONTIGUS", "CHEVAUCHEMENT"]:
-            keep_ghm = (groupe == "CONTIGUS")
+D’ailleurs d’une façon générale il ne faut jamais utiliser directement le NDA de la PUI, même quand il n’y a pas d’IPP fourni par la PUI ! Dans ces cas-là il faut 1) utiliser le NDA de la PUI pour retrouver un IPP dans les données des mouvements puis 2) trouver un nouvel NDA (qui sera le même ou non que celui de la PUI) avec l’IPP trouvé + date de pose. C’est plus fiable ainsi.
 
-            if not results_by_type[groupe]:
-                if keep_ghm:
-                    df_to_write = pd.DataFrame([{
-                        "IPP": "N/A", "DATE_NAISSANCE": "N/A",
-                        "NDA": "N/A", "UMA": "N/A", "GHM": "N/A",
-                        "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A",
-                        "SITE": "N/A", "COMMENTAIRE": ""
-                    }])
-                else:
-                    df_to_write = pd.DataFrame([{
-                        "IPP": "N/A", "DATE_NAISSANCE": "N/A",
-                        "NDA": "N/A", "UMA": "N/A",
-                        "DATE_ENTREE": "N/A", "DATE_SORTIE": "N/A",
-                        "SITE": "N/A", "COMMENTAIRE": ""
-                    }])
-            else:
-                blocks = []
-                for site_label, subset in results_by_type[groupe]:
-                    blocks.append(build_rows_instead_of_columns(subset, keep_ghm=keep_ghm, site_label=site_label))
-                df_to_write = pd.concat(blocks, ignore_index=True)
+Le NDA de la PUI peut être utilisé en 2ième intention si échec avec le NDA recherché.
 
-            df_to_write.to_excel(writer, sheet_name=groupe, index=False)
 
-            ws = writer.sheets[groupe]
-            for i, col in enumerate(df_to_write.columns):
-                max_len = max(df_to_write[col].astype(str).map(len).max(), len(col)) + 2
-                ws.column_dimensions[ws.cell(row=1, column=i + 1).column_letter].width = max_len
+LPP 8127390 (cardio interventionnelle) (3700€)
 
-    print(f"[INFO] Excel généré: {out_xlsx}")
+N=119 lignes dans la liste PUI.
 
-    # Mail
-    if not MAIL_CONFIG_PATH.exists():
-        raise RuntimeError(f"Config mail introuvable: {MAIL_CONFIG_PATH}")
+Votre liste signale 52 absents.
 
-    cfg = json.loads(MAIL_CONFIG_PATH.read_text(encoding="utf-8"))
-    mail_from = cfg["from"]
-    to = cfg["to"]
-    cc = cfg.get("cc", [])
-    subject = cfg.get("subject", f"Liste doublons {start_str} -> {end_str}")
-    body = cfg.get("body", f"Bonjour,\n\nVeuillez trouver ci-joint la liste des doublons à traiter.\nPériode : {start_str} -> {end_str}\n\n"
-                    "---\n"
-                    "Mail généré automatiquement.")
+Pour ma part je trouve 47 absents.
 
-    send_mail(
-        mail_from=mail_from,
-        recipients=to,
-        cc=cc,
-        subject=subject,
-        body=body,
-        attachments=[str(out_xlsx)]
-    )
+Vous trouvez « absents » pour les  patients suivant : "ABDUL"       "AZERGUERRAS" "DJURIC"      "GAYE"        "JOFFRIN"    "MALOT"       "VILSAINT", mais ce sont dans tous les cas des NDA de la PUI faux (NDA de consultations ou d’hospitalisation complètes faux) ils ont bien les DMI.
+
+Par contre 1 est absent selon moi, mais pas pour vous :
+8018750327	612666295	LE MOAL	PATRICIA	20/11/1954	31/03/2025	612666295
+Je suppose que c’est parce que il y a sur ce séjour d’autres DMI dans le fichcomp. Mais ils ne sont pas équivalents (et sont beaucoup moins chers) donc cette ligne devrait être signalée dans la liste.
+
+LPP 3416095 (ORL) (13600€, pose unilatérale le + souvent mais parfois pose bilatérale)
+
+N=24 lignes dans la liste PUI.
+
+Votre liste signale 3 absents.
+2 sont ok.
+Le 3ième PESTELLE CENDRIER ets un séjour sorti en 2024 donc hors sujet.
+
+Pour ma part ils sont tous absent pour ce LPP précis.
+Mais très souvent ils ont un autre LPP d’implant cochléaire, équivalent, le 3400869.
+En tenant compte de cela j’ai 2 absents (qui sont parmi vos 3)
