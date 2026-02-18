@@ -78,15 +78,9 @@ FROM
       TO_CHAR(rsm.d8eeue,'YYYY') AS annee,
       rsm.cddnc9 AS dp
     FROM rsm
-    WHERE rsm.cdurm_p IN ('UMA1','UMA2')
-      AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
+    WHERE rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
       AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
-      AND EXISTS (
-        SELECT 1
-        FROM epi
-        WHERE epi.nores = rsm.kyres
-          AND epi.tyepi = 'HC'
-      )
+      AND rsm.cdurm_p = '670'
   ) b,
   dgn
   WHERE dgn.kyres(+) = b.kyres
