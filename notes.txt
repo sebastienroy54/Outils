@@ -1,4 +1,96 @@
-Dans le cadre de notre bilan annuel d'activité, je me permets de revenir vers vous pour savoir s'il serait possible s'il vous plaît d'avoir les données pour 2024 et 2025 concernant, en hospitalisation complète:
-- le nombre de séjours avec cirrhose liée à l'alcool et leur pourcentage par rapport au nombre total de séjours avec cirrhose et au nombre total de séjours
-- le nombre de séjours avec pathologie liée à l'alcool et leur pourcentage par rapport au nombre total de séjours
-- le nombre de sevrages complexes, des sevrages simples, d'hospitalisations avec consommation excessive d'alcool.
+SELECT
+  s.annee,
+  COUNT(*) AS nb_sejours_total,
+  SUM(s.flag_cirr_total) AS nb_sejours_cirr_total,
+  SUM(s.flag_cirr_alcool) AS nb_sejours_cirr_alcool,
+  ROUND(100 * SUM(s.flag_cirr_alcool) / DECODE(SUM(s.flag_cirr_total),0,NULL,SUM(s.flag_cirr_total)), 1) AS pct_cirr_alcool_vs_cirr,
+  ROUND(100 * SUM(s.flag_cirr_alcool) / DECODE(COUNT(*),0,NULL,COUNT(*)), 1) AS pct_cirr_alcool_vs_total,
+  SUM(s.flag_patho_alcool) AS nb_sejours_patho_alcool,
+  ROUND(100 * SUM(s.flag_patho_alcool) / DECODE(COUNT(*),0,NULL,COUNT(*)), 1) AS pct_patho_alcool_vs_total,
+  SUM(s.flag_sevrage_simple) AS nb_sevrages_simples,
+  SUM(s.flag_sevrage_complexe) AS nb_sevrages_complexes,
+  SUM(s.flag_conso_excessive) AS nb_sejours_conso_excessive
+FROM
+(
+  SELECT
+    b.annee,
+    b.kyres,
+    MAX(
+      DECODE(SUBSTR(b.dp,1,3),'K74',1,0)
+      + DECODE(b.dp,'K703',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'K74',1,0)
+      + DECODE(dgn.kycddg,'K703',1,0)
+    ) AS flag_cirr_total,
+    MAX(
+      DECODE(b.dp,'K703',1,0)
+      + DECODE(dgn.kycddg,'K703',1,0)
+    ) AS flag_cirr_alcool,
+    MAX(
+      DECODE(SUBSTR(b.dp,1,3),'F10',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'K70',1,0)
+      + DECODE(b.dp,'K860',1,0)
+      + DECODE(b.dp,'I426',1,0)
+      + DECODE(b.dp,'G621',1,0)
+      + DECODE(b.dp,'K292',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'T51',1,0)
+      + DECODE(b.dp,'Z721',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'Y90',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'Y91',1,0)
+      + DECODE(b.dp,'R780',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'F10',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'K70',1,0)
+      + DECODE(dgn.kycddg,'K860',1,0)
+      + DECODE(dgn.kycddg,'I426',1,0)
+      + DECODE(dgn.kycddg,'G621',1,0)
+      + DECODE(dgn.kycddg,'K292',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'T51',1,0)
+      + DECODE(dgn.kycddg,'Z721',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'Y90',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'Y91',1,0)
+      + DECODE(dgn.kycddg,'R780',1,0)
+    ) AS flag_patho_alcool,
+    MAX(
+      DECODE(b.dp,'F103',1,0)
+      + DECODE(dgn.kycddg,'F103',1,0)
+    ) AS flag_sevrage_simple,
+    MAX(
+      DECODE(b.dp,'F104',1,0)
+      + DECODE(dgn.kycddg,'F104',1,0)
+    ) AS flag_sevrage_complexe,
+    MAX(
+      DECODE(b.dp,'F100',1,0)
+      + DECODE(b.dp,'Z721',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'Y90',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'Y91',1,0)
+      + DECODE(b.dp,'R780',1,0)
+      + DECODE(SUBSTR(b.dp,1,3),'T51',1,0)
+      + DECODE(dgn.kycddg,'F100',1,0)
+      + DECODE(dgn.kycddg,'Z721',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'Y90',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'Y91',1,0)
+      + DECODE(dgn.kycddg,'R780',1,0)
+      + DECODE(SUBSTR(dgn.kycddg,1,3),'T51',1,0)
+    ) AS flag_conso_excessive
+  FROM
+  (
+    SELECT DISTINCT
+      rsm.kyres,
+      TO_CHAR(rsm.d8eeue,'YYYY') AS annee,
+      rsm.cddnc9 AS dp
+    FROM rsm
+    WHERE rsm.cdurm_p IN ('UMA1','UMA2')
+      AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
+      AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
+      AND EXISTS (
+        SELECT 1
+        FROM epi
+        WHERE epi.nores = rsm.kyres
+          AND epi.tyepi = 'HC'
+      )
+  ) b,
+  dgn
+  WHERE dgn.kyres(+) = b.kyres
+  GROUP BY b.annee, b.kyres
+) s
+GROUP BY s.annee
+ORDER BY s.annee;
