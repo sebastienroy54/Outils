@@ -1,10 +1,10 @@
-GHS           NB
------ ----------
-7267           4
-7268           5
-7269           5
-7271           2
-7281          27
-7282          31
-7283           8
-7284           1
+SELECT
+  SUM(DECODE(TO_CHAR(rss.numghs),'7267',1,0)+DECODE(TO_CHAR(rss.numghs),'7268',1,0)+DECODE(TO_CHAR(rss.numghs),'7269',1,0)+DECODE(TO_CHAR(rss.numghs),'7270',1,0)+DECODE(TO_CHAR(rss.numghs),'7271',1,0)+DECODE(TO_CHAR(rss.numghs),'5796',1,0)) simples,
+  SUM(DECODE(TO_CHAR(rss.numghs),'7281',1,0)+DECODE(TO_CHAR(rss.numghs),'7282',1,0)+DECODE(TO_CHAR(rss.numghs),'7283',1,0)+DECODE(TO_CHAR(rss.numghs),'7284',1,0)) complexes
+FROM rsm, rum, rss
+WHERE rsm.cdurm_p = '670'
+  AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND rum.nores = rsm.kyres
+  AND rss.kyrss = rum.kyrss
+  AND TO_CHAR(rss.numghs) IN ('7267','7268','7269','7270','7271','5796','7281','7282','7283','7284');
