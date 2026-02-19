@@ -1,38 +1,88 @@
-SQL> SELECT column_name
-  2  FROM user_tab_columns
-  3  WHERE table_name = 'RSS'
-  4  ORDER BY column_name;
+SQL> select column_name from all_tab_columns where table_name = 'RSS' order by column_name;
 
-aucune ligne sélectionnée
+COLUMN_NAME
+------------------------------
+AGEJ
+BUHCD
+CDCMD
+CDCOM2
+CDCSP
+CDERG
+CDFAM
+CDGHM
+CDRESI
+DIAGP
+DIAGR
+DIALYSE
+DUPRES
+DUSEJ
+D8DEB
+D8FIN
+D8GRP
+D8SIMBA
+ENVOI_IA
+FLAGALIMTA
+FLAGAVASTIN
+GHSMINOR
+INDORG
+INSIMBA
+KYRSS
+NAS
+NBAC
+NBACRX1
+NBACRX2
+NBACRX3
+NBACTSUPP9623
+NBACTSUPP9624
+NBACTSUPP9625
+NBACTSUPP9631
+NBACTSUPP9632
+NBACTSUPP9633
+NBAC687
+NBAC688
+NBAC689
+NBANTEPARTUM
+NBCHHYPB
+NBDIAG
+NBENT1
+NBENT2
+NBENT3
+NBHD
+NBICT
+NBJNNA
+NBJNNB
+NBJNNC
+NBJREA
+NBJSC
+NBJSI
+NBJSTF_ISSUDEREA
+NBJ_USIP
+NBJXINF
+NBJXSUP
+NBPROT
+NBPROTPED
+NBRADIOPEDIA
+NBRCMI
+NBREP
+NBSEANCE
+NBSEANCEAVANTSROS
+NBSUPP_1
+NBSUPP_2
+NOCLAS
+NODA
+NORSS
+NOSEJP
+NOVERG
+NOVERR
+NUMGHS
+PIH_A
+PIH_B
+PRESTDIALAVSROS
+SEJXINF
+SEQFIG
+SIGFG
+SIGRSS
+SIGRSSGHSFG
+TYPSEJ
 
-SQL> SELECT COUNT(DISTINCT rsm.kyres) nb
-  2  FROM rsm, rum, rss, cmp
-  3  WHERE rsm.cdurm_p = '670'
-  4    AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  5    AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  6    AND rum.nores = rsm.kyres
-  7    AND rss.kyrss = rum.kyrss
-  8    AND cmp.norss = rss.norss;
-
-        NB
-----------
-         0
-
-SQL> SELECT b.ghs, COUNT(*) nb
-  2  FROM (
-  3    SELECT DISTINCT rsm.kyres, MAX(cmp.ghs) ghs
-  4    FROM rsm, rum, rss, cmp
-  5    WHERE rsm.cdurm_p = '670'
-  6      AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  7      AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  8      AND rum.nores = rsm.kyres
-  9      AND rss.kyrss = rum.kyrss
- 10      AND cmp.norss = rss.norss
- 11    GROUP BY rsm.kyres
- 12  ) b
- 13  WHERE b.ghs IN ('7281','7267','5796','7282','7268','7283','7269','7284','7270','7271','7200','7
-272','5797','7273','7274','7275')
- 14  GROUP BY b.ghs
- 15  ORDER BY b.ghs;
-
-aucune ligne sélectionnée
+82 ligne(s) sélectionnée(s).
