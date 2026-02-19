@@ -1,12 +1,40 @@
-SET PAGESIZE 200
-SET LINESIZE 200
+COLUMN_NAME
+-----------
+CDGHM
+CDGHS
+NAS
+NUM
 
-SELECT owner, table_name, column_name
-FROM all_tab_columns
-WHERE UPPER(column_name) IN ('CDGHS','GHS','CODEGHS','KYCDGHS')
-ORDER BY owner, table_name, column_name;
-
-SELECT table_name, column_name
-FROM user_tab_columns
-WHERE UPPER(column_name) IN ('CDGHS','GHS','CODEGHS','KYCDGHS')
-ORDER BY table_name, column_name;
+COLUMN_NAME
+-----------
+AIGPSY
+CDCMD
+CDERG
+CDGHM
+DIALYS
+D8DEB
+D8FIN
+FG
+GHS
+INDETA
+INDETB
+INDORG
+INDSEJ
+INF
+NBAC687
+NBAC688
+NBAC689
+NBHJO
+NBJOUR
+NBRUM
+NBSEAN
+NOCLAS
+NODA
+NOHOP
+NOREPR
+NORSS
+NOVERG
+NOVERR
+REA
+SUP
+TYDOS
