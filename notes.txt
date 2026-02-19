@@ -1,40 +1,29 @@
-COLUMN_NAME
------------
-CDGHM
-CDGHS
-NAS
-NUM
+SELECT column_name
+FROM user_tab_columns
+WHERE table_name = 'RSS'
+ORDER BY column_name;
 
-COLUMN_NAME
------------
-AIGPSY
-CDCMD
-CDERG
-CDGHM
-DIALYS
-D8DEB
-D8FIN
-FG
-GHS
-INDETA
-INDETB
-INDORG
-INDSEJ
-INF
-NBAC687
-NBAC688
-NBAC689
-NBHJO
-NBJOUR
-NBRUM
-NBSEAN
-NOCLAS
-NODA
-NOHOP
-NOREPR
-NORSS
-NOVERG
-NOVERR
-REA
-SUP
-TYDOS
+SELECT COUNT(DISTINCT rsm.kyres) nb
+FROM rsm, rum, rss, cmp
+WHERE rsm.cdurm_p = '670'
+  AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND rum.nores = rsm.kyres
+  AND rss.kyrss = rum.kyrss
+  AND cmp.norss = rss.norss;
+
+SELECT b.ghs, COUNT(*) nb
+FROM (
+  SELECT DISTINCT rsm.kyres, MAX(cmp.ghs) ghs
+  FROM rsm, rum, rss, cmp
+  WHERE rsm.cdurm_p = '670'
+    AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
+    AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
+    AND rum.nores = rsm.kyres
+    AND rss.kyrss = rum.kyrss
+    AND cmp.norss = rss.norss
+  GROUP BY rsm.kyres
+) b
+WHERE b.ghs IN ('7281','7267','5796','7282','7268','7283','7269','7284','7270','7271','7200','7272','5797','7273','7274','7275')
+GROUP BY b.ghs
+ORDER BY b.ghs;
