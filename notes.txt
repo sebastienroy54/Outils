@@ -1,7 +1,3 @@
-Devant de résultats inhabituels d’ISO post césarienne au 1er semestre 2025( Codes CCAM: JQGA) , il a été décidé d’étendre la surveillance au 2eme semestre  2025…
-Du coup : pour les césariennes réalisées entre le 01/07/25 et le 31/12/2025, pourrais-tu me communiquer les READMISSIONS jusque 1 mois apres c’est-à-dire le 31/01/2026 SVP
-
-
 SET HEADING ON
 SET FEEDBACK OFF
 SET PAGESIZE 6000
@@ -10,48 +6,6 @@ SET COLSEP ';'
 SET TRIMSPOOL ON
 SET WRAP OFF
 SET TERMOUT OFF
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\surveillance_iso_2025.csv
-SELECT DISTINCT
-    ri.NOIP AS IPP,
-    ri.NODA AS NDA_index,
-    ri.D8EEUE AS date_entree_index,
-    ei.UE AS UH_index,
-    rac.KYCDAC AS acte_ccam,
-    CASE
-        WHEN rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' THEN 'NEPHRECTOMIE'
-        WHEN rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%' THEN 'PROSTATECTOMIE'
-        WHEN rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%' THEN 'HYSTERECTOMIE'
-        WHEN rac.KYCDAC LIKE 'JQGA%' THEN 'CESARIENNE'
-        ELSE 'AUTRE'
-    END AS type_intervention,
-    r2.NODA AS NDA_rehospi,
-    r2.D8EEUE AS date_entree_rehospi,
-    ROUND(r2.D8EEUE - ri.D8EEUE) AS nb_jours_apres_index
-FROM RSM ri, EPI ei, RAC rac, RSM r2
-WHERE ri.NODA = ei.KYNODA
-  AND ri.KYRES = rac.KYRES
-  AND (
-        rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' OR
-        rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%' OR
-        rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%' OR
-        rac.KYCDAC LIKE 'JQGA%'
-      )
-  AND (
-        (rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' OR 
-         rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%')
-        AND ei.UE IN ('592','580','586','598','798','171','176','330','A02')
-        OR
-        (rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%')
-        AND ei.UE IN ('500','553','564','702','804','830','831','954','465','182','401','484')
-        OR
-        (rac.KYCDAC LIKE 'JQGA%')
-        AND ei.UE IN ('443','877','785','875','871','863','864','435','878','776','869','886')
-      )
-  AND ri.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND ri.D8EEUE <= TRUNC(SYSDATE)
-  AND r2.NOIP = ri.NOIP
-  AND r2.NODA <> ri.NODA
-  AND r2.D8EEUE > ri.D8EEUE
-  AND r2.D8EEUE <= ri.D8EEUE + 30
-ORDER BY type_intervention;
-SPOOL OFF;
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\surveillance_iso_cesar_2025S2.csv
+SELECT DISTINCT ri.noip ipp, ri.noda nda_index, ri.d8eeue date_entree_index, ei.ue uh_index, rac.kycdac acte_ccam, 'CESARIENNE' type_intervention, r2.noda nda_rehospi, r2.d8eeue date_entree_rehospi, ROUND(r2.d8eeue-ri.d8eeue) nb_jours_apres_index FROM rsm ri, epi ei, rac rac, rsm r2 WHERE ri.noda=ei.kynoda AND ri.kyres=rac.kyres AND rac.kycdac LIKE 'JQGA%' AND ei.ue IN ('443','877','785','875','871','863','864','435','878','776','869','886') AND ri.d8eeue >= TO_DATE('01/07/2025','DD/MM/YYYY') AND ri.d8eeue < TO_DATE('01/01/2026','DD/MM/YYYY') AND r2.noip=ri.noip AND r2.noda<>ri.noda AND r2.d8eeue>ri.d8eeue AND r2.d8eeue<=ri.d8eeue+30 AND r2.d8eeue < TO_DATE('01/02/2026','DD/MM/YYYY') ORDER BY ri.noip, ri.d8eeue, r2.d8eeue;
+SPOOL OFF
