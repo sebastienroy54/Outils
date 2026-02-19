@@ -1,24 +1,12 @@
-GHS	GHM	LIBELLE	sevrage
-7281	20Z041	Ethylisme avec dépendance, niveau 1	complexe
-7267	20Z041	Ethylisme avec dépendance, niveau 1	simple
-5796	20Z041	Ethylisme avec dépendance, niveau 1	0 nuit
-7282	20Z042	Ethylisme avec dépendance, niveau 2	complexe
-7268	20Z042	Ethylisme avec dépendance, niveau 2	simple
-5796	20Z042	Ethylisme avec dépendance, niveau 2	0 nuit
-7283	20Z043	Ethylisme avec dépendance, niveau 3	complexe
-7269	20Z043	Ethylisme avec dépendance, niveau 3	simple
-5796	20Z043	Ethylisme avec dépendance, niveau 3	0 nuit
-7284	20Z044	Ethylisme avec dépendance, niveau 4	complexe
-7270	20Z044	Ethylisme avec dépendance, niveau 4	simple
-5796	20Z044	Ethylisme avec dépendance, niveau 4	0 nuit
-7271	20Z04T	Ethylisme avec dépendance, très courte durée	simple
-5796	20Z04T	Ethylisme avec dépendance, très courte durée	0 nuit
-7200	20Z051	Ethylisme aigu, niveau 1	conso excessive
-7272	20Z051	Ethylisme aigu, niveau 1	conso excessive
-5797	20Z051	Ethylisme aigu, niveau 1	conso excessive
-7273	20Z052	Ethylisme aigu, niveau 2	conso excessive
-5797	20Z052	Ethylisme aigu, niveau 2	conso excessive
-7274	20Z053	Ethylisme aigu, niveau 3	conso excessive
-5797	20Z053	Ethylisme aigu, niveau 3	conso excessive
-7275	20Z054	Ethylisme aigu, niveau 4	conso excessive
-5797	20Z054	Ethylisme aigu, niveau 4	conso excessive
+SET PAGESIZE 200
+SET LINESIZE 200
+
+SELECT owner, table_name, column_name
+FROM all_tab_columns
+WHERE UPPER(column_name) IN ('CDGHS','GHS','CODEGHS','KYCDGHS')
+ORDER BY owner, table_name, column_name;
+
+SELECT table_name, column_name
+FROM user_tab_columns
+WHERE UPPER(column_name) IN ('CDGHS','GHS','CODEGHS','KYCDGHS')
+ORDER BY table_name, column_name;
