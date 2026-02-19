@@ -1,10 +1,91 @@
 SELECT
-  SUM(DECODE(TO_CHAR(rss.numghs),'7267',1,0)+DECODE(TO_CHAR(rss.numghs),'7268',1,0)+DECODE(TO_CHAR(rss.numghs),'7269',1,0)+DECODE(TO_CHAR(rss.numghs),'7270',1,0)+DECODE(TO_CHAR(rss.numghs),'7271',1,0)+DECODE(TO_CHAR(rss.numghs),'5796',1,0)) simples,
-  SUM(DECODE(TO_CHAR(rss.numghs),'7281',1,0)+DECODE(TO_CHAR(rss.numghs),'7282',1,0)+DECODE(TO_CHAR(rss.numghs),'7283',1,0)+DECODE(TO_CHAR(rss.numghs),'7284',1,0)) complexes
-FROM rsm, rum, rss
-WHERE rsm.cdurm_p = '670'
-  AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND rum.nores = rsm.kyres
-  AND rss.kyrss = rum.kyrss
-  AND TO_CHAR(rss.numghs) IN ('7267','7268','7269','7270','7271','5796','7281','7282','7283','7284');
+  s.annee,
+  COUNT(*) nb_sejours_total,
+  SUM(s.flag_cirr_total) nb_sejours_cirr_total,
+  SUM(s.flag_cirr_alcool) nb_sejours_cirr_alcool,
+  ROUND(100*SUM(s.flag_cirr_alcool)/DECODE(SUM(s.flag_cirr_total),0,NULL,SUM(s.flag_cirr_total)),1) pct_cirr_alcool_vs_cirr,
+  ROUND(100*SUM(s.flag_cirr_alcool)/DECODE(COUNT(*),0,NULL,COUNT(*)),1) pct_cirr_alcool_vs_total,
+  SUM(s.flag_patho_alcool) nb_sejours_patho_alcool,
+  ROUND(100*SUM(s.flag_patho_alcool)/DECODE(COUNT(*),0,NULL,COUNT(*)),1) pct_patho_alcool_vs_total,
+  SUM(s.flag_sevrage_simple) nb_sevrages_simples,
+  SUM(s.flag_sevrage_complexe) nb_sevrages_complexes,
+  SUM(s.flag_conso_excessive) nb_sejours_conso_excessive
+FROM (
+  SELECT
+    b.annee,
+    b.kyres,
+
+    MAX(
+      DECODE(b.dp,'K700',1,0)+DECODE(b.dp,'K703',1,0)+DECODE(b.dp,'K717',1,0)+DECODE(SUBSTR(b.dp,1,3),'K74',1,0)
+    + DECODE(dgn.kycddg,'K700',1,0)+DECODE(dgn.kycddg,'K703',1,0)+DECODE(dgn.kycddg,'K717',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'K74',1,0)
+    ) flag_cirr_total,
+
+    MAX(
+      DECODE(b.dp,'K700',1,0)+DECODE(b.dp,'K703',1,0)
+    + DECODE(dgn.kycddg,'K700',1,0)+DECODE(dgn.kycddg,'K703',1,0)
+    ) flag_cirr_alcool,
+
+    MAX(
+      DECODE(SUBSTR(b.dp,1,4),'F107',1,0)+DECODE(b.dp,'F108',1,0)+DECODE(b.dp,'F109',1,0)
+    + DECODE(b.dp,'G312',1,0)+DECODE(b.dp,'G621',1,0)+DECODE(b.dp,'G721',1,0)
+    + DECODE(b.dp,'I426',1,0)
+    + DECODE(b.dp,'K292',1,0)
+    + DECODE(b.dp,'K700',1,0)+DECODE(b.dp,'K701',1,0)+DECODE(b.dp,'K702',1,0)+DECODE(b.dp,'K703',1,0)+DECODE(b.dp,'K704',1,0)+DECODE(b.dp,'K709',1,0)
+    + DECODE(b.dp,'K852',1,0)+DECODE(b.dp,'K860',1,0)
+    + DECODE(b.dp,'O354',1,0)+DECODE(b.dp,'P043',1,0)+DECODE(b.dp,'Q860',1,0)
+    + DECODE(b.dp,'R780',1,0)
+    + DECODE(b.dp,'T510',1,0)+DECODE(b.dp,'T518',1,0)+DECODE(b.dp,'T519',1,0)
+    + DECODE(SUBSTR(b.dp,1,3),'X45',1,0)+DECODE(SUBSTR(b.dp,1,3),'X65',1,0)+DECODE(SUBSTR(b.dp,1,3),'Y15',1,0)
+    + DECODE(b.dp,'Y573',1,0)
+    + DECODE(SUBSTR(b.dp,1,3),'Y90',1,0)+DECODE(SUBSTR(b.dp,1,3),'Y91',1,0)
+    + DECODE(b.dp,'Z040',1,0)+DECODE(b.dp,'Z502',1,0)+DECODE(b.dp,'Z714',1,0)+DECODE(b.dp,'Z721',1,0)+DECODE(b.dp,'Z811',1,0)
+
+    + DECODE(SUBSTR(dgn.kycddg,1,4),'F107',1,0)+DECODE(dgn.kycddg,'F108',1,0)+DECODE(dgn.kycddg,'F109',1,0)
+    + DECODE(dgn.kycddg,'G312',1,0)+DECODE(dgn.kycddg,'G621',1,0)+DECODE(dgn.kycddg,'G721',1,0)
+    + DECODE(dgn.kycddg,'I426',1,0)
+    + DECODE(dgn.kycddg,'K292',1,0)
+    + DECODE(dgn.kycddg,'K700',1,0)+DECODE(dgn.kycddg,'K701',1,0)+DECODE(dgn.kycddg,'K702',1,0)+DECODE(dgn.kycddg,'K703',1,0)+DECODE(dgn.kycddg,'K704',1,0)+DECODE(dgn.kycddg,'K709',1,0)
+    + DECODE(dgn.kycddg,'K852',1,0)+DECODE(dgn.kycddg,'K860',1,0)
+    + DECODE(dgn.kycddg,'O354',1,0)+DECODE(dgn.kycddg,'P043',1,0)+DECODE(dgn.kycddg,'Q860',1,0)
+    + DECODE(dgn.kycddg,'R780',1,0)
+    + DECODE(dgn.kycddg,'T510',1,0)+DECODE(dgn.kycddg,'T518',1,0)+DECODE(dgn.kycddg,'T519',1,0)
+    + DECODE(SUBSTR(dgn.kycddg,1,3),'X45',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'X65',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'Y15',1,0)
+    + DECODE(dgn.kycddg,'Y573',1,0)
+    + DECODE(SUBSTR(dgn.kycddg,1,3),'Y90',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'Y91',1,0)
+    + DECODE(dgn.kycddg,'Z040',1,0)+DECODE(dgn.kycddg,'Z502',1,0)+DECODE(dgn.kycddg,'Z714',1,0)+DECODE(dgn.kycddg,'Z721',1,0)+DECODE(dgn.kycddg,'Z811',1,0)
+    ) flag_patho_alcool,
+
+    MAX(
+      DECODE(b.ghs,'7267',1,0)+DECODE(b.ghs,'7268',1,0)+DECODE(b.ghs,'7269',1,0)+DECODE(b.ghs,'7270',1,0)+DECODE(b.ghs,'7271',1,0)+DECODE(b.ghs,'5796',1,0)
+    ) flag_sevrage_simple,
+
+    MAX(
+      DECODE(b.ghs,'7281',1,0)+DECODE(b.ghs,'7282',1,0)+DECODE(b.ghs,'7283',1,0)+DECODE(b.ghs,'7284',1,0)
+    ) flag_sevrage_complexe,
+
+    MAX(
+      DECODE(b.cdghm,'20Z051',1,0)+DECODE(b.cdghm,'20Z052',1,0)+DECODE(b.cdghm,'20Z053',1,0)+DECODE(b.cdghm,'20Z054',1,0)
+    ) flag_conso_excessive
+
+  FROM
+  (
+    SELECT
+      rsm.kyres,
+      TO_CHAR(rsm.d8eeue,'YYYY') annee,
+      rsm.cddnc9 dp,
+      MAX(rss.cdghm) cdghm,
+      TO_CHAR(MAX(rss.numghs)) ghs
+    FROM rsm, rum, rss
+    WHERE rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
+      AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
+      AND rsm.cdurm_p = '670'
+      AND rum.nores = rsm.kyres
+      AND rss.kyrss = rum.kyrss
+    GROUP BY rsm.kyres, TO_CHAR(rsm.d8eeue,'YYYY'), rsm.cddnc9
+  ) b,
+  dgn
+  WHERE dgn.kyres(+) = b.kyres
+  GROUP BY b.annee, b.kyres
+) s
+GROUP BY s.annee
+ORDER BY s.annee;
