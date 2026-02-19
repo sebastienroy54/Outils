@@ -1,10 +1,10 @@
-SELECT TO_CHAR(rss.numghs) ghs, COUNT(*) nb
-FROM rsm, rum, rss
-WHERE rsm.cdurm_p = '670'
-  AND rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND rum.nores = rsm.kyres
-  AND rss.kyrss = rum.kyrss
-  AND TO_CHAR(rss.numghs) IN ('7281','7267','5796','7282','7268','7283','7269','7284','7270','7271','7272','5797','7273','7274','7275','7200')
-GROUP BY TO_CHAR(rss.numghs)
-ORDER BY ghs;
+GHS           NB
+----- ----------
+7267           4
+7268           5
+7269           5
+7271           2
+7281          27
+7282          31
+7283           8
+7284           1
