@@ -1,90 +1,57 @@
-SELECT
-  s.annee,
-  COUNT(*) nb_sejours_total_rss,
-  SUM(s.flag_cirr_total) nb_sejours_cirr_total,
-  SUM(s.flag_cirr_alcool) nb_sejours_cirr_alcool,
-  ROUND(100*SUM(s.flag_cirr_alcool)/DECODE(SUM(s.flag_cirr_total),0,NULL,SUM(s.flag_cirr_total)),1) pct_cirr_alcool_vs_cirr,
-  ROUND(100*SUM(s.flag_cirr_alcool)/DECODE(COUNT(*),0,NULL,COUNT(*)),1) pct_cirr_alcool_vs_total,
-  SUM(s.flag_patho_alcool) nb_sejours_patho_alcool,
-  ROUND(100*SUM(s.flag_patho_alcool)/DECODE(COUNT(*),0,NULL,COUNT(*)),1) pct_patho_alcool_vs_total,
-  SUM(s.flag_sevrage_simple) nb_sevrages_simples,
-  SUM(s.flag_sevrage_complexe) nb_sevrages_complexes,
-  SUM(s.flag_conso_excessive) nb_sejours_conso_excessive
-FROM (
-  SELECT
-    b.annee,
-    b.kyrss,
+Devant de résultats inhabituels d’ISO post césarienne au 1er semestre 2025( Codes CCAM: JQGA) , il a été décidé d’étendre la surveillance au 2eme semestre  2025…
+Du coup : pour les césariennes réalisées entre le 01/07/25 et le 31/12/2025, pourrais-tu me communiquer les READMISSIONS jusque 1 mois apres c’est-à-dire le 31/01/2026 SVP
 
-    MAX(
-      DECODE(b.dp,'K700',1,0)+DECODE(b.dp,'K703',1,0)+DECODE(b.dp,'K717',1,0)+DECODE(SUBSTR(b.dp,1,3),'K74',1,0)
-    + DECODE(dgn.kycddg,'K700',1,0)+DECODE(dgn.kycddg,'K703',1,0)+DECODE(dgn.kycddg,'K717',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'K74',1,0)
-    ) flag_cirr_total,
 
-    MAX(
-      DECODE(b.dp,'K700',1,0)+DECODE(b.dp,'K703',1,0)
-    + DECODE(dgn.kycddg,'K700',1,0)+DECODE(dgn.kycddg,'K703',1,0)
-    ) flag_cirr_alcool,
-
-    MAX(
-      DECODE(SUBSTR(b.dp,1,4),'F107',1,0)+DECODE(b.dp,'F108',1,0)+DECODE(b.dp,'F109',1,0)
-    + DECODE(b.dp,'G312',1,0)+DECODE(b.dp,'G621',1,0)+DECODE(b.dp,'G721',1,0)
-    + DECODE(b.dp,'I426',1,0)
-    + DECODE(b.dp,'K292',1,0)
-    + DECODE(b.dp,'K700',1,0)+DECODE(b.dp,'K701',1,0)+DECODE(b.dp,'K702',1,0)+DECODE(b.dp,'K703',1,0)+DECODE(b.dp,'K704',1,0)+DECODE(b.dp,'K709',1,0)
-    + DECODE(b.dp,'K852',1,0)+DECODE(b.dp,'K860',1,0)
-    + DECODE(b.dp,'O354',1,0)+DECODE(b.dp,'P043',1,0)+DECODE(b.dp,'Q860',1,0)
-    + DECODE(b.dp,'R780',1,0)
-    + DECODE(b.dp,'T510',1,0)+DECODE(b.dp,'T518',1,0)+DECODE(b.dp,'T519',1,0)
-    + DECODE(SUBSTR(b.dp,1,3),'X45',1,0)+DECODE(SUBSTR(b.dp,1,3),'X65',1,0)+DECODE(SUBSTR(b.dp,1,3),'Y15',1,0)
-    + DECODE(b.dp,'Y573',1,0)
-    + DECODE(SUBSTR(b.dp,1,3),'Y90',1,0)+DECODE(SUBSTR(b.dp,1,3),'Y91',1,0)
-    + DECODE(b.dp,'Z040',1,0)+DECODE(b.dp,'Z502',1,0)+DECODE(b.dp,'Z714',1,0)+DECODE(b.dp,'Z721',1,0)+DECODE(b.dp,'Z811',1,0)
-
-    + DECODE(SUBSTR(dgn.kycddg,1,4),'F107',1,0)+DECODE(dgn.kycddg,'F108',1,0)+DECODE(dgn.kycddg,'F109',1,0)
-    + DECODE(dgn.kycddg,'G312',1,0)+DECODE(dgn.kycddg,'G621',1,0)+DECODE(dgn.kycddg,'G721',1,0)
-    + DECODE(dgn.kycddg,'I426',1,0)
-    + DECODE(dgn.kycddg,'K292',1,0)
-    + DECODE(dgn.kycddg,'K700',1,0)+DECODE(dgn.kycddg,'K701',1,0)+DECODE(dgn.kycddg,'K702',1,0)+DECODE(dgn.kycddg,'K703',1,0)+DECODE(dgn.kycddg,'K704',1,0)+DECODE(dgn.kycddg,'K709',1,0)
-    + DECODE(dgn.kycddg,'K852',1,0)+DECODE(dgn.kycddg,'K860',1,0)
-    + DECODE(dgn.kycddg,'O354',1,0)+DECODE(dgn.kycddg,'P043',1,0)+DECODE(dgn.kycddg,'Q860',1,0)
-    + DECODE(dgn.kycddg,'R780',1,0)
-    + DECODE(dgn.kycddg,'T510',1,0)+DECODE(dgn.kycddg,'T518',1,0)+DECODE(dgn.kycddg,'T519',1,0)
-    + DECODE(SUBSTR(dgn.kycddg,1,3),'X45',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'X65',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'Y15',1,0)
-    + DECODE(dgn.kycddg,'Y573',1,0)
-    + DECODE(SUBSTR(dgn.kycddg,1,3),'Y90',1,0)+DECODE(SUBSTR(dgn.kycddg,1,3),'Y91',1,0)
-    + DECODE(dgn.kycddg,'Z040',1,0)+DECODE(dgn.kycddg,'Z502',1,0)+DECODE(dgn.kycddg,'Z714',1,0)+DECODE(dgn.kycddg,'Z721',1,0)+DECODE(dgn.kycddg,'Z811',1,0)
-    ) flag_patho_alcool,
-
-    MAX(
-      DECODE(b.ghs,'7267',1,0)+DECODE(b.ghs,'7268',1,0)+DECODE(b.ghs,'7269',1,0)+DECODE(b.ghs,'7270',1,0)+DECODE(b.ghs,'7271',1,0)+DECODE(b.ghs,'5796',1,0)
-    ) flag_sevrage_simple,
-
-    MAX(
-      DECODE(b.ghs,'7281',1,0)+DECODE(b.ghs,'7282',1,0)+DECODE(b.ghs,'7283',1,0)+DECODE(b.ghs,'7284',1,0)
-    ) flag_sevrage_complexe,
-
-    MAX(
-      DECODE(b.cdghm,'20Z051',1,0)+DECODE(b.cdghm,'20Z052',1,0)+DECODE(b.cdghm,'20Z053',1,0)+DECODE(b.cdghm,'20Z054',1,0)
-    ) flag_conso_excessive
-  FROM
-  (
-    SELECT
-      TO_CHAR(rsm.d8eeue,'YYYY') annee,
-      rss.kyrss kyrss,
-      rsm.cddnc9 dp,
-      rss.cdghm cdghm,
-      TO_CHAR(rss.numghs) ghs,
-      rsm.kyres kyres
-    FROM rsm, rum, rss
-    WHERE rsm.d8eeue >= TO_DATE('01/01/2024','DD/MM/YYYY')
-      AND rsm.d8eeue <  TO_DATE('01/01/2026','DD/MM/YYYY')
-      AND rsm.cdurm_p = '670'
-      AND rum.nores = rsm.kyres
-      AND rss.kyrss = rum.kyrss
-  ) b,
-  dgn
-  WHERE dgn.kyres(+) = b.kyres
-  GROUP BY b.annee, b.kyrss
-) s
-GROUP BY s.annee
-ORDER BY s.annee;
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\surveillance_iso_2025.csv
+SELECT DISTINCT
+    ri.NOIP AS IPP,
+    ri.NODA AS NDA_index,
+    ri.D8EEUE AS date_entree_index,
+    ei.UE AS UH_index,
+    rac.KYCDAC AS acte_ccam,
+    CASE
+        WHEN rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' THEN 'NEPHRECTOMIE'
+        WHEN rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%' THEN 'PROSTATECTOMIE'
+        WHEN rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%' THEN 'HYSTERECTOMIE'
+        WHEN rac.KYCDAC LIKE 'JQGA%' THEN 'CESARIENNE'
+        ELSE 'AUTRE'
+    END AS type_intervention,
+    r2.NODA AS NDA_rehospi,
+    r2.D8EEUE AS date_entree_rehospi,
+    ROUND(r2.D8EEUE - ri.D8EEUE) AS nb_jours_apres_index
+FROM RSM ri, EPI ei, RAC rac, RSM r2
+WHERE ri.NODA = ei.KYNODA
+  AND ri.KYRES = rac.KYRES
+  AND (
+        rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' OR
+        rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%' OR
+        rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%' OR
+        rac.KYCDAC LIKE 'JQGA%'
+      )
+  AND (
+        (rac.KYCDAC LIKE 'JAFA%' OR rac.KYCDAC LIKE 'JAFC%' OR 
+         rac.KYCDAC LIKE 'JGFA%' OR rac.KYCDAC LIKE 'JGFC%')
+        AND ei.UE IN ('592','580','586','598','798','171','176','330','A02')
+        OR
+        (rac.KYCDAC LIKE 'JKFA%' OR rac.KYCDAC LIKE 'JKFC%')
+        AND ei.UE IN ('500','553','564','702','804','830','831','954','465','182','401','484')
+        OR
+        (rac.KYCDAC LIKE 'JQGA%')
+        AND ei.UE IN ('443','877','785','875','871','863','864','435','878','776','869','886')
+      )
+  AND ri.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND ri.D8EEUE <= TRUNC(SYSDATE)
+  AND r2.NOIP = ri.NOIP
+  AND r2.NODA <> ri.NODA
+  AND r2.D8EEUE > ri.D8EEUE
+  AND r2.D8EEUE <= ri.D8EEUE + 30
+ORDER BY type_intervention;
+SPOOL OFF;
