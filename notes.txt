@@ -1,11 +1,1 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\surveillance_iso_cesar_2025S2.csv
-SELECT DISTINCT ri.noip ipp, ri.noda nda_index, ri.d8eeue date_entree_index, ei.ue uh_index, rac.kycdac acte_ccam, 'CESARIENNE' type_intervention, r2.noda nda_rehospi, r2.d8eeue date_entree_rehospi, ROUND(r2.d8eeue-ri.d8eeue) nb_jours_apres_index FROM rsm ri, epi ei, rac rac, rsm r2 WHERE ri.noda=ei.kynoda AND ri.kyres=rac.kyres AND rac.kycdac LIKE 'JQGA%' AND ei.ue IN ('443','877','785','875','871','863','864','435','878','776','869','886') AND ri.d8eeue >= TO_DATE('01/07/2025','DD/MM/YYYY') AND ri.d8eeue < TO_DATE('01/01/2026','DD/MM/YYYY') AND r2.noip=ri.noip AND r2.noda<>ri.noda AND r2.d8eeue>ri.d8eeue AND r2.d8eeue<=ri.d8eeue+30 AND r2.d8eeue < TO_DATE('01/02/2026','DD/MM/YYYY') ORDER BY ri.noip, ri.d8eeue, r2.d8eeue;
-SPOOL OFF
+Service	Libellé du service	Code de l'UH	Libellé de l'UH	NIP	Patient	Date de réalisation	NDA	Code de l'acte	Code phase	Libellé de l'acte	UH de demande	Référence produit	Libellé produit	Référence fournisseur	Libellé forunisseur	Code LPP	Code DC	Indicateur	Quantité	Gratuit	Echec pose	Déstérilisé	N° lot / N° série	N° lot	N°série	Prix	TVA	Code ATIH	Indication
