@@ -1,1 +1,28 @@
-sudo find / -maxdepth 3 -type f -name "1" -ls 2>/dev/null | head
+root@g12-dim-p001:~:[0]$ sudo find / -maxdepth 3 -type f -name "1" -ls 2>/dev/null | head
+  3960886      4 -rw-r--r--   1 root     root          762 févr. 20 08:00 /root/1
+root@g12-dim-p001:~:[0]$ ls /root/1
+/root/1
+root@g12-dim-p001:~:[0]$ ls /root/1/
+ls: impossible d'accéder à '/root/1/': N'est pas un dossier
+root@g12-dim-p001:~:[0]$ tail -n 200 /root/1
+[ Info: compute_exh for cch, force = false, recipients_group = 2, remontee = missing
+ERROR: ArgumentError: invalid index: nothing of type Nothing
+Stacktrace:
+ [1] to_index(i::Nothing)
+   @ Base ./indices.jl:315
+ [2] to_index(A::CSV.File, i::Nothing)
+   @ Base ./indices.jl:292
+ [3] to_indices
+   @ ./indices.jl:368 [inlined]
+ [4] to_indices
+   @ ./indices.jl:360 [inlined]
+ [5] getindex
+   @ ./abstractarray.jl:1342 [inlined]
+ [6] get_info_remontee(date_or_remontee::Date)
+   @ Main /home/julia/exh/exh.jl:134
+ [7] compute_exh(site::String, force::Bool, recipients_group::Int64, remontee::Missing, to::TimerOutput)
+   @ Main /home/julia/exh/exh.jl:582
+ [8] main(ARGS::Vector{String})
+   @ Main /home/julia/exh/exh.jl:1141
+ [9] _start()
+   @ Base ./client.jl:556
