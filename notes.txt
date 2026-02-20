@@ -4,3 +4,231 @@ Je reviens sur votre volonté d’automatisation : une automatisation intégrale
 •	Pas évident que le format de la source PUI soit constant
 •	On a vu que parfois un autre LPP correspondant à un DMI semblable était présent. Par exemple pour notre implant cochléaire 3299070, le 3239865 équivalent était souvent codé. Je vous l’ai dit et vous vous avez intégré cela dans votre code (ou alors vous avez choisi la méthode des euros ?). Mais il y a possiblement une douzaine de LPP équivalents, qui se présenterons peut-être plus tard, et nouveaux LPP apparaissent au fil du temps. Et leurs prix peuvent changer.
 •	Là on n’a ciblé que quatre LPP précis car Marion avait repéré que ceux-là étaient en écarts. Ce sera peut-être d’autres LPP ensuite avec de nouveaux particularismes.
+
+
+root@g12-dim-p001:~:[0]$ systemctl status cron --no-pager
+● cron.service - Regular background program processing daemon
+     Loaded: loaded (/lib/systemd/system/cron.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-01-02 15:25:13 CET; 1 month 18 days ago
+       Docs: man:cron(8)
+   Main PID: 604 (cron)
+      Tasks: 1 (limit: 38431)
+     Memory: 471.0M
+        CPU: 1h 5min 43.739s
+     CGroup: /system.slice/cron.service
+             └─604 /usr/sbin/cron -f
+
+févr. 20 08:30:01 g12-dim-p001 CRON[581908]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.…v/null; fi)
+févr. 20 08:30:01 g12-dim-p001 CRON[581907]: pam_unix(cron:session): session closed for user root
+févr. 20 09:17:01 g12-dim-p001 CRON[582291]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 09:17:01 g12-dim-p001 CRON[582291]: pam_unix(cron:session): session closed for user root
+févr. 20 09:30:01 g12-dim-p001 CRON[582371]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 09:30:01 g12-dim-p001 CRON[582371]: pam_unix(cron:session): session closed for user root
+févr. 20 10:17:01 g12-dim-p001 CRON[582904]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 10:17:01 g12-dim-p001 CRON[582904]: pam_unix(cron:session): session closed for user root
+févr. 20 10:30:01 g12-dim-p001 CRON[582986]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 10:30:01 g12-dim-p001 CRON[582986]: pam_unix(cron:session): session closed for user root
+Hint: Some lines were ellipsized, use -l to show in full.
+root@g12-dim-p001:~:[0]$ grep -i cron /var/log/syslog | tail -n 200
+grep: /var/log/syslog: Aucun fichier ou dossier de ce type
+root@g12-dim-p001:~:[0]$ journalctl -u cron --since "2026-01-28" --no-pager | tail -n 200
+févr. 18 09:30:01 g12-dim-p001 CRON[558767]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 09:30:01 g12-dim-p001 CRON[558767]: pam_unix(cron:session): session closed for user root
+févr. 18 10:17:01 g12-dim-p001 CRON[559334]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 10:17:01 g12-dim-p001 CRON[559334]: pam_unix(cron:session): session closed for user root
+févr. 18 10:30:01 g12-dim-p001 CRON[559436]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 10:30:01 g12-dim-p001 CRON[559436]: pam_unix(cron:session): session closed for user root
+févr. 18 11:17:01 g12-dim-p001 CRON[559818]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 11:17:01 g12-dim-p001 CRON[559818]: pam_unix(cron:session): session closed for user root
+févr. 18 11:30:01 g12-dim-p001 CRON[559898]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 11:30:01 g12-dim-p001 CRON[559898]: pam_unix(cron:session): session closed for user root
+févr. 18 12:17:01 g12-dim-p001 CRON[560277]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 12:17:01 g12-dim-p001 CRON[560278]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 18 12:17:01 g12-dim-p001 CRON[560277]: pam_unix(cron:session): session closed for user root
+févr. 18 12:30:01 g12-dim-p001 CRON[560357]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 12:30:01 g12-dim-p001 CRON[560357]: pam_unix(cron:session): session closed for user root
+févr. 18 13:17:01 g12-dim-p001 CRON[560738]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 13:17:01 g12-dim-p001 CRON[560738]: pam_unix(cron:session): session closed for user root
+févr. 18 13:30:01 g12-dim-p001 CRON[560819]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 13:30:01 g12-dim-p001 CRON[560820]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 18 13:30:01 g12-dim-p001 CRON[560819]: pam_unix(cron:session): session closed for user root
+févr. 18 14:17:01 g12-dim-p001 CRON[561209]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 14:17:01 g12-dim-p001 CRON[561209]: pam_unix(cron:session): session closed for user root
+févr. 18 14:30:01 g12-dim-p001 CRON[561292]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 14:30:01 g12-dim-p001 CRON[561292]: pam_unix(cron:session): session closed for user root
+févr. 18 15:17:01 g12-dim-p001 CRON[561682]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 15:17:01 g12-dim-p001 CRON[561682]: pam_unix(cron:session): session closed for user root
+févr. 18 15:30:01 g12-dim-p001 CRON[561761]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 15:30:01 g12-dim-p001 CRON[561761]: pam_unix(cron:session): session closed for user root
+févr. 18 16:17:01 g12-dim-p001 CRON[562148]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 16:17:01 g12-dim-p001 CRON[562148]: pam_unix(cron:session): session closed for user root
+févr. 18 16:30:01 g12-dim-p001 CRON[562226]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 16:30:01 g12-dim-p001 CRON[562226]: pam_unix(cron:session): session closed for user root
+févr. 18 17:17:01 g12-dim-p001 CRON[562610]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 17:17:01 g12-dim-p001 CRON[562610]: pam_unix(cron:session): session closed for user root
+févr. 18 17:30:01 g12-dim-p001 CRON[562742]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 17:30:01 g12-dim-p001 CRON[562743]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 18 17:30:01 g12-dim-p001 CRON[562742]: pam_unix(cron:session): session closed for user root
+févr. 18 18:17:01 g12-dim-p001 CRON[563123]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 18:17:01 g12-dim-p001 CRON[563123]: pam_unix(cron:session): session closed for user root
+févr. 18 18:30:01 g12-dim-p001 CRON[563202]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 18:30:01 g12-dim-p001 CRON[563202]: pam_unix(cron:session): session closed for user root
+févr. 18 19:17:01 g12-dim-p001 CRON[563583]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 19:17:02 g12-dim-p001 CRON[563583]: pam_unix(cron:session): session closed for user root
+févr. 18 19:30:01 g12-dim-p001 CRON[563664]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 19:30:01 g12-dim-p001 CRON[563664]: pam_unix(cron:session): session closed for user root
+févr. 18 20:17:01 g12-dim-p001 CRON[564044]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 20:17:01 g12-dim-p001 CRON[564045]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 18 20:17:01 g12-dim-p001 CRON[564044]: pam_unix(cron:session): session closed for user root
+févr. 18 20:30:01 g12-dim-p001 CRON[564127]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 20:30:01 g12-dim-p001 CRON[564127]: pam_unix(cron:session): session closed for user root
+févr. 18 21:17:01 g12-dim-p001 CRON[564508]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 21:17:01 g12-dim-p001 CRON[564508]: pam_unix(cron:session): session closed for user root
+févr. 18 21:30:01 g12-dim-p001 CRON[564589]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 21:30:01 g12-dim-p001 CRON[564590]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 18 21:30:01 g12-dim-p001 CRON[564589]: pam_unix(cron:session): session closed for user root
+févr. 18 22:17:01 g12-dim-p001 CRON[565160]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 22:17:01 g12-dim-p001 CRON[565161]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 18 22:17:01 g12-dim-p001 CRON[565160]: pam_unix(cron:session): session closed for user root
+févr. 18 22:30:01 g12-dim-p001 CRON[565246]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 22:30:01 g12-dim-p001 CRON[565246]: pam_unix(cron:session): session closed for user root
+févr. 18 23:17:01 g12-dim-p001 CRON[565647]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 23:17:01 g12-dim-p001 CRON[565647]: pam_unix(cron:session): session closed for user root
+févr. 18 23:30:01 g12-dim-p001 CRON[565783]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 18 23:30:01 g12-dim-p001 CRON[565783]: pam_unix(cron:session): session closed for user root
+févr. 19 00:17:01 g12-dim-p001 CRON[566277]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 00:17:01 g12-dim-p001 CRON[566277]: pam_unix(cron:session): session closed for user root
+févr. 19 01:17:01 g12-dim-p001 CRON[566738]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 01:17:01 g12-dim-p001 CRON[566738]: pam_unix(cron:session): session closed for user root
+févr. 19 02:17:01 g12-dim-p001 CRON[567197]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 02:17:01 g12-dim-p001 CRON[567197]: pam_unix(cron:session): session closed for user root
+févr. 19 03:10:01 g12-dim-p001 CRON[567584]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 03:10:01 g12-dim-p001 CRON[567584]: pam_unix(cron:session): session closed for user root
+févr. 19 03:17:01 g12-dim-p001 CRON[567661]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 03:17:01 g12-dim-p001 CRON[567661]: pam_unix(cron:session): session closed for user root
+févr. 19 04:17:01 g12-dim-p001 CRON[568119]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 04:17:01 g12-dim-p001 CRON[568120]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 19 04:17:01 g12-dim-p001 CRON[568119]: pam_unix(cron:session): session closed for user root
+févr. 19 05:17:01 g12-dim-p001 CRON[568589]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 05:17:01 g12-dim-p001 CRON[568589]: pam_unix(cron:session): session closed for user root
+févr. 19 06:17:01 g12-dim-p001 CRON[569099]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 06:17:01 g12-dim-p001 CRON[569099]: pam_unix(cron:session): session closed for user root
+févr. 19 06:25:01 g12-dim-p001 CRON[569139]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 06:25:01 g12-dim-p001 CRON[569139]: pam_unix(cron:session): session closed for user root
+févr. 19 07:17:01 g12-dim-p001 CRON[569559]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 07:17:01 g12-dim-p001 CRON[569560]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 19 07:17:01 g12-dim-p001 CRON[569559]: pam_unix(cron:session): session closed for user root
+févr. 19 07:30:01 g12-dim-p001 CRON[569640]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 07:30:01 g12-dim-p001 CRON[569640]: pam_unix(cron:session): session closed for user root
+févr. 19 08:00:01 g12-dim-p001 CRON[569887]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 08:00:01 g12-dim-p001 CRON[569888]: (root) CMD (/home/crontab/julia_exh.sh >> /var/log/exh.log 2>1)
+févr. 19 08:00:56 g12-dim-p001 CRON[569887]: pam_unix(cron:session): session closed for user root
+févr. 19 08:17:01 g12-dim-p001 CRON[570071]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 08:17:01 g12-dim-p001 CRON[570071]: pam_unix(cron:session): session closed for user root
+févr. 19 08:30:01 g12-dim-p001 CRON[570153]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 08:30:01 g12-dim-p001 CRON[570153]: pam_unix(cron:session): session closed for user root
+févr. 19 09:17:01 g12-dim-p001 CRON[570532]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 09:17:01 g12-dim-p001 CRON[570532]: pam_unix(cron:session): session closed for user root
+févr. 19 09:30:01 g12-dim-p001 CRON[570614]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 09:30:01 g12-dim-p001 CRON[570614]: pam_unix(cron:session): session closed for user root
+févr. 19 10:17:01 g12-dim-p001 CRON[571144]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 10:17:01 g12-dim-p001 CRON[571144]: pam_unix(cron:session): session closed for user root
+févr. 19 10:30:01 g12-dim-p001 CRON[571246]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 10:30:01 g12-dim-p001 CRON[571246]: pam_unix(cron:session): session closed for user root
+févr. 19 11:17:01 g12-dim-p001 CRON[571665]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 11:17:01 g12-dim-p001 CRON[571665]: pam_unix(cron:session): session closed for user root
+févr. 19 11:30:01 g12-dim-p001 CRON[571746]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 11:30:01 g12-dim-p001 CRON[571746]: pam_unix(cron:session): session closed for user root
+févr. 19 12:17:01 g12-dim-p001 CRON[572163]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 12:17:01 g12-dim-p001 CRON[572163]: pam_unix(cron:session): session closed for user root
+févr. 19 12:30:01 g12-dim-p001 CRON[572246]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 12:30:01 g12-dim-p001 CRON[572246]: pam_unix(cron:session): session closed for user root
+févr. 19 13:17:01 g12-dim-p001 CRON[572630]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 13:17:01 g12-dim-p001 CRON[572631]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 19 13:17:01 g12-dim-p001 CRON[572630]: pam_unix(cron:session): session closed for user root
+févr. 19 13:30:01 g12-dim-p001 CRON[572712]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 13:30:01 g12-dim-p001 CRON[572713]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 19 13:30:01 g12-dim-p001 CRON[572712]: pam_unix(cron:session): session closed for user root
+févr. 19 14:17:01 g12-dim-p001 CRON[573106]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 14:17:01 g12-dim-p001 CRON[573106]: pam_unix(cron:session): session closed for user root
+févr. 19 14:30:01 g12-dim-p001 CRON[573189]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 14:30:01 g12-dim-p001 CRON[573189]: pam_unix(cron:session): session closed for user root
+févr. 19 15:17:01 g12-dim-p001 CRON[573626]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 15:17:01 g12-dim-p001 CRON[573627]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 19 15:17:01 g12-dim-p001 CRON[573626]: pam_unix(cron:session): session closed for user root
+févr. 19 15:30:01 g12-dim-p001 CRON[573707]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 15:30:01 g12-dim-p001 CRON[573707]: pam_unix(cron:session): session closed for user root
+févr. 19 16:17:01 g12-dim-p001 CRON[574093]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 16:17:01 g12-dim-p001 CRON[574093]: pam_unix(cron:session): session closed for user root
+févr. 19 16:30:01 g12-dim-p001 CRON[574174]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 16:30:01 g12-dim-p001 CRON[574175]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 19 16:30:01 g12-dim-p001 CRON[574174]: pam_unix(cron:session): session closed for user root
+févr. 19 17:17:01 g12-dim-p001 CRON[574553]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 17:17:01 g12-dim-p001 CRON[574553]: pam_unix(cron:session): session closed for user root
+févr. 19 17:30:01 g12-dim-p001 CRON[574635]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 17:30:01 g12-dim-p001 CRON[574635]: pam_unix(cron:session): session closed for user root
+févr. 19 18:17:01 g12-dim-p001 CRON[575010]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 18:17:01 g12-dim-p001 CRON[575010]: pam_unix(cron:session): session closed for user root
+févr. 19 18:30:01 g12-dim-p001 CRON[575097]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 18:30:01 g12-dim-p001 CRON[575097]: pam_unix(cron:session): session closed for user root
+févr. 19 19:17:01 g12-dim-p001 CRON[575476]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 19:17:01 g12-dim-p001 CRON[575476]: pam_unix(cron:session): session closed for user root
+févr. 19 19:30:01 g12-dim-p001 CRON[575560]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 19:30:01 g12-dim-p001 CRON[575560]: pam_unix(cron:session): session closed for user root
+févr. 19 20:17:01 g12-dim-p001 CRON[575942]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 20:17:01 g12-dim-p001 CRON[575942]: pam_unix(cron:session): session closed for user root
+févr. 19 20:30:01 g12-dim-p001 CRON[576028]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 20:30:01 g12-dim-p001 CRON[576028]: pam_unix(cron:session): session closed for user root
+févr. 19 21:17:01 g12-dim-p001 CRON[576409]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 21:17:01 g12-dim-p001 CRON[576409]: pam_unix(cron:session): session closed for user root
+févr. 19 21:30:01 g12-dim-p001 CRON[576496]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 21:30:01 g12-dim-p001 CRON[576496]: pam_unix(cron:session): session closed for user root
+févr. 19 22:17:01 g12-dim-p001 CRON[576874]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 22:17:01 g12-dim-p001 CRON[576874]: pam_unix(cron:session): session closed for user root
+févr. 19 22:30:01 g12-dim-p001 CRON[576958]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 22:30:01 g12-dim-p001 CRON[576958]: pam_unix(cron:session): session closed for user root
+févr. 19 23:17:01 g12-dim-p001 CRON[577337]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 23:17:01 g12-dim-p001 CRON[577338]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 19 23:17:01 g12-dim-p001 CRON[577337]: pam_unix(cron:session): session closed for user root
+févr. 19 23:30:01 g12-dim-p001 CRON[577418]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 19 23:30:01 g12-dim-p001 CRON[577418]: pam_unix(cron:session): session closed for user root
+févr. 20 00:17:01 g12-dim-p001 CRON[577924]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 00:17:01 g12-dim-p001 CRON[577924]: pam_unix(cron:session): session closed for user root
+févr. 20 01:17:01 g12-dim-p001 CRON[578384]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 01:17:01 g12-dim-p001 CRON[578384]: pam_unix(cron:session): session closed for user root
+févr. 20 02:17:01 g12-dim-p001 CRON[578899]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 02:17:01 g12-dim-p001 CRON[578899]: pam_unix(cron:session): session closed for user root
+févr. 20 03:10:01 g12-dim-p001 CRON[579283]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 03:10:01 g12-dim-p001 CRON[579283]: pam_unix(cron:session): session closed for user root
+févr. 20 03:17:01 g12-dim-p001 CRON[579362]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 03:17:01 g12-dim-p001 CRON[579362]: pam_unix(cron:session): session closed for user root
+févr. 20 04:17:01 g12-dim-p001 CRON[579822]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 04:17:01 g12-dim-p001 CRON[579822]: pam_unix(cron:session): session closed for user root
+févr. 20 05:17:01 g12-dim-p001 CRON[580283]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 05:17:01 g12-dim-p001 CRON[580283]: pam_unix(cron:session): session closed for user root
+févr. 20 06:17:01 g12-dim-p001 CRON[580757]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 06:17:01 g12-dim-p001 CRON[580757]: pam_unix(cron:session): session closed for user root
+févr. 20 06:25:01 g12-dim-p001 CRON[580799]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 06:25:01 g12-dim-p001 CRON[580799]: pam_unix(cron:session): session closed for user root
+févr. 20 07:17:01 g12-dim-p001 CRON[581274]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 07:17:01 g12-dim-p001 CRON[581275]: (root) CMD (cd / && run-parts --report /etc/cron.hourly)
+févr. 20 07:17:01 g12-dim-p001 CRON[581274]: pam_unix(cron:session): session closed for user root
+févr. 20 07:30:01 g12-dim-p001 CRON[581407]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 07:30:01 g12-dim-p001 CRON[581408]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 20 07:30:01 g12-dim-p001 CRON[581407]: pam_unix(cron:session): session closed for user root
+févr. 20 08:00:01 g12-dim-p001 CRON[581653]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 08:00:01 g12-dim-p001 CRON[581654]: (root) CMD (/home/crontab/julia_exh.sh >> /var/log/exh.log 2>1)
+févr. 20 08:00:54 g12-dim-p001 CRON[581653]: pam_unix(cron:session): session closed for user root
+févr. 20 08:17:01 g12-dim-p001 CRON[581825]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 08:17:01 g12-dim-p001 CRON[581825]: pam_unix(cron:session): session closed for user root
+févr. 20 08:30:01 g12-dim-p001 CRON[581907]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 08:30:01 g12-dim-p001 CRON[581908]: (root) CMD ([ -x /etc/init.d/anacron ] && if [ ! -d /run/systemd/system ]; then /usr/sbin/invoke-rc.d anacron start >/dev/null; fi)
+févr. 20 08:30:01 g12-dim-p001 CRON[581907]: pam_unix(cron:session): session closed for user root
+févr. 20 09:17:01 g12-dim-p001 CRON[582291]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 09:17:01 g12-dim-p001 CRON[582291]: pam_unix(cron:session): session closed for user root
+févr. 20 09:30:01 g12-dim-p001 CRON[582371]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 09:30:01 g12-dim-p001 CRON[582371]: pam_unix(cron:session): session closed for user root
+févr. 20 10:17:01 g12-dim-p001 CRON[582904]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 10:17:01 g12-dim-p001 CRON[582904]: pam_unix(cron:session): session closed for user root
+févr. 20 10:30:01 g12-dim-p001 CRON[582986]: pam_unix(cron:session): session opened for user root(uid=0) by (uid=0)
+févr. 20 10:30:01 g12-dim-p001 CRON[582986]: pam_unix(cron:session): session closed for user root
