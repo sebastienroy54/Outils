@@ -1,1 +1,1 @@
-sudo find /home -maxdepth 4 -type f -name "1" -newermt "2026-02-19 07:55" ! -newermt "2026-02-19 08:10" -ls
+journalctl -k --since "2026-02-19 07:55" --until "2026-02-19 08:10" --no-pager | grep -iE "oom|killed process|out of memory|julia"
