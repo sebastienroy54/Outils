@@ -1,1 +1,6 @@
 Service	Libellé du service	Code de l'UH	Libellé de l'UH	NIP	Patient	Date de réalisation	NDA	Code de l'acte	Code phase	Libellé de l'acte	UH de demande	Référence produit	Libellé produit	Référence fournisseur	Libellé forunisseur	Code LPP	Code DC	Indicateur	Quantité	Gratuit	Echec pose	Déstérilisé	N° lot / N° série	N° lot	N°série	Prix	TVA	Code ATIH	Indication
+
+Je reviens sur votre volonté d’automatisation : une automatisation intégrale risque d’être difficile, ou d’être un work-in-progress permanent car :
+•	Pas évident que le format de la source PUI soit constant
+•	On a vu que parfois un autre LPP correspondant à un DMI semblable était présent. Par exemple pour notre implant cochléaire 3299070, le 3239865 équivalent était souvent codé. Je vous l’ai dit et vous vous avez intégré cela dans votre code (ou alors vous avez choisi la méthode des euros ?). Mais il y a possiblement une douzaine de LPP équivalents, qui se présenterons peut-être plus tard, et nouveaux LPP apparaissent au fil du temps. Et leurs prix peuvent changer.
+•	Là on n’a ciblé que quatre LPP précis car Marion avait repéré que ceux-là étaient en écarts. Ce sera peut-être d’autres LPP ensuite avec de nouveaux particularismes.
