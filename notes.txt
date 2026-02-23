@@ -10,6 +10,10 @@ XLSM_NAME = "Copie de bilan DIM 2025.xlsm"
 MAP_CSV_NAME = "NCK.2024-2025.IPP.NAS.csv"
 FIC_NAME = "2025M12.dmi.fic"
 
+# NEW: fichiers de config
+CFG_EQUIV_XLSX = "config_equivalences.xlsx"
+CFG_TARIFS_XLSX = "config_tarifs.xlsx"
+
 OUT_FLAT_XLSX = "pharma_flat_avec_NDA.xlsx"
 OUT_CONTROLE_XLSX = "pharma_controle_fichcomp.xlsx"
 OUT_ABSENT_XLSX = "pharma_absents_dmi_fic.xlsx"
@@ -29,28 +33,6 @@ FIC_QTE_END = 82   # entier
 
 FIC_AMT_START = 83
 FIC_AMT_END = 92   # millièmes d'euros
-
-# Equivalences LPP (selon le mail)
-LPP_EQUIV = {
-    "3299070": {"3239865"},
-    "3416095": {"3400869"},
-    # "3111645": set()  # pas d'équivalent, on utilisera le contrôle montant si besoin
-    # "8127390": set()
-}
-
-# Prix unitaires (EUR) utiles pour contrôle montant minimal
-LPP_PRICE_EUR = {
-    "3111645": 8900,
-    "3299070": 14600,
-    "8127390": 3700,
-    "3416095": 13600,
-}
-
-# Quantité attendue (au minimum)
-LPP_QTE_ATTENDUE = {
-    "3111645": 1,  # Nemost souvent par paire
-    # autres : 1 par défaut (mais on peut aussi déduire par doublons PUI)
-}
 
 # Colonnes finales flat demandées (12)
 FINAL_RENAME = {
@@ -99,6 +81,107 @@ def excel_date_to_dt(x):
     if isinstance(x, (int, float)):
         return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
     return pd.to_datetime(str(x), errors="coerce", dayfirst=True)
+
+# ========= LECTURE CONFIG =========
+def _read_xlsx_table(path: str, sheet=None) -> pd.DataFrame:
+    df = pd.read_excel(path, sheet_name=sheet if sheet is not None else 0, dtype=str)
+    df.columns = [str(c).strip() for c in df.columns]
+    # supprime colonnes vides
+    df = df.loc[:, [c for c in df.columns if c and not c.lower().startswith("unnamed")]]
+    return df
+
+def load_equivalences(path: str) -> dict[str, set[str]]:
+    """
+    Accepte au minimum 2 colonnes: LPPR_cible, LPP_equivalent
+    Optionnel: Actif (O/N)
+    """
+    df = _read_xlsx_table(path)
+    # normalise noms colonnes (tolérant)
+    col_map = {c.lower(): c for c in df.columns}
+    c_lppr = col_map.get("lppr_cible") or col_map.get("lppr") or col_map.get("lpp_cible")
+    c_eq = col_map.get("lpp_equivalent") or col_map.get("equivalent") or col_map.get("lpp")
+    if not c_lppr or not c_eq:
+        raise ValueError("config_equivalences.xlsx: colonnes attendues: LPPR_cible et LPP_equivalent")
+
+    c_actif = col_map.get("actif")  # optionnel
+
+    out: dict[str, set[str]] = {}
+    for _, r in df.iterrows():
+        lppr = clean_digits_id(r.get(c_lppr))
+        eq = clean_digits_id(r.get(c_eq))
+        if not lppr or not eq:
+            continue
+        if c_actif:
+            actif = str(r.get(c_actif, "")).strip().upper()
+            if actif == "N":
+                continue
+        out.setdefault(lppr, set()).add(eq)
+    return out
+
+def load_tarifs(path: str):
+    """
+    Accepte au minimum: LPPR, Prix_unitaire_EUR
+    Optionnel: Qte_attendue, Seuil_type, Actif
+    Retourne:
+      - price_eur: dict[lppr] -> float
+      - qte_attendue: dict[lppr] -> int
+      - seuil_type: dict[lppr] -> str ("total_NAS" par défaut)
+    """
+    df = pd.read_excel(path)  # laisse Excel typer la colonne prix (float)
+    df.columns = [str(c).strip() for c in df.columns]
+    col_map = {c.lower(): c for c in df.columns}
+
+    c_lppr = col_map.get("lppr")
+    c_price = col_map.get("prix_unitaire_eur") or col_map.get("prix_unitaire") or col_map.get("prix")
+    if not c_lppr or not c_price:
+        raise ValueError("config_tarifs.xlsx: colonnes attendues: LPPR et Prix_unitaire_EUR")
+
+    c_qte = col_map.get("qte_attendue")  # optionnel
+    c_seuil = col_map.get("seuil_type")  # optionnel
+    c_actif = col_map.get("actif")       # optionnel
+
+    price_eur: dict[str, float] = {}
+    qte_attendue: dict[str, int] = {}
+    seuil_type: dict[str, str] = {}
+
+    for _, r in df.iterrows():
+        lppr = clean_digits_id(r.get(c_lppr))
+        if not lppr:
+            continue
+
+        if c_actif:
+            actif = str(r.get(c_actif, "")).strip().upper()
+            if actif == "N":
+                continue
+
+        # prix
+        val_price = r.get(c_price)
+        if pd.isna(val_price):
+            continue
+        try:
+            price = float(val_price)
+        except Exception:
+            continue
+        price_eur[lppr] = price
+
+        # qte attendue
+        if c_qte:
+            val_q = r.get(c_qte)
+            try:
+                q = int(val_q) if not pd.isna(val_q) else 1
+            except Exception:
+                q = 1
+            qte_attendue[lppr] = max(1, q)
+
+        # seuil type
+        if c_seuil:
+            st = str(r.get(c_seuil, "")).strip()
+            if st:
+                seuil_type[lppr] = st
+
+    return price_eur, qte_attendue, seuil_type
+
+# ========= (TON CODE EXISTANT EN DESSOUS, INCHANGÉ SAUF DICTS) =========
 
 CODE_RE = re.compile(r"\b(\d{6,8})\b")
 
@@ -395,10 +478,6 @@ def read_mapping_csv(map_path: str) -> pd.DataFrame:
     return m[["nip", "nas", "date_deb", "date_fin"]]
 
 def compute_nda_from_intervals(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.Series:
-    """
-    Calcule le NAS le plus plausible via IPP + date_pose.
-    Retourne une Series 'nda_calcule' (vide si non trouvé).
-    """
     need = df[df["ipp"].ne("") & df["date_pose"].notna()].reset_index()[["index", "ipp", "date_pose"]].copy()
     if need.empty:
         return pd.Series([""] * len(df), index=df.index)
@@ -437,7 +516,6 @@ def parse_jjmmaaaa(s: str) -> pd.Timestamp:
     s = ("" if s is None else str(s)).strip()
     if len(s) != 8 or not s.isdigit():
         return pd.NaT
-    # JJMMAAAA
     return pd.to_datetime(s, format="%d%m%Y", errors="coerce")
 
 def read_fichcomp_dmi(fic_path: str) -> pd.DataFrame:
@@ -455,7 +533,7 @@ def read_fichcomp_dmi(fic_path: str) -> pd.DataFrame:
                     amt_raw = line[FIC_AMT_START-1:FIC_AMT_END]
 
                     nas = clean_digits_id(nas_raw)
-                    lpp = clean_digits_id(lpp_raw)[:7]  # code utile sur 7 caractères
+                    lpp = clean_digits_id(lpp_raw)[:7]
                     dpose = parse_jjmmaaaa(date_raw)
 
                     qte_s = clean_digits_id(qte_raw)
@@ -492,16 +570,20 @@ def main():
     map_path = os.path.join(BASE_DIR, MAP_CSV_NAME)
     fic_path = os.path.join(BASE_DIR, FIC_NAME)
 
+    cfg_equiv_path = os.path.join(BASE_DIR, CFG_EQUIV_XLSX)
+    cfg_tarifs_path = os.path.join(BASE_DIR, CFG_TARIFS_XLSX)
+
     out_flat = os.path.join(BASE_DIR, OUT_FLAT_XLSX)
     out_ctrl = os.path.join(BASE_DIR, OUT_CONTROLE_XLSX)
     out_abs = os.path.join(BASE_DIR, OUT_ABSENT_XLSX)
 
-    if not os.path.exists(xlsm_path):
-        raise FileNotFoundError(f"Fichier introuvable: {xlsm_path}")
-    if not os.path.exists(map_path):
-        raise FileNotFoundError(f"Fichier mapping introuvable: {map_path}")
-    if not os.path.exists(fic_path):
-        raise FileNotFoundError(f"Fichier .fic introuvable: {fic_path}")
+    for p in (xlsm_path, map_path, fic_path, cfg_equiv_path, cfg_tarifs_path):
+        if not os.path.exists(p):
+            raise FileNotFoundError(f"Fichier introuvable: {p}")
+
+    # NEW: charge configs
+    LPP_EQUIV = load_equivalences(cfg_equiv_path)
+    LPP_PRICE_EUR, LPP_QTE_ATTENDUE, LPP_SEUIL_TYPE = load_tarifs(cfg_tarifs_path)
 
     # 1) Extraction PUI XLSM
     wb = load_workbook(xlsm_path, data_only=True)
@@ -524,16 +606,9 @@ def main():
     # 2) Remplissages / fiabilisation NAS
     mapping = read_mapping_csv(map_path)
 
-    # garde NDA PUI pour audit
     df["nda_pui"] = df["nda"].copy()
-
-    # si on n'a que NDA, retrouve IPP
     df = fill_ipp_from_nda(df, mapping)
-
-    # calcule NAS via IPP+date_pose (même si PUI a déjà un NDA)
     df["nda_calcule"] = compute_nda_from_intervals(df, mapping)
-
-    # NDA final = calculé en priorité, sinon NDA PUI
     df["nda"] = df["nda_calcule"].where(df["nda_calcule"].ne(""), df["nda_pui"])
     df["nda"] = df["nda"].apply(clean_digits_id)
 
@@ -543,29 +618,25 @@ def main():
     df = df[df["ipp"] != ""].copy()
     df.reset_index(drop=True, inplace=True)
 
-    # 3) Export flat (12 colonnes, renommées)
+    # 3) Export flat
     df_flat = df[FINAL_COLS].copy().rename(columns=FINAL_RENAME)
     export_excel_with_date_formats(df_flat, out_flat, sheet_name="flat")
 
-    # 4) Lecture fichcomp et agrégations
+    # 4) Lecture fichcomp
     fc = read_fichcomp_dmi(fic_path)
 
-    # agrégations par NAS & LPP
     agg_lpp = fc.groupby(["nas", "lpp"], as_index=False).agg(
         qte_lpp=("qte", "sum"),
         montant_lpp=("montant_eur", "sum"),
     )
-
-    # agrégation total € par NAS (toutes LPP)
     agg_total = fc.groupby("nas", as_index=False).agg(
         montant_total=("montant_eur", "sum"),
     )
 
-    # 5) Construction fichier contrôle (une ligne PUI = une ligne contrôle)
+    # 5) Contrôle
     ctrl = df.copy()
     ctrl["lpp_cible"] = ctrl["lppr"].astype(str)
 
-    # jointure qté/montant du LPP cible
     ctrl = ctrl.merge(
         agg_lpp.rename(columns={"nas": "nda", "lpp": "lpp_cible", "qte_lpp": "qte_cible", "montant_lpp": "montant_cible"}),
         on=["nda", "lpp_cible"],
@@ -575,12 +646,6 @@ def main():
     ctrl["qte_cible"] = ctrl["qte_cible"].fillna(0).astype(int)
     ctrl["montant_cible"] = ctrl["montant_cible"].fillna(0.0)
 
-    # équivalents
-    def equiv_codes(lppr: str):
-        return LPP_EQUIV.get(str(lppr), set())
-
-    # on calcule qte_equiv = somme des qte de tous les équivalents
-    # (approche simple: loop par LPPR sur un sous-merge)
     ctrl["qte_equiv"] = 0
     ctrl["montant_equiv"] = 0.0
 
@@ -601,14 +666,12 @@ def main():
         ctrl.loc[mask, "qte_equiv"] = ctrl.loc[mask, "nda"].map(summed["qte_equiv"]).fillna(0).astype(int).values
         ctrl.loc[mask, "montant_equiv"] = ctrl.loc[mask, "nda"].map(summed["montant_equiv"]).fillna(0.0).values
 
-    # montant total sur NAS
     ctrl = ctrl.merge(agg_total.rename(columns={"nas": "nda"}), on="nda", how="left")
     ctrl["montant_total"] = ctrl["montant_total"].fillna(0.0)
 
-    # quantité attendue : dict + fallback = 1
+    # qté attendue : depuis config + fallback = 1
     ctrl["qte_attendue"] = ctrl["lppr"].astype(str).map(LPP_QTE_ATTENDUE).fillna(1).astype(int)
 
-    # statut
     def statut_row(r):
         lppr = str(r["lppr"])
         if r["nda"] == "":
@@ -617,17 +680,18 @@ def main():
             return "OK (LPP ciblé présent)"
         if r["qte_equiv"] > 0:
             return "OK (LPP équivalent)"
-        # règle “ortho Nemost” / contrôle montant minimal
+
         price = LPP_PRICE_EUR.get(lppr)
         if price is not None:
-            seuil = price * r["qte_attendue"]
-            if r["montant_total"] < seuil:
+            seuil = float(price) * int(r["qte_attendue"])
+            st = LPP_SEUIL_TYPE.get(lppr, "total_NAS")
+            amt = r["montant_total"] if st == "total_NAS" else r["montant_cible"]
+            if amt < seuil:
                 return "ABSENT (montant trop faible)"
         return "ABSENT (LPP non trouvé)"
 
     ctrl["Statut"] = ctrl.apply(statut_row, axis=1)
 
-    # renommer pour export contrôle (colonnes lisibles)
     ctrl_export = ctrl[FINAL_COLS].copy().rename(columns=FINAL_RENAME)
     ctrl_export["NDA PUI"] = ctrl["nda_pui"].values
     ctrl_export["NDA calculé"] = ctrl["nda_calcule"].values
@@ -640,25 +704,14 @@ def main():
     ctrl_export["€ total NAS"] = ctrl["montant_total"].round(2).values
     ctrl_export["Statut"] = ctrl["Statut"].values
 
-    # filtre hors période (option simple : garder uniquement poses en 2025)
     ctrl_export = ctrl_export[ctrl_export["Date de pose"].notna()].copy()
     ctrl_export = ctrl_export[ctrl_export["Date de pose"].dt.year == 2025].copy()
-
-    # tri
     ctrl_export = ctrl_export.sort_values(by=["LPPR", "Date de pose", "Nom", "Prénom"], ascending=[True, True, True, True])
 
     export_excel_with_date_formats(ctrl_export, out_ctrl, sheet_name="controle")
 
-    # 6) absents = filtre
     abs_export = ctrl_export[ctrl_export["Statut"].str.startswith("ABSENT")].copy()
-
-    cols_to_drop_in_absents = [
-        "Qté LPP ciblé (NAS)",
-        "Qté LPP équiv (NAS)",
-        "€ LPP ciblé",
-        "€ LPP équiv",
-    ]
-
+    cols_to_drop_in_absents = ["Qté LPP ciblé (NAS)", "Qté LPP équiv (NAS)", "€ LPP ciblé", "€ LPP équiv"]
     abs_export = abs_export.drop(columns=[c for c in cols_to_drop_in_absents if c in abs_export.columns])
 
     export_excel_with_date_formats(abs_export, out_abs, sheet_name="absents")
@@ -671,19 +724,12 @@ def main():
 
     print("\n=== Synthèse absents ===")
     print("Total lignes contrôle:", len(ctrl_export))
-
-    # Absents stricts
     abs_strict = ctrl_export[ctrl_export["Statut"].eq("ABSENT (LPP non trouvé)")]
     print("Absents stricts (LPP non trouvé):", len(abs_strict))
-
-    # Absents montant (Nemost etc.)
     abs_amt = ctrl_export[ctrl_export["Statut"].eq("ABSENT (montant trop faible)")]
     print("Absents via montant:", len(abs_amt))
-
-    # Total absents
     abs_total = ctrl_export[ctrl_export["Statut"].str.startswith("ABSENT")]
     print("Absents total:", len(abs_total))
-
     print("\n=== Répartition par LPPR (absents) ===")
     print(abs_total["LPPR"].value_counts().to_string())
 
