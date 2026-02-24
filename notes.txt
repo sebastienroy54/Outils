@@ -1,24 +1,15 @@
-=== Config chargée ===
-Equivalences LPPR: 2
-Tarifs LPPR: 4
-Qté attendue paramétrée: 4
-Seuil_type paramétré: 4
-Lignes exclues car IPP introuvable : 2
-c:\Users\4251352\projets\DMI_NCK.py:84: UserWarning: Parsing dates in %Y-%m-%d %H:%M:%S format when dayfirst=True was specified. Pass `dayfirst=False` or specify a format to silence this warning.
-  return pd.to_datetime(str(x), errors="coerce", dayfirst=True)
-=== Config chargée ===
-Equivalences LPPR: 2
-Tarifs LPPR: 4
-Qté attendue paramétrée: 4
-Seuil_type paramétré: 4
+def excel_date_to_dt(x):
+    if x is None or (isinstance(x, str) and x.strip() == ""):
+        return pd.NaT
+    if isinstance(x, (datetime,)):
+        return pd.to_datetime(x, errors="coerce")
+    if isinstance(x, pd.Timestamp):
+        return x
+    if isinstance(x, (int, float)):
+        return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
 
-=== SAG ===
-Lignes SAG: 3946
-Lignes SAG exclues: 38
-
-=== Résumé final ===
-Absents fichcomp: 111
-Répartition statuts finaux:
-Statut final
-A relancer service (non saisi SAG)             110
-Problème flux (SAG saisi / fichcomp absent)      1
+    s = str(x).strip()
+    # si ISO (YYYY-MM-DD...), ne pas dayfirst
+    if re.match(r"^\d{4}-\d{2}-\d{2}", s):
+        return pd.to_datetime(s, errors="coerce", dayfirst=False)
+    return pd.to_datetime(s, errors="coerce", dayfirst=True)
