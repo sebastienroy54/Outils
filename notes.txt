@@ -1,3 +1,32 @@
-targets = {"3111645","8127390","3299070","3416095","3239865","3400869"}
-print("SAG: lignes avec LPP cible/équiv:", int(sag["lpp"].isin(targets).sum()))
-print(sag.loc[sag["lpp"].isin(targets), "lpp"].value_counts().to_string())
+=== Config chargée ===
+Equivalences LPPR: 2
+Tarifs LPPR: 4
+Qté attendue paramétrée: 4
+Seuil_type paramétré: 4
+Lignes exclues car IPP introuvable : 2
+SAG: lignes avec LPP vide: 1946
+SAG: NDA vide: 359
+SAG: IPP vide: 0
+SAG: lignes avec LPP cible/équiv: 121
+lpp
+8127390    81
+3400869    21
+3239865    11
+3111645     8
+=== Config chargée ===
+Equivalences LPPR: 2
+Tarifs LPPR: 4
+Qté attendue paramétrée: 4
+Seuil_type paramétré: 4
+
+=== SAG ===
+Lignes SAG: 3946
+Lignes SAG exclues: 38
+
+=== Résumé final ===
+Absents fichcomp: 111
+Répartition statuts finaux:
+Statut final
+A relancer service (non saisi SAG)             109
+Problème flux (SAG saisi / fichcomp absent)      1
+Exclu (SAG: Echec pose)                          1
