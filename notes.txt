@@ -1,12 +1,43 @@
-# Parmi les absents dont NDA est présent dans SAG
-tmp = abs_action[abs_action["NDA présent dans SAG"] == True]
+=== Config chargée ===
+Equivalences LPPR: 2
+Tarifs LPPR: 4
+Qté attendue paramétrée: 4
+Seuil_type paramétré: 4
+Lignes exclues car IPP introuvable : 2
+SAG: lignes avec LPP vide: 1946
+SAG: NDA vide: 359
+SAG: IPP vide: 0
+SAG: lignes avec LPP cible/équiv: 121
+lpp
+8127390    81
+3400869    21
+3239865    11
+3111645     8
+=== Config chargée ===
+Equivalences LPPR: 2
+Tarifs LPPR: 4
+Qté attendue paramétrée: 4
+Seuil_type paramétré: 4
 
-# Séjours SAG correspondants
-sag_ndas = set(tmp["NDA"])
+=== SAG ===
+Lignes SAG: 3946
+Lignes SAG exclues: 38
 
-sag_subset = sag[sag["nda"].isin(sag_ndas)]
+=== Diagnostic NDA ===
+NDA présent dans SAG
+True     59
+False    52
+Name: count, dtype: int64
 
-print("\n=== Diagnostic LPP sur NDA présents ===")
-print("Lignes SAG sur ces NDA:", len(sag_subset))
-print("Dont LPP vide:", int((sag_subset["lpp"] == "").sum()))
-print("Dont LPP non vide:", int((sag_subset["lpp"] != "").sum()))
+=== Diagnostic LPP sur NDA présents ===
+Lignes SAG sur ces NDA: 272
+Dont LPP vide: 87
+Dont LPP non vide: 185
+
+=== Résumé final ===
+Absents fichcomp: 111
+Répartition statuts finaux:
+Statut final
+A relancer service (non saisi SAG)             109
+Problème flux (SAG saisi / fichcomp absent)      1
+Exclu (SAG: Echec pose)                          1
