@@ -1,3 +1,3 @@
-print("SAG: lignes avec LPP vide:", int((sag["lpp"] == "").sum()))
-print("SAG: NDA vide:", int((sag["nda"] == "").sum()))
-print("SAG: IPP vide:", int((sag["ipp"] == "").sum()))
+targets = {"3111645","8127390","3299070","3416095","3239865","3400869"}
+print("SAG: lignes avec LPP cible/équiv:", int(sag["lpp"].isin(targets).sum()))
+print(sag.loc[sag["lpp"].isin(targets), "lpp"].value_counts().to_string())
