@@ -1,15 +1,3 @@
-def excel_date_to_dt(x):
-    if x is None or (isinstance(x, str) and x.strip() == ""):
-        return pd.NaT
-    if isinstance(x, (datetime,)):
-        return pd.to_datetime(x, errors="coerce")
-    if isinstance(x, pd.Timestamp):
-        return x
-    if isinstance(x, (int, float)):
-        return pd.to_datetime("1899-12-30") + pd.to_timedelta(int(x), unit="D")
-
-    s = str(x).strip()
-    # si ISO (YYYY-MM-DD...), ne pas dayfirst
-    if re.match(r"^\d{4}-\d{2}-\d{2}", s):
-        return pd.to_datetime(s, errors="coerce", dayfirst=False)
-    return pd.to_datetime(s, errors="coerce", dayfirst=True)
+print("SAG: lignes avec LPP vide:", int((sag["lpp"] == "").sum()))
+print("SAG: NDA vide:", int((sag["nda"] == "").sum()))
+print("SAG: IPP vide:", int((sag["ipp"] == "").sum()))
