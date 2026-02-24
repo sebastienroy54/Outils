@@ -1,141 +1,16 @@
-SAG_NAME = "SAG.DMI.xlsx"
+sag_path = os.path.join(BASE_DIR, SAG_NAME)
+if not os.path.exists(sag_path):
+    raise FileNotFoundError(f"Fichier SAG introuvable: {sag_path}")
 
-def read_sag_dmi(sag_path: str) -> pd.DataFrame:
-    df = pd.read_excel(sag_path, dtype=str)
-    df.columns = [str(c).strip() for c in df.columns]
+sag = read_sag_dmi(sag_path)
 
-    # helper O/N
-    def to_bool_O(x) -> bool:
-        s = "" if x is None else str(x).strip().upper()
-        return s == "O"
+abs_action = enrich_absents_with_sag(
+    abs_export,
+    sag=sag,
+    equiv_map=LPP_EQUIV,
+    tol_days=2
+)
 
-    out = pd.DataFrame()
-    out["service"] = df.get("Service", "")
-    out["service_lib"] = df.get("Libellé du service", "")
-    out["uh_code"] = df.get("Code de l'UH", "")
-    out["uh_lib"] = df.get("Libellé de l'UH", "")
-
-    out["ipp"] = df.get("NIP", "").apply(clean_digits_id)
-    out["nda"] = df.get("NDA", "").apply(clean_digits_id)
-
-    out["date_real"] = df.get("Date de réalisation", "").apply(excel_date_to_dt)
-    out["date_real"] = pd.to_datetime(out["date_real"], errors="coerce", dayfirst=True).dt.normalize()
-
-    out["lpp"] = df.get("Code LPP", "").apply(clean_digits_id).astype(str).str[:7]
-
-    # quantite/prix
-    q = df.get("Quantité", "")
-    out["qte"] = pd.to_numeric(q, errors="coerce").fillna(0).astype(int)
-
-    p = df.get("Prix", "")
-    out["prix"] = pd.to_numeric(p, errors="coerce").fillna(0.0).astype(float)
-
-    out["code_atih"] = df.get("Code ATIH", "")
-    out["gratuit"] = df.get("Gratuit", "").apply(to_bool_O)
-    out["echec_pose"] = df.get("Echec pose", "").apply(to_bool_O)
-    out["desterilise"] = df.get("Déstérilisé", "").apply(to_bool_O)
-
-    # statut SAG (exclusion)
-    out["sag_exclu"] = out["gratuit"] | out["echec_pose"] | out["desterilise"]
-
-    # garde uniquement lignes identifiables
-    out = out[(out["ipp"] != "") | (out["nda"] != "")].copy()
-
-    return out
-
-def build_lpp_candidates(lppr: str, equiv_map: dict[str, set[str]]) -> set[str]:
-    lppr = str(lppr)
-    cands = {lppr}
-    cands |= set(equiv_map.get(lppr, set()))
-    return {clean_digits_id(x)[:7] for x in cands if clean_digits_id(x)}
-
-def enrich_absents_with_sag(abs_export: pd.DataFrame, sag: pd.DataFrame, equiv_map: dict[str, set[str]], tol_days: int = 2) -> pd.DataFrame:
-    abs2 = abs_export.copy()
-
-    # colonnes de sortie
-    abs2["SAG trouvé"] = False
-    abs2["SAG exclu"] = False
-    abs2["SAG motif exclu"] = ""
-    abs2["SAG Service"] = ""
-    abs2["SAG UH"] = ""
-    abs2["SAG Date"] = pd.NaT
-    abs2["SAG LPP"] = ""
-    abs2["SAG Qté"] = 0
-    abs2["SAG Prix"] = 0.0
-    abs2["SAG Code ATIH"] = ""
-    abs2["Statut final"] = ""
-
-    # index SAG pour accélérer
-    sag = sag.copy()
-    sag["date_real"] = pd.to_datetime(sag["date_real"], errors="coerce").dt.normalize()
-
-    # pre-joins: par NDA
-    sag_by_nda = sag[sag["nda"].ne("")].copy()
-    # par IPP
-    sag_by_ipp = sag[sag["ipp"].ne("")].copy()
-
-    def pick_best(cand: pd.DataFrame, target_date: pd.Timestamp):
-        if cand.empty:
-            return None
-        if pd.isna(target_date):
-            # si pas de date, prend la plus proche "any"
-            return cand.iloc[0]
-        cand = cand.copy()
-        cand["delta"] = (cand["date_real"] - target_date).abs().dt.days
-        cand = cand.sort_values(["delta"], ascending=True)
-        return cand.iloc[0]
-
-    for i, r in abs2.iterrows():
-        lppr = str(r["LPPR"])
-        nda = clean_digits_id(r.get("NDA"))
-        ipp = clean_digits_id(r.get("IPP"))
-        dpose = r.get("Date de pose")
-        dpose = pd.to_datetime(dpose, errors="coerce", dayfirst=True)
-        if isinstance(dpose, pd.Timestamp):
-            dpose = dpose.normalize()
-
-        cands_lpp = build_lpp_candidates(lppr, equiv_map)
-
-        found_row = None
-
-        # Match A: NDA + LPP (+ date proche si possible)
-        if nda:
-            cand = sag_by_nda[(sag_by_nda["nda"] == nda) & (sag_by_nda["lpp"].isin(cands_lpp))]
-            if not cand.empty and pd.notna(dpose):
-                cand = cand[(cand["date_real"] >= dpose - pd.Timedelta(days=tol_days)) &
-                            (cand["date_real"] <= dpose + pd.Timedelta(days=tol_days))]
-            found_row = pick_best(cand, dpose)
-
-        # Fallback: IPP + date proche + LPP
-        if found_row is None and ipp and pd.notna(dpose):
-            cand = sag_by_ipp[(sag_by_ipp["ipp"] == ipp) & (sag_by_ipp["lpp"].isin(cands_lpp))]
-            cand = cand[(cand["date_real"] >= dpose - pd.Timedelta(days=tol_days)) &
-                        (cand["date_real"] <= dpose + pd.Timedelta(days=tol_days))]
-            found_row = pick_best(cand, dpose)
-
-        if found_row is None:
-            abs2.at[i, "Statut final"] = "A relancer service (non saisi SAG)"
-            continue
-
-        # Remplissage infos SAG
-        abs2.at[i, "SAG trouvé"] = True
-        abs2.at[i, "SAG exclu"] = bool(found_row["sag_exclu"])
-        abs2.at[i, "SAG Service"] = str(found_row.get("service", "")).strip()
-        abs2.at[i, "SAG UH"] = str(found_row.get("uh_code", "")).strip()
-        abs2.at[i, "SAG Date"] = found_row.get("date_real", pd.NaT)
-        abs2.at[i, "SAG LPP"] = str(found_row.get("lpp", "")).strip()
-        abs2.at[i, "SAG Qté"] = int(found_row.get("qte", 0))
-        abs2.at[i, "SAG Prix"] = float(found_row.get("prix", 0.0))
-        abs2.at[i, "SAG Code ATIH"] = str(found_row.get("code_atih", "")).strip()
-
-        if bool(found_row["sag_exclu"]):
-            motifs = []
-            if bool(found_row["gratuit"]): motifs.append("Gratuit")
-            if bool(found_row["echec_pose"]): motifs.append("Echec pose")
-            if bool(found_row["desterilise"]): motifs.append("Déstérilisé")
-            abs2.at[i, "SAG motif exclu"] = " / ".join(motifs) if motifs else "Exclu"
-            abs2.at[i, "Statut final"] = f"Exclu (SAG: {abs2.at[i, 'SAG motif exclu']})"
-        else:
-            abs2.at[i, "Statut final"] = "Problème flux (SAG saisi / fichcomp absent)"
-
-    return abs2
+export_excel_with_date_formats(abs_action, os.path.join(BASE_DIR, "pharma_absents_actionnables.xlsx"), sheet_name="absents_actionnables")
+print("Absents actionnables:", len(abs_action))
+print(abs_action["Statut final"].value_counts().to_string())
