@@ -1,40 +1,170 @@
-import pandas as pd
-import streamlit as st
-import io
-import zipfile
+ano_regime(ano) = SubString(ano,141,142)
+ano_gestion(ano) = SubString(ano,143,144)
+ano_ddn(ano) = SubString(ano,248,255)
+ano_nas(ano) = SubString(ano,41,60)
+ano_format(ano) = "V" * SubString(ano,17,19)
+ano_exo_a_montant_amc(ano) = SubString(ano,145,247)
+ano_participation_a_centre_gestion(ano) = SubString(ano,257,277)
+filler(n) = lpad(" ",n)
+ano_confirmation_pc_a_ipp(ano) = SubString(ano,278,420)
+ano_sexe(ano) = SubString(ano,256,256) in ["1","2"] ? SubString(ano,256,256) : "1"
+ano_annee_ddn(ano) = SubString(ano,254,255)
+ano_mois_ddn(ano) = SubString(ano,250,251)
+ano_ipp(ano) = SubString(ano,401,410)
+ano_ipp_cropped(ano) = SubString(ano,403,410)
+ano_cle(num_secu) = lpad(97 - parse(Int,num_secu) % 97,2,'0')
 
-def main():
-    st.title("Découpage Excel par chirurgien")
+fix_anohosp_v014(ano) = string(SubString(ano,1,113),SubString(ano,116))
 
-    # Récupération du fichier
-    uploaded_file = st.file_uploader("Téléversez votre fichier Excel ici", type=["xlsx"])
+function anohosp_to_vidhosp(site, anohosp_data)
+    
+    vid = anohosp_data[:,[:raw]]
+    rename!(vid,[:raw => :anohosp])
+    
+    vid.format = ano_format.(vid.anohosp)
 
-    if uploaded_file:
-        df = pd.read_excel(uploaded_file)
-        df = df.dropna(how='all')
+    # filtrer sur les formats d'anohosp pris en charge
+    vid = subset(vid,:format => ByRow(x -> x ∈ ["V013","V014","V015"]))
 
-        df["Chirurgien"] = df['Chirurgien'].astype(str)
-        # Récupération des noms des chirurgiens
-        nom_chir = df['Chirurgien'].str.lower().str.strip().unique()
-
-        zip_buffer = io.BytesIO()
-        # Création des fichiers excel pour chaque chirurgien
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for chirurgien in nom_chir:
-                df_chir = df[df['Chirurgien'].str.lower().str.strip() == chirurgien]
-
-                excel_buffer = io.BytesIO()
-                df_chir.to_excel(excel_buffer, index=False)
-                excel_buffer.seek(0)
-
-                nom_fichier = f"{chirurgien.replace(' ', '_')}.xlsx"
-                zf.writestr(nom_fichier, excel_buffer.read())
-        zip_buffer.seek(0)
-
-        # Création d'un bouton pour télécharger
-        st.download_button(
-            label="Télécharger les fichiers Excel",
-            data=zip_buffer.getvalue(),
-            file_name="Excels_Chirurgiens.zip",
-            mime="applications/zip"
+    # TEMP anohosp v014 simpa
+    vid.anohosp = @. ifelse(vid.format == "V013", vid.anohosp, fix_anohosp_v014(vid.anohosp))
+    
+    # pseudo numero d'assurance maladie : Sexe,Annee et mois naissance, IPP sans les 2 premiers caracteres
+    vid.fake_num_am = string.(
+        ano_sexe.(vid.anohosp), 
+        ano_annee_ddn.(vid.anohosp),
+        ano_mois_ddn.(vid.anohosp),
+        ano_ipp_cropped.(vid.anohosp)
+    )
+    vid.cle = ano_cle.(vid.fake_num_am)
+    vid.regime = ano_regime.(vid.anohosp)
+    vid.gestion = ano_gestion.(vid.anohosp)
+    vid.ddn = ano_ddn.(vid.anohosp)
+    vid.sexe = ano_sexe.(vid.anohosp)
+    vid.nas = ano_nas.(vid.anohosp)
+    vid.filler .= filler(30)
+    vid.finess .= FINESSES[site][1]
+    vid.exo_a_montant_amc = ano_exo_a_montant_amc.(vid.anohosp)
+    vid.participation_a_centre_gestion = ano_participation_a_centre_gestion.(vid.anohosp)
+    vid.confirmation_pc_a_ipp= ano_confirmation_pc_a_ipp.(vid.anohosp)
+    vid.art51 .= filler(1)
+    
+    # creation VID-HOSP
+    vid.raw = @. ifelse( vid.format == "V013", string.(
+            vid.fake_num_am,
+            vid.cle,
+            vid.regime,
+            vid.gestion,
+            vid.ddn,
+            vid.sexe,
+            vid.nas,
+            vid.format,
+            vid.finess,
+            vid.fake_num_am,
+            vid.cle,
+            vid.exo_a_montant_amc,
+            vid.participation_a_centre_gestion,
+            vid.filler,
+            vid.confirmation_pc_a_ipp
+        ),
+        string.(
+            vid.fake_num_am,
+            vid.cle,
+            vid.regime,
+            vid.gestion,
+            vid.ddn,
+            vid.sexe,
+            vid.nas,
+            vid.format,
+            vid.finess,
+            vid.fake_num_am,
+            vid.cle,
+            vid.exo_a_montant_amc,
+            vid.participation_a_centre_gestion,
+            vid.filler,
+            vid.confirmation_pc_a_ipp,
+            # new in 2020 / v014
+            vid.fake_num_am, 
+            vid.cle,
+            vid.art51
         )
+    )
+    # filtrer sur le format d'anohosp V013
+    vid[(vid.format .=== "V013") .|| (vid.format .=== "V014") .|| (vid.format .=== "V015"), :]
+end
+
+function decoupp_mco(simpa_file_path)
+    @info "------- decoupping SIMPA MCO file :" *simpa_file_path
+    
+    folder = dirname(simpa_file_path)
+    
+    data = read_file(simpa_file_path)
+    clean_file_path = replace(splitext(basename(simpa_file_path))[1],r"(\.fic)"=>"")
+    # clean_file_path = replace(clean_file_path, r"[^\w]" => s"")
+    site = clean_file_path[4:5]
+    remontee = last(clean_file_path,4) * last(clean_file_path,6)[1:2]
+    @info "site: " * FINESSES[site][2] * " " * site * " " * FINESSES[site][1]
+    @info "remontée: "* remontee
+    message = "site = " * FINESSES[site][2] * " " * site * " " * FINESSES[site][1] * "\n"
+    message *= "remontée = "* remontee *"\n\n"
+
+    @info "-------- RUM"
+
+    rum = data[startswith.(data.raw,"9") ,:]
+    # suppression entete de ligne
+    rum.raw = SubString.(rum.raw,63)
+    # Ajout de 15 apres le numero de RSS suite a une modif SIMPA 
+    rum.raw = string.(SubString.(rum.raw,1,36),"15",SubString.(rum.raw,39))
+    
+    write_to_file(rum.raw,joinpath(folder,"MCO" * site * "_" * remontee * "_RUM.txt"))
+    @info first(rum, 10)
+    loc_rum = nrow(rum)
+    message *= "RUM = $(loc_rum) lignes \n"
+
+    @info "-------- ANOHOSP"
+    
+    ano = data[startswith.(data.raw,"A") ,:]
+    # suppression entete de ligne
+    ano.raw = SubString.(ano.raw,17)
+    ano = ano[.!isempty.(ano.raw), :]
+    write_to_file(ano.raw,joinpath(folder,"MCO" * site * "_" * remontee * "_ANOHOSP.txt"))
+    @info first(ano, 10)
+    loc_ano = nrow(ano)
+    message *= "ANOHOSP = $(loc_ano) lignes \n"
+    
+    @info "-------- VIDHOSP"
+    
+    vid = anohosp_to_vidhosp(site,ano)
+    write_to_file(vid.raw,joinpath(folder,"MCO" * site * "_" * remontee * "_VIDHOSP.txt"))
+    @info first(vid,10)
+    message *= "VIDHOSP = "*string(nrow(vid))*" lignes \n"
+
+    @info "-------- DMI"
+
+    dmi = data[startswith.(data.raw,"I") ,:]
+    # suppression entete de ligne + ajout du finess
+    dmi.raw = string.(FINESSES[site][1],SubString.(dmi.raw,7))
+    loc_dmi = nrow(dmi)
+    if loc_dmi > 0
+        write_to_file(dmi.raw,joinpath(folder,"MCO" * site * "_" * remontee * "_DMI.txt"))
+    end
+    @info first(dmi, 10)
+    message *= "DMI = $(loc_dmi) lignes \n"
+
+    @info "-------- MO"
+
+    mo = data[startswith.(data.raw,"M") ,:]
+    # suppression entete de ligne
+    mo.raw = SubString.(mo.raw,7)
+    loc_mo = nrow(mo)
+    if loc_mo > 0
+        write_to_file(mo.raw,joinpath(folder,"MCO" * site * "_" * remontee * "_MO.txt"))
+    end
+    @info first(mo, 10)
+
+    message *= "MO = $(loc_mo) lignes \n\n"
+    nb_ligne_result = loc_rum + loc_ano + loc_mo + loc_dmi
+    message *= "lignes du fichier initial (hors ligne entête et fin de fichier) = $(nrow(data)-2) \n"
+    message *= "lignes RUM, ANO, MO & DMI traitées = $(nb_ligne_result)"
+    message
+end
