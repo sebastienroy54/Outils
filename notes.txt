@@ -1,1 +1,33 @@
-=TRANSPOSE(FILTREXML("<t><s>"&SUBSTITUE(A1;" ";"</s><s>")&"</s></t>";"//s"))
+root@g12-dim-p001:~:[0]$ cat /root/1
+[ Info: compute_exh for cch, force = false, recipients_group = 2, remontee = mis                                                             sing
+ERROR: MethodError: no method matching isless(::String15, ::Date)
+The function `isless` exists, but no method is defined for this combination of a                                                             rgument types.
+
+Closest candidates are:
+  isless(!Matched::Missing, ::Any)
+   @ Base missing.jl:87
+  isless(::AbstractString, !Matched::AbstractString)
+   @ Base strings/basic.jl:360
+  isless(!Matched::T, ::T) where T<:TimeType
+   @ Dates ~/.julia/juliaup/julia-1.12.0+0.x64.linux.gnu/share/julia/stdlib/v1.1                                                             2/Dates/src/types.jl:472
+  ...
+
+Stacktrace:
+ [1] <(x::String15, y::Date)
+   @ Base ./operators.jl:399
+ [2] <=(x::String15, y::Date)
+   @ Base ./operators.jl:448
+ [3] (::var"#get_info_remontee##0#get_info_remontee##1"{Date})(r::CSV.Row)
+   @ Main /home/julia/exh/exh.jl:134
+ [4] findnext
+   @ ./array.jl:2390 [inlined]
+ [5] findfirst
+   @ ./array.jl:2441 [inlined]
+ [6] get_info_remontee(date_or_remontee::Date)
+   @ Main /home/julia/exh/exh.jl:134
+ [7] compute_exh(site::String, force::Bool, recipients_group::Int64, remontee::M                                                             issing, to::TimerOutput)
+   @ Main /home/julia/exh/exh.jl:582
+ [8] main(ARGS::Vector{String})
+   @ Main /home/julia/exh/exh.jl:1141
+ [9] _start()
+   @ Base ./client.jl:556
