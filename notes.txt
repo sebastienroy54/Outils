@@ -96,3 +96,6 @@ WHERE
     )
 ORDER BY
     R1.NOIP, U.D8EEUE;
+
+
+Désolée je n’arrive pas à traiter la donnée proprement. Auriez-vous un moyen / une idée pour connaître le casemix en diagnostics des patients venus en admission directe en HC MI CCH en 2025 et non connus du service donc qui respectent ces conditions : pas de passage au SAU avant leur admission, premier RUM = MI CCH (dc pas de passage en UHCD), jamais vu en MI CCH sur les deux dernières années.
