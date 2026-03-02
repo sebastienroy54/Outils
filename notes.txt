@@ -1,8 +1,284 @@
-ZIP détecté: domaine=MCO site=021 periode=202512
-EXCEL: nom non standard (pas de validation site/période via le nom).
-Mapping UM: 114 clés (URM_APHP -> URM_SITE) après déduplication 1->1.
-Fichiers RSS trouvés: 1
-Fichiers ANO trouvés: 1
-RSS 750100166.2025.12.rss.ini.txt: matched=71564/131711 rate=0.5433 missing_unique=29
-  Top missing keys (up to 10): [('0116', 12477), ('0565', 9556), ('0880', 3697), ('0883', 2715), ('0862', 2588), ('0124', 2546), ('0884', 2092), ('0123', 2024), ('0863', 1967), ('0876', 1952)]
-ANO 750100166.2025.12.ano.txt: vidhosp_produced=94588 (nonempty_seen=94588) parse_errors_cle00=0
+def show_str_debug(label: str, s: str):
+    """Affiche longueur + repr + codes unicode de chaque char (utile pour espaces invisibles)."""
+    if s is None:
+        st.write(f"{label}: None")
+        return
+    s = str(s)
+    st.write(f"{label}: len={len(s)} repr={repr(s)}")
+    st.write(f"{label} codepoints: {[hex(ord(c)) for c in s]}")
+
+def preview_keys_debug(keys, title: str, n: int = 15):
+    st.write(f"--- {title} (n={min(n, len(keys))}) ---")
+    for k in list(keys)[:n]:
+        show_str_debug("key", k)
+
+
+def read_um_mapping_xlsx_only(excel_bytes: bytes, excel_filename: str) -> pd.DataFrame:
+    ext = (excel_filename or "").lower().split(".")[-1]
+    if ext == "xls":
+        raise ValueError(
+            "Fichier Excel au format .xls détecté.\n"
+            "Merci de l'enregistrer en .xlsx (Fichier > Enregistrer sous > .xlsx), "
+            "puis de relancer l'outil."
+        )
+
+    bio = io.BytesIO(excel_bytes)
+    df = pd.read_excel(bio, engine="openpyxl", skiprows=2)
+    df = df.dropna(how="all")
+
+    # Normalize column names (strip spaces)
+    cols = {c: str(c).strip() for c in df.columns}
+    df = df.rename(columns=cols)
+
+    # Expect URM_APHP and URM_SITE
+    col_upper = {c.upper().replace(" ", "").replace("-", "_"): c for c in df.columns}
+    urm_aphp_col = col_upper.get("URM_APHP") or col_upper.get("URMAPHP")
+    urm_site_col = col_upper.get("URM_SITE") or col_upper.get("URMSITE")
+
+    if not urm_aphp_col or not urm_site_col:
+        raise ValueError(
+            "Colonnes attendues non trouvées dans l'Excel. "
+            "Il faut des colonnes 'URM_APHP' et 'URM_SITE'."
+        )
+
+    out = df[[urm_aphp_col, urm_site_col]].copy()
+    out.columns = ["URM_APHP", "URM_SITE"]
+
+    # ===== DEBUG EXCEL (BRUT) =====
+    st.write("===== DEBUG EXCEL =====")
+    st.write("Colonnes détectées:", {"URM_APHP": urm_aphp_col, "URM_SITE": urm_site_col})
+    st.write("Aperçu 10 premières lignes (brut):")
+    st.write(out.head(10))
+
+    st.write("URM_APHP (brut) debug (15 premières):")
+    for i, v in enumerate(out["URM_APHP"].head(15).tolist(), 1):
+        show_str_debug(f"URM_APHP brut #{i}", v)
+
+    # Nettoyage minimal existant (sans patch de normalisation)
+    out["URM_APHP"] = out["URM_APHP"].astype(str).str.strip()
+    out["URM_SITE"] = out["URM_SITE"].astype(str).str.strip()
+
+    # ===== DEBUG EXCEL (APRES STRIP) =====
+    st.write("URM_APHP (après strip) debug (15 premières):")
+    for i, v in enumerate(out["URM_APHP"].head(15).tolist(), 1):
+        show_str_debug(f"URM_APHP strip #{i}", v)
+
+    # Debug: détecter NBSP / tabs etc.
+    def has_weird_space(x) -> bool:
+        s = str(x)
+        return any(ord(c) in (0x00A0, 0x0009, 0x000B, 0x000C) for c in s)
+
+    weird = out[out["URM_APHP"].apply(has_weird_space)].head(20)
+    st.write(f"Nb URM_APHP avec espaces bizarres (NBSP/tab) (aperçu max 20) : {weird.shape[0]}")
+    if weird.shape[0] > 0:
+        st.write(weird[["URM_APHP", "URM_SITE"]])
+        st.write("Détail codepoints sur ces URM_APHP bizarres:")
+        for i, v in enumerate(weird["URM_APHP"].tolist(), 1):
+            show_str_debug(f"URM_APHP weird #{i}", v)
+
+    # Drop empty keys
+    out = out[(out["URM_APHP"].notna()) & (out["URM_APHP"] != "")]
+
+    # Force 1->1 mapping (keep first occurrence)
+    out = out.drop_duplicates(subset=["URM_APHP"], keep="first")
+
+    return out
+for test_key in ["0116", "0565", "0880", "0124", "0123"]:
+    st.write(f"Test présence clé {test_key} dans mapping:", test_key in mapping)
+    if test_key in mapping:
+        show_str_debug(f"mapping[{test_key}]", mapping[test_key])
+
+
+def process_rss_text_mco(rss_bytes: bytes, mapping: dict, start_1_based: int, length: int):
+    """
+    Replace UM APHP at fixed position (start_1_based, length) with UM_SITE.
+
+    Returns: (corrected_bytes, stats_dict)
+    """
+    text = safe_decode_singlebyte(rss_bytes)
+    lines = text.splitlines(True)  # keep line endings
+
+    start0 = start_1_based - 1
+    end0 = start0 + length
+
+    total = 0
+    matched = 0
+    missing_keys = Counter()
+
+    # Debug: inspect a few first lines + target key behavior
+    debug_samples = 5
+    dbg_target = "0116"
+    dbg_target_hits = 0
+    dbg_target_limit = 5
+
+    out_lines = []
+    for line in lines:
+        if len(line) < end0:
+            out_lines.append(line)
+            continue
+
+        seg = line[start0:end0]
+        key = seg.replace(" ", "")
+        total += 1
+
+        if debug_samples > 0:
+            st.write("===== DEBUG RSS SAMPLE =====")
+            show_str_debug("RSS seg brut", seg)
+            show_str_debug("RSS key après replace(' ', '')", key)
+            st.write("Présence dans mapping:", key in mapping)
+            debug_samples -= 1
+
+        if key in mapping:
+            rep = mapping[key]
+            rep_fixed = (rep + (" " * length))[:length]
+            new_line = line[:start0] + rep_fixed + line[end0:]
+            out_lines.append(new_line)
+            matched += 1
+        else:
+            out_lines.append(line)
+            missing_keys[key] += 1
+
+            # Debug ciblé sur 0116
+            if key == dbg_target and dbg_target_hits < dbg_target_limit:
+                st.write("===== DEBUG TARGET 0116 (non match) =====")
+                show_str_debug("RSS key", key)
+                st.write("Exemples de clés mapping (10):")
+                preview_keys_debug(list(mapping.keys()), "mapping keys head", n=10)
+
+                # Chercher des clés "proches" contenant 116
+                near = [k for k in list(mapping.keys()) if "116" in str(k)][:20]
+                preview_keys_debug(near, "Near keys containing '116' (max 20)", n=len(near))
+
+                dbg_target_hits += 1
+
+    corrected = "".join(out_lines)
+    stats = {
+        "total_records_checked": total,
+        "matched": matched,
+        "match_rate": (matched / total) if total else 0.0,
+        "missing_top10": missing_keys.most_common(10),
+        "missing_unique": len(missing_keys),
+    }
+    return safe_encode_singlebyte(corrected), stats
+
+
+
+def process_zip_mco(
+    zip_bytes: bytes,
+    zip_filename: str,
+    excel_bytes: bytes,
+    excel_filename: str,
+    keep_original_rss: bool = True,
+    rss_um_start_1based: int = 87,
+    rss_um_length: int = 4,
+    min_match_rate: float = 0.98,
+):
+    report_lines = []
+
+    zip_meta = parse_zip_name(zip_filename)
+    xls_meta = parse_excel_name(excel_filename)
+
+    if zip_meta:
+        report_lines.append(f"ZIP détecté: domaine={zip_meta['domain']} site={zip_meta['site3']} periode={zip_meta['yyyymm']}")
+    else:
+        report_lines.append("ZIP: nom non standard (pas de validation site/période via le nom).")
+
+    if xls_meta:
+        report_lines.append(f"EXCEL détecté: domaine={xls_meta['domain']} site={xls_meta['site5']} periode={xls_meta['yyyymm']} ext={xls_meta['ext']}")
+    else:
+        report_lines.append("EXCEL: nom non standard (pas de validation site/période via le nom).")
+
+    if zip_meta and xls_meta:
+        expected_site5 = site3_to_site5(zip_meta["site3"])
+        if xls_meta["site5"] != expected_site5 or xls_meta["yyyymm"] != zip_meta["yyyymm"]:
+            raise ValueError(
+                f"Incohérence ZIP/EXCEL: ZIP site={zip_meta['site3']} periode={zip_meta['yyyymm']} "
+                f"mais EXCEL site={xls_meta['site5']} periode={xls_meta['yyyymm']} "
+                f"(attendu site5={expected_site5})."
+            )
+
+    um_df = read_um_mapping_xlsx_only(excel_bytes, excel_filename)
+    mapping = dict(zip(um_df["URM_APHP"].tolist(), um_df["URM_SITE"].tolist()))
+    report_lines.append(f"Mapping UM: {len(mapping)} clés (URM_APHP -> URM_SITE) après déduplication 1->1.")
+
+    # ===== DEBUG MAPPING =====
+    st.write("===== DEBUG MAPPING =====")
+    st.write("Nb clés mapping:", len(mapping))
+    preview_keys_debug(list(mapping.keys()), "Premières clés mapping", n=10)
+
+    for test_key in ["0116", "0565", "0880", "0124", "0123"]:
+        st.write(f"Test présence clé {test_key} dans mapping:", test_key in mapping)
+        if test_key in mapping:
+            show_str_debug(f"mapping[{test_key}]", mapping[test_key])
+
+    zin = zipfile.ZipFile(io.BytesIO(zip_bytes), "r")
+    names = zin.namelist()
+
+    rss_files = [n for n in names if RSS_RE.match(n.split("/")[-1])]
+    ano_files = [n for n in names if ANO_RE.match(n.split("/")[-1])]
+
+    report_lines.append(f"Fichiers RSS trouvés: {len(rss_files)}")
+    report_lines.append(f"Fichiers ANO trouvés: {len(ano_files)}")
+
+    zout_buffer = io.BytesIO()
+    with zipfile.ZipFile(zout_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+        # Copy everything as-is
+        for n in names:
+            zout.writestr(n, zin.read(n))
+
+        # Add corrected RSS alongside original
+        for rss_name in rss_files:
+            base = rss_name.split("/")[-1]
+            m = RSS_RE.match(base)
+
+            rss_bytes_in = zin.read(rss_name)
+            corrected_bytes, stats = process_rss_text_mco(
+                rss_bytes_in,
+                mapping,
+                start_1_based=rss_um_start_1based,
+                length=rss_um_length,
+            )
+
+            report_lines.append(
+                f"RSS {base}: matched={stats['matched']}/{stats['total_records_checked']} "
+                f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']}"
+            )
+            if stats["missing_top10"]:
+                report_lines.append(f"  Top missing keys (up to 10): {stats['missing_top10']}")
+
+            if stats["total_records_checked"] > 0 and stats["match_rate"] < min_match_rate:
+                raise ValueError(
+                    f"Taux de match UM trop faible sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                    f"Probable mauvais fichier de correspondance, mauvais mois/site, ou format inattendu."
+                )
+
+            prefix = rss_name[: -len(base)]
+            corrected_name = prefix + base.replace(".rss.ini.txt", ".rss.ini-corrige.txt")
+            zout.writestr(corrected_name, corrected_bytes)
+
+        # VIDHOSP generation unchanged
+        for ano_name in ano_files:
+            base = ano_name.split("/")[-1]
+            m = ANO_RE.match(base)
+            finess, yyyy, mm = m.group(1), m.group(2), m.group(3)
+
+            ano_bytes_in = zin.read(ano_name)
+            vid_bytes, vid_stats = anohosp_to_vidhosp_lines(finess=finess, ano_bytes=ano_bytes_in)
+
+            report_lines.append(
+                f"ANO {base}: vidhosp_produced={vid_stats['vidhosp_produced']} "
+                f"(nonempty_seen={vid_stats['anohosp_nonempty_seen']}) parse_errors_cle00={vid_stats['parse_errors_cle00']}"
+            )
+            if vid_stats["skipped_format_top10"]:
+                report_lines.append(f"  Formats ignorés (top): {vid_stats['skipped_format_top10']}")
+
+            prefix = ano_name[: -len(base)]
+            vid_name = prefix + f"{finess}.{yyyy}.{mm}.vidhosp.txt"
+            zout.writestr(vid_name, vid_bytes)
+
+        report_txt = "\n".join(report_lines) + "\n"
+        zout.writestr("PMSIPilot_report.txt", safe_encode_singlebyte(report_txt))
+
+    zin.close()
+    zout_buffer.seek(0)
+    return zout_buffer.getvalue(), "\n".join(report_lines)
