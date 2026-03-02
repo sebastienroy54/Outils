@@ -1,540 +1,181 @@
-Colonnes détectées:
-{
-"URM_APHP":"URM_APHP"
-"URM_SITE":"URM_SITE"
-}
+def normalize_um(value, width=4) -> str:
+    """
+    Normalise un code UM APHP :
+    - cast en str
+    - suppression espaces
+    - suppression virgules
+    - padding à gauche sur 4 caractères
+    """
+    if value is None:
+        return ""
+    s = str(value).strip()
+    s = s.replace(" ", "")
+    s = s.replace(",", "")
+    if s == "" or s.lower() == "nan":
+        return ""
+    return s.zfill(width)
 
-Aperçu 10 premières lignes (brut):
-0	127	010 
-1	862	010J
-2	"2,383"	010S
-3	879	011 
-4	"1,344"	011J
-5	"2,636"	012J
-6	"2,840"	015J
-7	"2,570"	017C
-8	120	020 
-9	"2,563"	020J
+
+def read_um_mapping_xlsx_only(excel_bytes: bytes, excel_filename: str) -> pd.DataFrame:
+    ext = (excel_filename or "").lower().split(".")[-1]
+    if ext == "xls":
+        raise ValueError(
+            "Fichier Excel au format .xls détecté.\n"
+            "Merci de l'enregistrer en .xlsx (Fichier > Enregistrer sous > .xlsx), "
+            "puis de relancer l'outil."
+        )
 
-
-URM_APHP (brut) debug (15 premières):
-
-URM_APHP brut #1: len=3 repr='127'
-
-URM_APHP brut #1 codepoints: ['0x31', '0x32', '0x37']
-
-URM_APHP brut #2: len=3 repr='862'
-
-URM_APHP brut #2 codepoints: ['0x38', '0x36', '0x32']
-
-URM_APHP brut #3: len=4 repr='2383'
-
-URM_APHP brut #3 codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-URM_APHP brut #4: len=3 repr='879'
-
-URM_APHP brut #4 codepoints: ['0x38', '0x37', '0x39']
-
-URM_APHP brut #5: len=4 repr='1344'
-
-URM_APHP brut #5 codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-URM_APHP brut #6: len=4 repr='2636'
-
-URM_APHP brut #6 codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-URM_APHP brut #7: len=4 repr='2840'
-
-URM_APHP brut #7 codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-URM_APHP brut #8: len=4 repr='2570'
-
-URM_APHP brut #8 codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-URM_APHP brut #9: len=3 repr='120'
-
-URM_APHP brut #9 codepoints: ['0x31', '0x32', '0x30']
-
-URM_APHP brut #10: len=4 repr='2563'
-
-URM_APHP brut #10 codepoints: ['0x32', '0x35', '0x36', '0x33']
-
-URM_APHP brut #11: len=3 repr='681'
-
-URM_APHP brut #11 codepoints: ['0x36', '0x38', '0x31']
-
-URM_APHP brut #12: len=3 repr='681'
-
-URM_APHP brut #12 codepoints: ['0x36', '0x38', '0x31']
-
-URM_APHP brut #13: len=4 repr='2571'
-
-URM_APHP brut #13 codepoints: ['0x32', '0x35', '0x37', '0x31']
-
-URM_APHP brut #14: len=4 repr='2386'
-
-URM_APHP brut #14 codepoints: ['0x32', '0x33', '0x38', '0x36']
-
-URM_APHP brut #15: len=3 repr='868'
-
-URM_APHP brut #15 codepoints: ['0x38', '0x36', '0x38']
-
-URM_APHP (après strip) debug (15 premières):
-
-URM_APHP strip #1: len=3 repr='127'
-
-URM_APHP strip #1 codepoints: ['0x31', '0x32', '0x37']
-
-URM_APHP strip #2: len=3 repr='862'
-
-URM_APHP strip #2 codepoints: ['0x38', '0x36', '0x32']
-
-URM_APHP strip #3: len=4 repr='2383'
-
-URM_APHP strip #3 codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-URM_APHP strip #4: len=3 repr='879'
-
-URM_APHP strip #4 codepoints: ['0x38', '0x37', '0x39']
-
-URM_APHP strip #5: len=4 repr='1344'
-
-URM_APHP strip #5 codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-URM_APHP strip #6: len=4 repr='2636'
-
-URM_APHP strip #6 codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-URM_APHP strip #7: len=4 repr='2840'
-
-URM_APHP strip #7 codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-URM_APHP strip #8: len=4 repr='2570'
-
-URM_APHP strip #8 codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-URM_APHP strip #9: len=3 repr='120'
-
-URM_APHP strip #9 codepoints: ['0x31', '0x32', '0x30']
-
-URM_APHP strip #10: len=4 repr='2563'
-
-URM_APHP strip #10 codepoints: ['0x32', '0x35', '0x36', '0x33']
-
-URM_APHP strip #11: len=3 repr='681'
-
-URM_APHP strip #11 codepoints: ['0x36', '0x38', '0x31']
-
-URM_APHP strip #12: len=3 repr='681'
-
-URM_APHP strip #12 codepoints: ['0x36', '0x38', '0x31']
-
-URM_APHP strip #13: len=4 repr='2571'
-
-URM_APHP strip #13 codepoints: ['0x32', '0x35', '0x37', '0x31']
-
-URM_APHP strip #14: len=4 repr='2386'
-
-URM_APHP strip #14 codepoints: ['0x32', '0x33', '0x38', '0x36']
-
-URM_APHP strip #15: len=3 repr='868'
-
-URM_APHP strip #15 codepoints: ['0x38', '0x36', '0x38']
-
-Nb URM_APHP avec espaces bizarres (NBSP/tab) (aperçu max 20) : 0
-
-===== DEBUG MAPPING =====
-
-Nb clés mapping: 114
-
---- Premières clés mapping (n=10) ---
-
-key: len=3 repr='127'
-
-key codepoints: ['0x31', '0x32', '0x37']
-
-key: len=3 repr='862'
-
-key codepoints: ['0x38', '0x36', '0x32']
-
-key: len=4 repr='2383'
-
-key codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-key: len=3 repr='879'
-
-key codepoints: ['0x38', '0x37', '0x39']
-
-key: len=4 repr='1344'
-
-key codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-key: len=4 repr='2636'
-
-key codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-key: len=4 repr='2840'
-
-key codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-key: len=4 repr='2570'
-
-key codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-key: len=3 repr='120'
-
-key codepoints: ['0x31', '0x32', '0x30']
-
-key: len=4 repr='2563'
-
-key codepoints: ['0x32', '0x35', '0x36', '0x33']
-
-Test présence clé 0116 dans mapping: False
-
-Test présence clé 0565 dans mapping: False
-
-Test présence clé 0880 dans mapping: False
-
-Test présence clé 0124 dans mapping: False
-
-Test présence clé 0123 dans mapping: False
-
-===== DEBUG RSS SAMPLE =====
-
-RSS seg brut: len=4 repr='0116'
-
-RSS seg brut codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-RSS key après replace(' ', ''): len=4 repr='0116'
-
-RSS key après replace(' ', '') codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Présence dans mapping: False
-
-===== DEBUG TARGET 0116 (non match) =====
-
-RSS key: len=4 repr='0116'
-
-RSS key codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Exemples de clés mapping (10):
-
---- mapping keys head (n=10) ---
-
-key: len=3 repr='127'
-
-key codepoints: ['0x31', '0x32', '0x37']
-
-key: len=3 repr='862'
-
-key codepoints: ['0x38', '0x36', '0x32']
-
-key: len=4 repr='2383'
-
-key codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-key: len=3 repr='879'
-
-key codepoints: ['0x38', '0x37', '0x39']
-
-key: len=4 repr='1344'
-
-key codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-key: len=4 repr='2636'
-
-key codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-key: len=4 repr='2840'
-
-key codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-key: len=4 repr='2570'
-
-key codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-key: len=3 repr='120'
-
-key codepoints: ['0x31', '0x32', '0x30']
-
-key: len=4 repr='2563'
-
-key codepoints: ['0x32', '0x35', '0x36', '0x33']
-
---- Near keys containing '116' (max 20) (n=1) ---
-
-key: len=3 repr='116'
-
-key codepoints: ['0x31', '0x31', '0x36']
-
-===== DEBUG RSS SAMPLE =====
-
-RSS seg brut: len=4 repr='0682'
-
-RSS seg brut codepoints: ['0x30', '0x36', '0x38', '0x32']
-
-RSS key après replace(' ', ''): len=4 repr='0682'
-
-RSS key après replace(' ', '') codepoints: ['0x30', '0x36', '0x38', '0x32']
-
-Présence dans mapping: False
-
-===== DEBUG RSS SAMPLE =====
-
-RSS seg brut: len=4 repr='0683'
-
-RSS seg brut codepoints: ['0x30', '0x36', '0x38', '0x33']
-
-RSS key après replace(' ', ''): len=4 repr='0683'
-
-RSS key après replace(' ', '') codepoints: ['0x30', '0x36', '0x38', '0x33']
-
-Présence dans mapping: False
-
-===== DEBUG RSS SAMPLE =====
-
-RSS seg brut: len=4 repr='0117'
-
-RSS seg brut codepoints: ['0x30', '0x31', '0x31', '0x37']
-
-RSS key après replace(' ', ''): len=4 repr='0117'
-
-RSS key après replace(' ', '') codepoints: ['0x30', '0x31', '0x31', '0x37']
-
-Présence dans mapping: False
-
-===== DEBUG RSS SAMPLE =====
-
-RSS seg brut: len=4 repr='0116'
-
-RSS seg brut codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-RSS key après replace(' ', ''): len=4 repr='0116'
-
-RSS key après replace(' ', '') codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Présence dans mapping: False
-
-===== DEBUG TARGET 0116 (non match) =====
-
-RSS key: len=4 repr='0116'
-
-RSS key codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Exemples de clés mapping (10):
-
---- mapping keys head (n=10) ---
-
-key: len=3 repr='127'
-
-key codepoints: ['0x31', '0x32', '0x37']
-
-key: len=3 repr='862'
-
-key codepoints: ['0x38', '0x36', '0x32']
-
-key: len=4 repr='2383'
-
-key codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-key: len=3 repr='879'
-
-key codepoints: ['0x38', '0x37', '0x39']
-
-key: len=4 repr='1344'
-
-key codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-key: len=4 repr='2636'
-
-key codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-key: len=4 repr='2840'
-
-key codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-key: len=4 repr='2570'
-
-key codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-key: len=3 repr='120'
-
-key codepoints: ['0x31', '0x32', '0x30']
-
-key: len=4 repr='2563'
-
-key codepoints: ['0x32', '0x35', '0x36', '0x33']
-
---- Near keys containing '116' (max 20) (n=1) ---
-
-key: len=3 repr='116'
-
-key codepoints: ['0x31', '0x31', '0x36']
-
-===== DEBUG TARGET 0116 (non match) =====
-
-RSS key: len=4 repr='0116'
-
-RSS key codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Exemples de clés mapping (10):
-
---- mapping keys head (n=10) ---
-
-key: len=3 repr='127'
-
-key codepoints: ['0x31', '0x32', '0x37']
-
-key: len=3 repr='862'
-
-key codepoints: ['0x38', '0x36', '0x32']
-
-key: len=4 repr='2383'
-
-key codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-key: len=3 repr='879'
-
-key codepoints: ['0x38', '0x37', '0x39']
-
-key: len=4 repr='1344'
-
-key codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-key: len=4 repr='2636'
-
-key codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-key: len=4 repr='2840'
-
-key codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-key: len=4 repr='2570'
-
-key codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-key: len=3 repr='120'
-
-key codepoints: ['0x31', '0x32', '0x30']
-
-key: len=4 repr='2563'
-
-key codepoints: ['0x32', '0x35', '0x36', '0x33']
-
---- Near keys containing '116' (max 20) (n=1) ---
-
-key: len=3 repr='116'
-
-key codepoints: ['0x31', '0x31', '0x36']
-
-===== DEBUG TARGET 0116 (non match) =====
-
-RSS key: len=4 repr='0116'
-
-RSS key codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Exemples de clés mapping (10):
-
---- mapping keys head (n=10) ---
-
-key: len=3 repr='127'
-
-key codepoints: ['0x31', '0x32', '0x37']
-
-key: len=3 repr='862'
-
-key codepoints: ['0x38', '0x36', '0x32']
-
-key: len=4 repr='2383'
-
-key codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-key: len=3 repr='879'
-
-key codepoints: ['0x38', '0x37', '0x39']
-
-key: len=4 repr='1344'
-
-key codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-key: len=4 repr='2636'
-
-key codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-key: len=4 repr='2840'
-
-key codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-key: len=4 repr='2570'
-
-key codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-key: len=3 repr='120'
-
-key codepoints: ['0x31', '0x32', '0x30']
-
-key: len=4 repr='2563'
-
-key codepoints: ['0x32', '0x35', '0x36', '0x33']
-
---- Near keys containing '116' (max 20) (n=1) ---
-
-key: len=3 repr='116'
-
-key codepoints: ['0x31', '0x31', '0x36']
-
-===== DEBUG TARGET 0116 (non match) =====
-
-RSS key: len=4 repr='0116'
-
-RSS key codepoints: ['0x30', '0x31', '0x31', '0x36']
-
-Exemples de clés mapping (10):
-
---- mapping keys head (n=10) ---
-
-key: len=3 repr='127'
-
-key codepoints: ['0x31', '0x32', '0x37']
-
-key: len=3 repr='862'
-
-key codepoints: ['0x38', '0x36', '0x32']
-
-key: len=4 repr='2383'
-
-key codepoints: ['0x32', '0x33', '0x38', '0x33']
-
-key: len=3 repr='879'
-
-key codepoints: ['0x38', '0x37', '0x39']
-
-key: len=4 repr='1344'
-
-key codepoints: ['0x31', '0x33', '0x34', '0x34']
-
-key: len=4 repr='2636'
-
-key codepoints: ['0x32', '0x36', '0x33', '0x36']
-
-key: len=4 repr='2840'
-
-key codepoints: ['0x32', '0x38', '0x34', '0x30']
-
-key: len=4 repr='2570'
-
-key codepoints: ['0x32', '0x35', '0x37', '0x30']
-
-key: len=3 repr='120'
-
-key codepoints: ['0x31', '0x32', '0x30']
-
-key: len=4 repr='2563'
-
-key codepoints: ['0x32', '0x35', '0x36', '0x33']
-
---- Near keys containing '116' (max 20) (n=1) ---
-
-key: len=3 repr='116'
-
-key codepoints: ['0x31', '0x31', '0x36']
+    bio = io.BytesIO(excel_bytes)
+    df = pd.read_excel(bio, engine="openpyxl", skiprows=2)
+    df = df.dropna(how="all")
+
+    cols = {c: str(c).strip() for c in df.columns}
+    df = df.rename(columns=cols)
+
+    col_upper = {c.upper().replace(" ", "").replace("-", "_"): c for c in df.columns}
+    urm_aphp_col = col_upper.get("URM_APHP") or col_upper.get("URMAPHP")
+    urm_site_col = col_upper.get("URM_SITE") or col_upper.get("URMSITE")
+
+    if not urm_aphp_col or not urm_site_col:
+        raise ValueError(
+            "Colonnes attendues non trouvées dans l'Excel. "
+            "Il faut des colonnes 'URM_APHP' et 'URM_SITE'."
+        )
+
+    out = df[[urm_aphp_col, urm_site_col]].copy()
+    out.columns = ["URM_APHP", "URM_SITE"]
+
+    # 🔥 Normalisation propre
+    out["URM_APHP"] = out["URM_APHP"].apply(lambda x: normalize_um(x, 4))
+    out["URM_SITE"] = out["URM_SITE"].astype(str).str.strip()
+
+    out = out[(out["URM_APHP"] != "")]
+    out = out.drop_duplicates(subset=["URM_APHP"], keep="first")
+
+
+
+
+
+def process_rss_text_mco(rss_bytes: bytes, mapping: dict, start_1_based: int, length: int):
+    text = safe_decode_singlebyte(rss_bytes)
+    lines = text.splitlines(True)
+
+    start0 = start_1_based - 1
+    end0 = start0 + length
+
+    total = 0
+    matched = 0
+    missing_keys = Counter()
+
+    out_lines = []
+
+    for line in lines:
+        if len(line) < end0:
+            out_lines.append(line)
+            continue
+
+        seg = line[start0:end0]
+        key = normalize_um(seg, length)
+
+        total += 1
+
+        if key in mapping:
+            rep = mapping[key]
+            rep_fixed = (rep + (" " * length))[:length]
+            new_line = line[:start0] + rep_fixed + line[end0:]
+            out_lines.append(new_line)
+            matched += 1
+        else:
+            out_lines.append(line)
+            missing_keys[key] += 1
+
+    corrected = "".join(out_lines)
+
+    stats = {
+        "total_records_checked": total,
+        "matched": matched,
+        "match_rate": (matched / total) if total else 0.0,
+        "missing_top10": missing_keys.most_common(10),
+        "missing_unique": len(missing_keys),
+    }
+
+    return safe_encode_singlebyte(corrected), stats
+
+
+def main():
+    st.title("Formatage PMSIPilot — MCO (V1)")
+
+    st.markdown(
+        "- Dépose un ZIP MCO (`mco_XXX_YYYYMM_in.zip`) + un Excel de correspondance UM.\n"
+        "- ⚠️ Seul le format .xlsx est accepté.\n"
+        "- Le ZIP final contient les fichiers d'origine + rss.ini-corrige + vidhosp + rapport."
+    )
+
+    mode = st.selectbox("Type", ["Auto", "MCO", "SMR", "PSY"], index=0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        uploaded_zip = st.file_uploader("ZIP d'entrée", type=["zip"])
+    with col2:
+        uploaded_excel = st.file_uploader("Excel correspondance UM (.xlsx requis)", type=["xls", "xlsx"])
+
+    keep_original_rss = st.checkbox("Conserver le RSS original", value=True)
+    min_match_rate = st.slider("Seuil minimum de match UM", 0.0, 1.0, 0.98, 0.01)
+
+    if uploaded_zip and uploaded_excel:
+
+        if uploaded_excel.name.lower().endswith(".xls"):
+            st.error(
+                "Fichier Excel au format .xls détecté.\n\n"
+                "Merci de l'ouvrir et de l'enregistrer au format .xlsx."
+            )
+            return
+
+        zip_bytes = uploaded_zip.read()
+        excel_bytes = uploaded_excel.read()
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as z:
+                namelist = z.namelist()
+        except Exception as e:
+            st.error(f"ZIP invalide: {e}")
+            return
+
+        detected = detect_domain(uploaded_zip.name, namelist)
+        chosen = detected if mode == "Auto" else mode
+
+        if chosen != "MCO":
+            st.warning("Pour le moment seul le MCO est implémenté.")
+            return
+
+        if st.button("Lancer le traitement", type="primary"):
+            try:
+                out_zip_bytes, report = process_zip_mco(
+                    zip_bytes=zip_bytes,
+                    zip_filename=uploaded_zip.name,
+                    excel_bytes=excel_bytes,
+                    excel_filename=uploaded_excel.name,
+                    keep_original_rss=keep_original_rss,
+                    rss_um_start_1based=87,
+                    rss_um_length=4,
+                    min_match_rate=float(min_match_rate),
+                )
+            except Exception as e:
+                st.error(str(e))
+                return
+
+            st.success("Traitement terminé.")
+            st.text_area("Rapport", report, height=300)
+
+            out_name = uploaded_zip.name.replace("_in.zip", "_out.zip")
+            st.download_button(
+                label="Télécharger le ZIP formaté",
+                data=out_zip_bytes,
+                file_name=out_name,
+                mime="application/zip",
+            )
+
+    else:
+        st.info("Téléverse un ZIP + un Excel pour démarrer.")
+
+    return out
