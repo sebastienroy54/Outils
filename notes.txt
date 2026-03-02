@@ -1,181 +1,137 @@
-def normalize_um(value, width=4) -> str:
-    """
-    Normalise un code UM APHP :
-    - cast en str
-    - suppression espaces
-    - suppression virgules
-    - padding à gauche sur 4 caractères
-    """
-    if value is None:
-        return ""
-    s = str(value).strip()
-    s = s.replace(" ", "")
-    s = s.replace(",", "")
-    if s == "" or s.lower() == "nan":
-        return ""
-    return s.zfill(width)
+---
+title: "generate_vidhosp_files_a_partir_Anohosp"
+author: "Octavien KPADEMONA YAMESSE"
+date: "2024-10-31"
+output: html_document
+---
 
+```{r}
+---
+  title: "Création des fichiers VIDHOSP"
+author: "Votre Nom"
+date: "`r Sys.Date()`"
+output: html_document
+---
+# METTRE LES 4 FICHIERS DES 4 SITES A LA RACINE //wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR"
+# CONTROLE A POUR TOUT SELECTIONNER ET CONTROLE ENTREE POUR EXECUTER ET GENERER LES 4 FICHIERS VIDHOSP  
+  
+  
+# Chargement des bibliothèques nécessaires
+library(dplyr)
+library(stringr)
+library(readr)
 
-def read_um_mapping_xlsx_only(excel_bytes: bytes, excel_filename: str) -> pd.DataFrame:
-    ext = (excel_filename or "").lower().split(".")[-1]
-    if ext == "xls":
-        raise ValueError(
-            "Fichier Excel au format .xls détecté.\n"
-            "Merci de l'enregistrer en .xlsx (Fichier > Enregistrer sous > .xlsx), "
-            "puis de relancer l'outil."
-        )
+# Définir le répertoire de travail
+print(getwd())
+setwd("//wprod.ds.aphp.fr/cup/G12/informatique_medicale/PMSIPILOT/Remontee_ATIH/SSR")
 
-    bio = io.BytesIO(excel_bytes)
-    df = pd.read_excel(bio, engine="openpyxl", skiprows=2)
-    df = df.dropna(how="all")
+# Constantes pour les FINESSES
+FINESSES <- list(
+  "21" = c("750100166", "CCH"),
+  "16" = c("750801441", "BRC"),
+  "90" = c("750100216", "VGR"),
+  "22" = c("920100062", "CCL")
+)
 
-    cols = {c: str(c).strip() for c in df.columns}
-    df = df.rename(columns=cols)
+# Fonction pour lire le fichier ANOHOSP
+read_file <- function(file_path) {
+  read_lines(file_path)
+}
 
-    col_upper = {c.upper().replace(" ", "").replace("-", "_"): c for c in df.columns}
-    urm_aphp_col = col_upper.get("URM_APHP") or col_upper.get("URMAPHP")
-    urm_site_col = col_upper.get("URM_SITE") or col_upper.get("URMSITE")
+# Fonction pour extraire les champs des lignes ANOHOSP
+extract_fields <- function(ano) {
+  list(
+    regime = substr(ano, 141, 142),
+    gestion = substr(ano, 143, 144),
+    ddn = substr(ano, 248, 255),
+    nas = substr(ano, 41, 60),
+    format = paste0("V", substr(ano, 17, 19)),
+    exo_a_montant_amc = substr(ano, 145, 247),
+    participation_a_centre_gestion = substr(ano, 257, 277),
+    sexe = ifelse(substr(ano, 256, 256) %in% c("1", "2"), substr(ano, 256, 256), "1"),
+    annee_ddn = substr(ano, 254, 255),
+    mois_ddn = substr(ano, 250, 251),
+    ipp_cropped = substr(ano, 403, 410),
+    confirmation_pc_a_ipp = substr(ano, 278, 420)
+  )
+}
+# Calcul de la clé d'assurance maladie fictive
+ano_cle <- function(num_secu) {
+  sprintf("%02d", 97 - as.numeric(num_secu) %% 97)
+}
+# Fonction principale pour créer VIDHOSP à partir d'ANOHOSP
+anohosp_to_vidhosp <- function(site, anohosp_data) {
+  anohosp_data <- str_trim(anohosp_data)
+  anohosp_data <- anohosp_data[nchar(anohosp_data) >= 19]
+  anohosp_data <- anohosp_data[str_detect(anohosp_data, "^[38]"), drop = FALSE]
+  anohosp_data <- anohosp_data[anohosp_data != ""]
+  
+  if (length(anohosp_data) == 0) {
+    stop("Aucune ligne trouvée correspondant aux critères. Vérifiez le fichier ANOHOSP.")
+  }
+  
+  vid <- data.frame(anohosp = anohosp_data)
+  
+  vid$format <- sapply(vid$anohosp, function(x) extract_fields(x)$format)
+  vid$fake_num_am <- mapply(function(sexe, annee, mois, ipp) paste0(sexe, annee, mois, ipp),
+                            sexe = sapply(vid$anohosp, function(x) extract_fields(x)$sexe),
+                            annee = sapply(vid$anohosp, function(x) extract_fields(x)$annee_ddn),
+                            mois = sapply(vid$anohosp, function(x) extract_fields(x)$mois_ddn),
+                            ipp = sapply(vid$anohosp, function(x) extract_fields(x)$ipp_cropped))
+  
+  vid$cle <- sapply(vid$fake_num_am, ano_cle)
+  vid$regime <- sapply(vid$anohosp, function(x) extract_fields(x)$regime)
+  vid$gestion <- sapply(vid$anohosp, function(x) extract_fields(x)$gestion)
+  vid$ddn <- sapply(vid$anohosp, function(x) extract_fields(x)$ddn)
+  vid$sexe <- sapply(vid$anohosp, function(x) extract_fields(x)$sexe)
+  vid$nas <- sapply(vid$anohosp, function(x) extract_fields(x)$nas)
+  vid$filler <- str_pad("", 30)
+  vid$finess <- FINESSES[[site]][1]
+  vid$exo_a_montant_amc <- sapply(vid$anohosp, function(x) extract_fields(x)$exo_a_montant_amc)
+  vid$participation_a_centre_gestion <- sapply(vid$anohosp, function(x) extract_fields(x)$participation_a_centre_gestion)
+  vid$confirmation_pc_a_ipp <- sapply(vid$anohosp, function(x) extract_fields(x)$confirmation_pc_a_ipp)
+  vid$art51 <- str_pad("", 1)
+  
+  # Création de VIDHOSP
+  vid$raw <- ifelse(vid$format == "V013",
+                    paste0(vid$fake_num_am, vid$cle, vid$regime, vid$gestion, vid$ddn,
+                           vid$sexe, vid$nas, vid$format, vid$finess, vid$fake_num_am,
+                           vid$cle, vid$exo_a_montant_amc, vid$participation_a_centre_gestion,
+                           vid$filler, vid$confirmation_pc_a_ipp),
+                    paste0(vid$fake_num_am, vid$cle, vid$regime, vid$gestion, vid$ddn,
+                           vid$sexe, vid$nas, vid$format, vid$finess, vid$fake_num_am,
+                           vid$cle, vid$exo_a_montant_amc, vid$participation_a_centre_gestion,
+                           vid$filler, vid$confirmation_pc_a_ipp, vid$fake_num_am,
+                           vid$cle, vid$art51))
+  
+  vid <- vid[vid$format %in% c("V013", "V014", "V015"), ]
+  
+  if (nrow(vid) == 0) {
+    stop("Aucune ligne ne correspond aux formats V013, V014 ou V015 après le filtrage.")
+  }
+  
+  return(vid)
+}
 
-    if not urm_aphp_col or not urm_site_col:
-        raise ValueError(
-            "Colonnes attendues non trouvées dans l'Excel. "
-            "Il faut des colonnes 'URM_APHP' et 'URM_SITE'."
-        )
+# Fonction pour créer un fichier VIDHOSP pour un site donné
+create_vidhosp <- function(site, anohosp_file_path) {
+  anohosp_data <- read_file(anohosp_file_path)
+  vid <- anohosp_to_vidhosp(site, anohosp_data)
+  
+  output_name <- paste0(site, "_VIDHOSP_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".txt")
+  write_lines(vid$raw, output_name)
+  message("Fichier VIDHOSP créé : ", output_name)
+}
+# Fonction pour créer les fichiers VIDHOSP pour tous les sites définis dans FINESSES
+create_all_vidhosp_files <- function() {
+  lapply(names(FINESSES), function(site) {
+    anohosp_file_path <- paste0("SSR", site, "_Anohosp.fic")
+    create_vidhosp(site, anohosp_file_path)
+  })
+}
 
-    out = df[[urm_aphp_col, urm_site_col]].copy()
-    out.columns = ["URM_APHP", "URM_SITE"]
+# Exécution de la fonction pour générer tous les fichiers VIDHOSP
+create_all_vidhosp_files()
 
-    # 🔥 Normalisation propre
-    out["URM_APHP"] = out["URM_APHP"].apply(lambda x: normalize_um(x, 4))
-    out["URM_SITE"] = out["URM_SITE"].astype(str).str.strip()
-
-    out = out[(out["URM_APHP"] != "")]
-    out = out.drop_duplicates(subset=["URM_APHP"], keep="first")
-
-
-
-
-
-def process_rss_text_mco(rss_bytes: bytes, mapping: dict, start_1_based: int, length: int):
-    text = safe_decode_singlebyte(rss_bytes)
-    lines = text.splitlines(True)
-
-    start0 = start_1_based - 1
-    end0 = start0 + length
-
-    total = 0
-    matched = 0
-    missing_keys = Counter()
-
-    out_lines = []
-
-    for line in lines:
-        if len(line) < end0:
-            out_lines.append(line)
-            continue
-
-        seg = line[start0:end0]
-        key = normalize_um(seg, length)
-
-        total += 1
-
-        if key in mapping:
-            rep = mapping[key]
-            rep_fixed = (rep + (" " * length))[:length]
-            new_line = line[:start0] + rep_fixed + line[end0:]
-            out_lines.append(new_line)
-            matched += 1
-        else:
-            out_lines.append(line)
-            missing_keys[key] += 1
-
-    corrected = "".join(out_lines)
-
-    stats = {
-        "total_records_checked": total,
-        "matched": matched,
-        "match_rate": (matched / total) if total else 0.0,
-        "missing_top10": missing_keys.most_common(10),
-        "missing_unique": len(missing_keys),
-    }
-
-    return safe_encode_singlebyte(corrected), stats
-
-
-def main():
-    st.title("Formatage PMSIPilot — MCO (V1)")
-
-    st.markdown(
-        "- Dépose un ZIP MCO (`mco_XXX_YYYYMM_in.zip`) + un Excel de correspondance UM.\n"
-        "- ⚠️ Seul le format .xlsx est accepté.\n"
-        "- Le ZIP final contient les fichiers d'origine + rss.ini-corrige + vidhosp + rapport."
-    )
-
-    mode = st.selectbox("Type", ["Auto", "MCO", "SMR", "PSY"], index=0)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        uploaded_zip = st.file_uploader("ZIP d'entrée", type=["zip"])
-    with col2:
-        uploaded_excel = st.file_uploader("Excel correspondance UM (.xlsx requis)", type=["xls", "xlsx"])
-
-    keep_original_rss = st.checkbox("Conserver le RSS original", value=True)
-    min_match_rate = st.slider("Seuil minimum de match UM", 0.0, 1.0, 0.98, 0.01)
-
-    if uploaded_zip and uploaded_excel:
-
-        if uploaded_excel.name.lower().endswith(".xls"):
-            st.error(
-                "Fichier Excel au format .xls détecté.\n\n"
-                "Merci de l'ouvrir et de l'enregistrer au format .xlsx."
-            )
-            return
-
-        zip_bytes = uploaded_zip.read()
-        excel_bytes = uploaded_excel.read()
-
-        try:
-            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as z:
-                namelist = z.namelist()
-        except Exception as e:
-            st.error(f"ZIP invalide: {e}")
-            return
-
-        detected = detect_domain(uploaded_zip.name, namelist)
-        chosen = detected if mode == "Auto" else mode
-
-        if chosen != "MCO":
-            st.warning("Pour le moment seul le MCO est implémenté.")
-            return
-
-        if st.button("Lancer le traitement", type="primary"):
-            try:
-                out_zip_bytes, report = process_zip_mco(
-                    zip_bytes=zip_bytes,
-                    zip_filename=uploaded_zip.name,
-                    excel_bytes=excel_bytes,
-                    excel_filename=uploaded_excel.name,
-                    keep_original_rss=keep_original_rss,
-                    rss_um_start_1based=87,
-                    rss_um_length=4,
-                    min_match_rate=float(min_match_rate),
-                )
-            except Exception as e:
-                st.error(str(e))
-                return
-
-            st.success("Traitement terminé.")
-            st.text_area("Rapport", report, height=300)
-
-            out_name = uploaded_zip.name.replace("_in.zip", "_out.zip")
-            st.download_button(
-                label="Télécharger le ZIP formaté",
-                data=out_zip_bytes,
-                file_name=out_name,
-                mime="application/zip",
-            )
-
-    else:
-        st.info("Téléverse un ZIP + un Excel pour démarrer.")
-
-    return out
+# FIN DE TRAITEMENT 
+```
