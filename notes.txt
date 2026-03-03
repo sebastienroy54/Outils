@@ -1,191 +1,161 @@
-import streamlit as st
-import subprocess
-import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime
-from pathlib import Path
+$$$375010016630 01072017021C
+010 75010016629 01012005000C
+010J75010016629 01012006000P
+010S75010016629 01012015000C
+011 75010016640 13112008000C
+011J75010016643 01012007000P
+012J75010016643 01012000000P
+013 75010016629 01012007000C
+014 75010016629 01012007000C
+014J75010016629 01012007000P
+014S75010016629 01012015000C
+015 75010016629 01012010000C
+015J75010016629 01012000000P
+017C75010016653 01012000000P
+020 75010016629 01012005000C
+020J75010016629 01112017000P
+020S75010016629 01012015000C
+021 75010016602A01012005014C
+021 75010016602E01102024012C
+022 75010016640 19102015000C
+022J75010016640 01012000000P
+022S75010016640 01012015000C
+031J75010016640 01012006000P
+037 75010016653 01012013000C
+037J75010016653 01012000000P
+037S75010016653 01012000000C
+040 75010016629 01012005000C
+040C75010016629 01012007000P
+040J75010016629 01012000000P
+040S75010016629 01052013000C
+040X75010016643 01012000000P
+041 75010016653 01012007000C
+041C75010016653 01052013000P
+041J75010016653 01012000000P
+046 75010016629 01042016000C
+060 75010016629 01012005000C
+060J75010016629 01012006000P
+060S75010016629 01012015000C
+061J75010016629 01012005000P
+062C75010016629 01032016000P
+062J75010016629 01012000000P
+063J75010016629 01012000000P
+064 75010016601A01012000008C
+070 75010016629 01012005000C
+070J75010016629 01012006000P
+070S75010016629 01012015000C
+071 75010016629 01012014000C
+071J75010016629 01012014000P
+071S75010016629 01012014000C
+072J75010016629 01012015000P
+073J75010016629 01012000000P
+080 75010016629 01012005000C
+080J75010016629 01012006000P
+080S75010016629 01012005000C
+081J75010016629 01012007000P
+082 75010016629 01012015000C
+082J75010016629 01012015000P
+083J75010016629 01012005000P
+084J75010016629 01012005000P
+088J75010016629 01012007000P
+090 75010016604 01012005020C
+090J75010016628 01012000000P
+091 75010016606 01012005020C
+092 75010016605 01012005013C
+101 75010016601A01012005010C
+101 75010016601A01012013008C
+102 75010016603A01012007008C
+102 75010016602C01102024000C
+103 75010016601A01012015008C
+104 75010016603A01012000006C
+104 75010016602C01102024006C
+104 75010016624C01032025006C
+112 75010016653 01012005000C
+112C75010016653 04072012000P
+112S75010016653 01012005000C
+113C75010016653 05012015000P
+114C75010016653 01052015000P
+115 75010016653 01012016000C
+120C75010016653 01012007000P
+121 75010016653 01012014000C
+121C75010016653 01012014000P
+130 75010016671 01012005000C
+130J75010016671 01012006000P
+132 75010016671 01012015000C
+133 75010016671 01012015000C
+140 75010016670 01012005000C
+140C75010016670 01012000000P
+140J75010016672 01012006000P
+140J75010016653 01032019000P
+140S75010016670 01012000000C
+141J75010016670 01012006000P
+142J75010016672 10082009001P
+142J75010016629 01032019001P
+143 75010016653 01012000000C
+143C75010016653 01012000000P
+143J75010016670 01022012000P
+144C75010016670 01022012000P
+145C75010016670 01012000000P
+146J75010016670 01012000000P
+150C75010016653 01012000000P
+150J75010016653 01012000000P
+160 75010016629 01012005000C
+161C75010016653 01012006000P
+161J75010016629 01012006000P
+162C75010016653 01052015000P
+162J75010016629 01012006000P
+260C75010016653 01012000000P
+260J75010016629 01012000000P
+270 75010016653 01012005000C
+270C75010016653 01012015000P
+270J75010016629 01012000000P
+270S75010016653 01012015000C
+271C75010016653 01052015000P
+290 75010016653 01012006000C
+310 75010016653 01012007000C
+320J75010016653 01012000000P
+330 75010016629 01012005000C
+330J75010016629 01012006000P
+340 75010016601A01012005018C
+341 75010016603A01012007006C
+341 75010016602C01102024006C
+341 75010016624C01032025006C
+384J75010016629 01012000000P
+390 75010016629 01012013000C
+390 75010016629 01012014000C
+390J75010016629 01012013000P
+392 75010016601A01012013008C
+393 75010016603A01012013008C
+393 75010016602I01102024008C
+394 75010016602B01012013007C
+410C75010016653 01012000000P
+450 75010016640 12092011000C
+450J75010016643 01102011000P
+451 75010016616 12092011009C
+451 75010016616 01012013012C
+451 75010016602H01102024012C
+460 75010016653 01062012000C
+460C75010016653 01062012000P
+461C75010016653 01102015000P
+500C75010016661 01012000000P
+500J75010016661 01012000000P
+501J75010016661 01012000000P
+520 75010016629 01012005000C
+520J75010016629 01012006000P
+520S75010016629 01012000000C
+540 75010016607A01012005019C
+542 75010016603A01012000003C
+543 75010016629 01012000000C
+561C75010016653 01012000000P
+591 75010016653 01052017000C
+591C75010016653 01052017000P
+591J75010016653 01052017000P
+600 75010016628 01102008000C
+600J75010016628 15092010000P
+601J75010016628 01012000000P
+670 75010016619 01032007001C
+670J75010016629 01012007000P
+770 75010016629 01012005000C
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-SQL_DIR = BASE_DIR / "SQL"
-DATA_DIR = BASE_DIR / "data"
-OUTILS_DIR = BASE_DIR / "outils"
 
-SQL_FILE = SQL_DIR / "Requete_RUM.sql"
-CSV_FILE = DATA_DIR / "dashboard.csv"
-CSS_FILE = OUTILS_DIR / "styles_dashboard_rum.css"
-
-def load_css(file_path):
-    if not file_path.exists():
-        st.warning(f"CSS introuvable : {file_path}")
-        return
-    with open(file_path, encoding="utf-8") as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-def run_sqlplus(user, password, tns_alias, sql_file):
-    cmd = [
-        "sqlplus",
-        "-S",
-        f"{user}/{password}@{tns_alias}",
-        f"@{sql_file}"
-    ]
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr or result.stdout or "Erreur SQL*Plus")
-
-def load_data(csv_file):
-    cols = [
-        "UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
-        "NB_JOURNEES", "NB_JOURNEES_SUPPL",
-        "%_RUM_SUPPL", "%_JOURNEES_SUPPL"
-    ]
-
-    df = pd.read_csv(
-        csv_file,
-        sep=";",
-        engine="python",
-        names=cols,
-        header=None,
-        encoding="cp1252"
-    )
-
-    df = df.dropna(subset=["UNIT"])
-    df["ANNEE"] = df["ANNEE"].astype(int)
-    df["UNIT"] = df["UNIT"].astype(str).str.strip()
-
-    numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-
-    df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
-    df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
-
-    return df.sort_values("UNIT").reset_index(drop=True)
-
-def afficher_tableau(df, annee1, annee2):
-
-    mois_actuel = datetime.now().month
-    mois_precedent = 12 if mois_actuel == 1 else mois_actuel - 1
-    suffixe_mois = f"M{mois_precedent:02d}"
-
-    um_names = {
-        "103": "Réa CHIR",
-        "104": "USC",
-        "21": "SI Cardiologie",
-        "340": "Med Intensive Rea",
-        "341": "USIP MIR",
-        "451": "SI Hématologie",
-        "91": "Réa Néonat",
-        "92": "SI Néonat"
-    }
-
-    st.markdown("""
-    <style>
-    .block-container { max-width: 95% !important; }
-    .table-grouped { width: 100% !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-    df["UNIT_NOM"] = df["UNIT"].map(um_names).fillna(df["UNIT"])
-
-    rows = []
-
-    for unit in sorted(df["UNIT"].unique()):
-        d1 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee1)]
-        d2 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee2)]
-
-        d1 = d1.iloc[0] if not d1.empty else None
-        d2 = d2.iloc[0] if not d2.empty else None
-
-        nb_rum1 = d1["NB_RUM"] if d1 is not None else 0
-        nb_rum_sup1 = d1["NB_RUM_SUPPL"] if d1 is not None else 0
-        pct_rum1 = d1["%_RUM_SUPPL"] if d1 is not None else 0
-        nb_journees1 = d1["NB_JOURNEES"] if d1 is not None else 0
-        nb_journees_sup1 = d1["NB_JOURNEES_SUPPL"] if d1 is not None else 0
-        pct_journees1 = d1["%_JOURNEES_SUPPL"] if d1 is not None else 0
-
-        nb_rum2 = d2["NB_RUM"] if d2 is not None else 0
-        nb_rum_sup2 = d2["NB_RUM_SUPPL"] if d2 is not None else 0
-        pct_rum2 = d2["%_RUM_SUPPL"] if d2 is not None else 0
-        nb_journees2 = d2["NB_JOURNEES"] if d2 is not None else 0
-        nb_journees_sup2 = d2["NB_JOURNEES_SUPPL"] if d2 is not None else 0
-        pct_journees2 = d2["%_JOURNEES_SUPPL"] if d2 is not None else 0
-
-        evol_rum = round(nb_rum_sup1 / nb_rum_sup2, 1) if nb_rum_sup2 else 0
-        evol_journees = round(nb_journees_sup1 / nb_journees_sup2, 1) if nb_journees_sup2 else 0
-
-        unit_nom = f"UM {unit} - {d1['UNIT_NOM'] if d1 is not None else (d2['UNIT_NOM'] if d2 is not None else unit)}"
-
-        sign_rum = "+" if evol_rum > 0 else ""
-        sign_journees = "+" if evol_journees >0 else ""
-
-        rows.append(
-            f"<tr>"
-            f"<td>{unit_nom}</td>"
-            f"<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td>{pct_rum2}%</td>"
-            f"<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td>{pct_journees2}%</td>"
-            f"<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td>{pct_rum1}%</td>"
-            f"<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td>{pct_journees1}%</td>"
-            f"<td>{sign_rum}{evol_rum}%</td>"
-            f"<td>{sign_journees}{evol_journees}%</td>"
-            f"</tr>"
-        )
-
-    tableau_html = f"""
-    <h2>Évolution {annee1} vs {annee2} - {suffixe_mois}</h2>
-    <table class="table-grouped">
-        <thead>
-        <tr>
-          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
-          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
-          <th colspan="3" class="group-border-right th-jours">{annee2} Journées</th>
-          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
-          <th colspan="3" class="group-border-right th-jours">{annee1} Journées</th>
-          <th colspan="2" class="th-evol">Évolution</th>
-        </tr>
-        <tr>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
-          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
-          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
-          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
-        </tr>
-      </thead>
-      <tbody>
-        {''.join(rows)}
-      </tbody>
-    </table>
-    """
-    st.markdown(tableau_html, unsafe_allow_html=True)
-
-def main():
-    st.title("Dashboard d'évolution des RUMs")
-
-    annee1 = 2024
-    annee2 = 2025
-
-    load_css(CSS_FILE)
-
-    user = "xxxxx"
-    password = "xxxxx"
-    tns_alias = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
-
-    if st.button("Actualiser le tableau"):
-        if CSV_FILE.exists():
-            CSV_FILE.unlink()
-        try:
-            run_sqlplus(user, password, tns_alias, SQL_FILE)
-            if not CSV_FILE.exists():
-                st.error("SQL exécuté mais dashboard.csv introuvable.")
-                st.stop()
-            df = load_data(CSV_FILE)
-            afficher_tableau(df, annee1, annee2)
-        except Exception as e:
-            st.error(f"Erreur lors de l'exécution : {e}")
-
-if __name__ == "__main__":
-    main()
+00021	$213	2549	30 	01/07/2017	021	C
