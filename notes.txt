@@ -170,8 +170,8 @@ def main():
 
     load_css(CSS_FILE)
 
-    user = "consult"
-    password = "consult"
+    user = "xxxxx"
+    password = "xxxxx"
     tns_alias = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
 
     if st.button("Actualiser le tableau"):
