@@ -1,3 +1,10 @@
-print("Pose min/max:", sedi_dt_pose.min(), sedi_dt_pose.max())
-print("Nb dates NaT:", sedi_dt_pose.isna().sum())
-print("Répartition mois:", sedi_dt_pose.dropna().dt.to_period("M").value_counts().sort_index())
+# ---- DEBUG SEDITRACE
+xls = pd.ExcelFile(PATH_SEDI)
+print("Onglets du fichier:", xls.sheet_names)
+
+print("Nb lignes lues:", len(sedi))
+print("Dernières valeurs 'Posé le':")
+print(sedi["Posé le"].tail(20))
+
+print("Dernières valeurs DATEHEURESAISIE:")
+print(sedi["DATEHEURESAISIE"].tail(20))
