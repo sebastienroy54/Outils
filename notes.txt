@@ -1,3 +1,92 @@
-Patient::IP_NIP	Patient::IP_Service référent	I_Date Intervention	I_Cadre Intervention	Patient::NEW_PE_Typologie1eIntervention
+# -*- coding: utf-8 -*-
+import pandas as pd
 
-IPP       	NDA       	ENTREE    	SORTIE    	UM
+EXCEL_PATH = "Extraction DREAM Janvier 2026.xlsx"
+CSV_PATH = "SEJOURS_Z515_JANVIER_2026.csv"
+OUTPUT_PATH = "IPP_presents_dans_Excel_absents_du_CSV.xlsx"
+
+# Colonnes attendues
+COL_IPP_EXCEL = "Patient::IP_NIP"
+COL_CADRE_EXCEL = "I_Cadre Intervention"
+COL_IPP_CSV = "IPP"
+
+def read_csv_flexible(path):
+    """
+    Essaie de lire un CSV avec séparateur ; ou , et encodages fréquents.
+    """
+    encodings = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
+    seps = [";", ","]
+    last_err = None
+
+    for enc in encodings:
+        for sep in seps:
+            try:
+                df = pd.read_csv(path, sep=sep, encoding=enc, dtype=str)
+                # Si on n'a qu'une colonne, souvent c'est le mauvais séparateur
+                if df.shape[1] <= 1:
+                    continue
+                return df
+            except Exception as e:
+                last_err = e
+
+    raise RuntimeError(f"Impossible de lire le CSV correctement: {last_err}")
+
+def normalize_id(series):
+    """
+    Normalise un identifiant: str, trim, enlève .0, garde vide -> NaN.
+    """
+    s = series.astype(str).str.strip()
+    s = s.replace({"nan": None, "None": None, "": None})
+    # cas classique si IPP lu comme float dans certains exports: "12345.0"
+    s = s.str.replace(r"\.0$", "", regex=True)
+    return s
+
+def main():
+    # --- Lecture Excel
+    df_x = pd.read_excel(EXCEL_PATH, dtype=str)
+
+    # Vérif colonnes
+    missing_cols = [c for c in [COL_IPP_EXCEL, COL_CADRE_EXCEL] if c not in df_x.columns]
+    if missing_cols:
+        raise KeyError(f"Colonnes manquantes dans l'Excel: {missing_cols}\nColonnes trouvées: {list(df_x.columns)}")
+
+    # --- Filtre TéléCS
+    df_x[COL_CADRE_EXCEL] = df_x[COL_CADRE_EXCEL].astype(str).str.strip()
+    df_x_filtered = df_x[df_x[COL_CADRE_EXCEL] != "TéléCS"].copy()
+
+    # --- Lecture CSV
+    df_c = read_csv_flexible(CSV_PATH)
+
+    if COL_IPP_CSV not in df_c.columns:
+        raise KeyError(f"Colonne '{COL_IPP_CSV}' introuvable dans le CSV.\nColonnes trouvées: {list(df_c.columns)}")
+
+    # --- Normalisation IPP
+    df_x_filtered[COL_IPP_EXCEL] = normalize_id(df_x_filtered[COL_IPP_EXCEL])
+    df_c[COL_IPP_CSV] = normalize_id(df_c[COL_IPP_CSV])
+
+    # Listes d'IPP
+    ipp_excel = set(df_x_filtered[COL_IPP_EXCEL].dropna().unique())
+    ipp_csv = set(df_c[COL_IPP_CSV].dropna().unique())
+
+    # IPP présents Excel mais absents CSV
+    ipp_missing_in_csv = ipp_excel - ipp_csv
+
+    # --- Résultat (on garde toutes les colonnes Excel pour ces IPP)
+    df_out = df_x_filtered[df_x_filtered[COL_IPP_EXCEL].isin(ipp_missing_in_csv)].copy()
+
+    # Optionnel: trier
+    df_out = df_out.sort_values(by=[COL_IPP_EXCEL])
+
+    # --- Export Excel
+    with pd.ExcelWriter(OUTPUT_PATH, engine="openpyxl") as writer:
+        df_out.to_excel(writer, index=False, sheet_name="IPP_absents_CSV")
+
+    print(f"OK - Export terminé: {OUTPUT_PATH}")
+    print(f"Nb lignes après filtre TéléCS: {len(df_x_filtered)}")
+    print(f"Nb IPP Excel (filtré): {len(ipp_excel)}")
+    print(f"Nb IPP CSV: {len(ipp_csv)}")
+    print(f"Nb IPP absents du CSV: {len(ipp_missing_in_csv)}")
+    print(f"Nb lignes exportées: {len(df_out)}")
+
+if __name__ == "__main__":
+    main()
