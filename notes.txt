@@ -9,12 +9,10 @@ OUTPUT_COMMON = "IPP_communs_Excel_CSV.xlsx"
 
 COL_IPP_EXCEL = "Patient::IP_NIP"
 COL_CADRE_EXCEL = "I_Cadre Intervention"
-COL_IPP_CSV = "IPP"  # après nettoyage des noms de colonnes
+COL_DATE = "I_Date Intervention"
+COL_IPP_CSV = "IPP"
 
 def read_csv_flexible(path):
-    """
-    Essaie de lire un CSV avec séparateur ; ou , et encodages fréquents.
-    """
     encodings = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
     seps = [";", ","]
     last_err = None
@@ -32,47 +30,34 @@ def read_csv_flexible(path):
     raise RuntimeError(f"Impossible de lire le CSV correctement: {last_err}")
 
 def normalize_id(series):
-    """
-    Normalise un identifiant: str, trim, enlève .0, vide -> NaN.
-    """
     s = series.astype(str).str.strip()
     s = s.replace({"nan": None, "None": None, "": None})
     s = s.str.replace(r"\.0$", "", regex=True)
     return s
 
 def clean_columns(df):
-    """
-    Nettoie les noms de colonnes: strip (supprime espaces début/fin).
-    """
     df = df.copy()
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
 def main():
+
     # --- Lecture Excel
-    df_x = pd.read_excel(EXCEL_PATH, dtype=str)
+    df_x = pd.read_excel(EXCEL_PATH)
     df_x = clean_columns(df_x)
 
-    missing_cols = [c for c in [COL_IPP_EXCEL, COL_CADRE_EXCEL] if c not in df_x.columns]
-    if missing_cols:
-        raise KeyError(
-            f"Colonnes manquantes dans l'Excel: {missing_cols}\n"
-            f"Colonnes trouvées: {list(df_x.columns)}"
-        )
+    # --- Conversion de la date
+    if COL_DATE in df_x.columns:
+        df_x[COL_DATE] = pd.to_datetime(df_x[COL_DATE], errors="coerce")
+        df_x[COL_DATE] = df_x[COL_DATE].dt.strftime("%d/%m/%Y")
 
     # --- Filtre TéléCS
     df_x[COL_CADRE_EXCEL] = df_x[COL_CADRE_EXCEL].astype(str).str.strip()
     df_x_filtered = df_x[df_x[COL_CADRE_EXCEL] != "TéléCS"].copy()
 
-    # --- Lecture CSV + nettoyage colonnes
+    # --- Lecture CSV
     df_c = read_csv_flexible(CSV_PATH)
-    df_c = clean_columns(df_c)  # <-- "IPP       " devient "IPP"
-
-    if COL_IPP_CSV not in df_c.columns:
-        raise KeyError(
-            f"Colonne '{COL_IPP_CSV}' introuvable dans le CSV après nettoyage.\n"
-            f"Colonnes trouvées: {list(df_c.columns)}"
-        )
+    df_c = clean_columns(df_c)
 
     # --- Normalisation IPP
     df_x_filtered[COL_IPP_EXCEL] = normalize_id(df_x_filtered[COL_IPP_EXCEL])
@@ -84,25 +69,23 @@ def main():
     ipp_missing_in_csv = ipp_excel - ipp_csv
     ipp_common = ipp_excel & ipp_csv
 
-    # --- Dataframes de sortie (on garde toutes les colonnes Excel)
+    # --- Résultats
     df_missing = df_x_filtered[df_x_filtered[COL_IPP_EXCEL].isin(ipp_missing_in_csv)].copy()
     df_common = df_x_filtered[df_x_filtered[COL_IPP_EXCEL].isin(ipp_common)].copy()
 
-    # Optionnel: tri
     df_missing = df_missing.sort_values(by=[COL_IPP_EXCEL])
     df_common = df_common.sort_values(by=[COL_IPP_EXCEL])
 
-    # --- Exports
+    # --- Export Excel
     with pd.ExcelWriter(OUTPUT_MISSING, engine="openpyxl") as w:
         df_missing.to_excel(w, index=False, sheet_name="Excel_not_in_CSV")
 
     with pd.ExcelWriter(OUTPUT_COMMON, engine="openpyxl") as w:
         df_common.to_excel(w, index=False, sheet_name="Excel_and_CSV")
 
-    print("OK - Exports terminés")
-    print(f"- {OUTPUT_MISSING} (lignes: {len(df_missing)}, IPP: {len(ipp_missing_in_csv)})")
-    print(f"- {OUTPUT_COMMON} (lignes: {len(df_common)}, IPP: {len(ipp_common)})")
-    print(f"Lignes Excel après filtre TéléCS: {len(df_x_filtered)}")
+    print("Exports terminés")
+    print(f"{OUTPUT_MISSING} : {len(df_missing)} lignes")
+    print(f"{OUTPUT_COMMON} : {len(df_common)} lignes")
 
 if __name__ == "__main__":
     main()
