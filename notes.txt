@@ -1,61 +1,9 @@
-import pandas as pd
-from openpyxl import load_workbook
+RUM_MI.xlsx :
+IPP       	NDA       	UM_R	ENTREE_RUM         	SORTIE_RUM
 
-fichier_entree = "export_infomed.xlsx"
-fichier_sortie = "export_infomed_filtre.xlsx"
+passage_UHCD_MI.xlsx:
+IPP       	NDA       	KYRES   	UM_U	ENTREE_UHCD        	SORTIE_UHCD        	DP    	DAS1      	DAS2      	DAS3      	DAS4
 
-codes_autorises = {
-    "HEQE002","HHFE002","HHQE002","HHQE005","ZZLP025","HJQE001","HHFE004","EHNE001",
-    "HHFE001","HEFE002","HESE002","HHQE004","HGSE003","HHFE006","HEFE001","HHSE002"
-}
 
-df = pd.read_excel(fichier_entree)
-
-def contient_code(valeur):
-    if pd.isna(valeur):
-        return False
-    
-    actes = str(valeur).split(";")
-    
-    for acte in actes:
-        code = acte.replace("(A)", "").strip()
-        if code in codes_autorises:
-            return True
-            
-    return False
-
-# Filtrage
-df_filtre = df[df["Acte codant"].apply(contient_code)].copy()
-
-# Conversion de la colonne date
-df_filtre["Date interv."] = pd.to_datetime(
-    df_filtre["Date interv."],
-    errors="coerce",
-    dayfirst=True
-)
-
-# Comptage des séjours
-nb_2024 = (df_filtre["Date interv."].dt.year == 2024).sum()
-nb_2025 = (df_filtre["Date interv."].dt.year == 2025).sum()
-
-print("Séjours 2024 :", nb_2024)
-print("Séjours 2025 :", nb_2025)
-
-# Sauvegarde
-df_filtre.to_excel(fichier_sortie, index=False)
-
-# Forcer le format Excel dd/mm/yyyy
-wb = load_workbook(fichier_sortie)
-ws = wb.active
-
-entetes = [cell.value for cell in ws[1]]
-col_index = entetes.index("Date interv.") + 1
-
-for row in range(2, ws.max_row + 1):
-    cell = ws.cell(row=row, column=col_index)
-    if cell.value is not None:
-        cell.number_format = "dd/mm/yyyy"
-
-wb.save(fichier_sortie)
-
-print("Fichier créé :", fichier_sortie)
+passage_SAU_MI.xlsx:
+IPP       	NDA       	UM_M	ENTREE_MI          	SORTIE_MI
