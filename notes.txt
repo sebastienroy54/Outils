@@ -1,10 +1,47 @@
-# ---- DEBUG SEDITRACE
-xls = pd.ExcelFile(PATH_SEDI)
-print("Onglets du fichier:", xls.sheet_names)
+import pandas as pd
 
-print("Nb lignes lues:", len(sedi))
-print("Dernières valeurs 'Posé le':")
-print(sedi["Posé le"].tail(20))
+# Liste des codes autorisés
+codes_autorises = {
+    "HEQE002",
+    "HHFE002",
+    "HHQE002",
+    "HHQE005",
+    "ZZLP025",
+    "HJQE001",
+    "HHFE004",
+    "EHNE001",
+    "HHFE001",
+    "HEFE002",
+    "HESE002",
+    "HHQE004",
+    "HGSE003",
+    "HHFE006",
+    "HEFE001",
+    "HHSE002"
+}
 
-print("Dernières valeurs DATEHEURESAISIE:")
-print(sedi["DATEHEURESAISIE"].tail(20))
+# Lire le fichier Excel
+df = pd.read_excel("export_infomed.xlsx")
+
+# Fonction qui vérifie si un code autorisé est présent
+def contient_code(valeur):
+    if pd.isna(valeur):
+        return False
+    
+    # Séparer les actes (souvent séparés par ;)
+    actes = str(valeur).split(";")
+    
+    for acte in actes:
+        # enlever le (A) éventuel
+        code = acte.replace("(A)", "").strip()
+        if code in codes_autorises:
+            return True
+    return False
+
+# Filtrer les lignes
+df_filtre = df[df["Acte codant"].apply(contient_code)]
+
+# Sauvegarder le résultat
+df_filtre.to_excel("export_infomed_filtre.xlsx", index=False)
+
+print("Filtrage terminé. Fichier créé : export_infomed_filtre.xlsx")
