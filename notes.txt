@@ -7,7 +7,7 @@ SET TRIMSPOOL ON
 SET WRAP OFF
 SET TERMOUT OFF
 
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\mamans_actes_bebe_UM130_2026.csv
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\bebes_actes_maman_UM130_2026.csv
 
 SELECT DISTINCT
        RSM.NOIP AS IPP,
@@ -24,19 +24,17 @@ WHERE
        RSM.KYRES = RAC.KYRES
        AND SDO.KYNODA = RSM.NODA
        AND RSM.CDURM_P = '130'
-       AND TRUNC(MONTHS_BETWEEN(RSM.D8EEUE, SDO.DANAIS)/12) > 10
+       AND MONTHS_BETWEEN(RSM.D8EEUE,SDO.DANAIS) < 12
        AND RAC.KYCDAC IN (
-           'ZZEP002',
-           'ZZEP003',
-           'ZZQP003',
-           'ZZEP004',
-           'GEJD001',
-           'GLLD018',
-           'DKMD002',
-           'GELD004',
-           'GELD003',
-           'YYYY123',
-           'ZZQP001'
+           'JDJD001',
+           'JQGD010',
+           'JNQD001',
+           'JMCA002',
+           'AFLB010',
+           'JMCA003',
+           'JDLD001',
+           'JQGD012',
+           'JAGD001'
        )
        AND RSM.D8EEUE >= TO_DATE('01/01/2026','DD/MM/YYYY')
        AND RSM.D8EEUE <= SYSDATE
