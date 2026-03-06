@@ -1,1 +1,47 @@
-Impossible de générer FICUM: colonnes manquantes dans l'excel: ['CODE_HOPITAL', 'TYPE_AUTORISATION', 'DATE_EFFET', 'NB_LITS', 'TYPE_HOSPITALISATION']
+def read_um_excel_xlsx_only(excel_bytes: bytes, excel_filename: str) -> pd.DataFrame:
+    ext = (excel_filename or "").lower().split(".")[-1]
+    if ext == "xls":
+        raise ValueError(
+            "Fichier Excel au format .xls détecté.\n"
+            "Merci de l'enregistrer en .xlsx (Fichier > Enregistrer sous > .xlsx), puis de relancer."
+        )
+
+    bio = io.BytesIO(excel_bytes)
+    df = pd.read_excel(bio, engine="openpyxl", skiprows=2)
+    df = df.dropna(how="all")
+
+    cols = {c: str(c).strip() for c in df.columns}
+    df = df.rename(columns=cols)
+
+    return df
+
+
+
+def build_um_mapping_from_df(df: pd.DataFrame) -> pd.DataFrame:
+    col_upper = {c.upper().replace(" ", "").replace("-", "_"): c for c in df.columns}
+    urm_aphp_col = col_upper.get("URM_APHP") or col_upper.get("URMAPHP")
+    urm_site_col = col_upper.get("URM_SITE") or col_upper.get("URMSITE")
+
+    if not urm_aphp_col or not urm_site_col:
+        raise ValueError("Colonnes attendues non trouvées dans l'Excel (URM_APHP et URM_SITE).")
+
+    out = df[[urm_aphp_col, urm_site_col]].copy()
+    out.columns = ["URM_APHP", "URM_SITE"]
+
+    out["URM_APHP"] = out["URM_APHP"].apply(lambda x: normalize_um(x, 4))
+    out["URM_SITE"] = out["URM_SITE"].astype(str).str.strip()
+
+    out = out[(out["URM_APHP"] != "")]
+    out = out.drop_duplicates(subset=["URM_APHP"], keep="first")
+
+
+um_excel_df = read_um_excel_xlsx_only(excel_bytes, excel_filename)
+um_df = build_um_mapping_from_df(um_excel_df)
+mapping = dict(zip(um_df["URM_APHP"].tolist(), um_df["URM_SITE"].tolist()))
+report_lines.append(f"Mapping UM: {len(mapping)} clés (URM_APHP -> URM_SITE) après déduplication 1->1.")
+
+
+
+ficum_bytes = build_ficum_lines_from_excel(um_excel_df, site5=site5, finess=finess_found)
+
+    return out
