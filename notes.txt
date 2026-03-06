@@ -1,1 +1,46 @@
-Le casemix a été calculé à partir des séjours de médecine interne (UM 010 et 010S) en 2025. Ont été retenus les patients admis directement en médecine interne, c’est-à-dire sans passage préalable par le SAU ni par l’UHCD (premier RUM en MI), et n’ayant pas été hospitalisés dans le service au cours des deux années précédentes (2023-2024). La répartition diagnostique a ensuite été établie à partir du diagnostic principal des séjours sélectionnés.
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\mamans_actes_bebe_UM130_2026.csv
+
+SELECT DISTINCT
+       RSM.NOIP AS IPP,
+       RSM.NODA AS NDA,
+       TO_CHAR(RSM.D8EEUE,'DD/MM/YYYY HH24:MI:SS') AS ENTREE,
+       TO_CHAR(RSM.D8SOUE,'DD/MM/YYYY HH24:MI:SS') AS SORTIE,
+       RSM.CDURM_P AS UM,
+       RAC.KYCDAC AS ACTE_CCAM
+FROM
+       RSM,
+       RAC,
+       SDO
+WHERE
+       RSM.KYRES = RAC.KYRES
+       AND SDO.KYNODA = RSM.NODA
+       AND RSM.CDURM_P = '130'
+       AND TRUNC(MONTHS_BETWEEN(RSM.D8EEUE, SDO.DANAIS)/12) > 10
+       AND RAC.KYCDAC IN (
+           'ZZEP002',
+           'ZZEP003',
+           'ZZQP003',
+           'ZZEP004',
+           'GEJD001',
+           'GLLD018',
+           'DKMD002',
+           'GELD004',
+           'GELD003',
+           'YYYY123',
+           'ZZQP001'
+       )
+       AND RSM.D8EEUE >= TO_DATE('01/01/2026','DD/MM/YYYY')
+       AND RSM.D8EEUE <= SYSDATE
+ORDER BY
+       RSM.D8EEUE;
+
+SPOOL OFF
