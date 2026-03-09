@@ -1,31 +1,15 @@
-def normalize_code_hopital(value) -> str:
-    """
-    Normalise CODE_HOPITAL sur 5 caractères.
-    Exemples :
-      21 -> 00021
-      "21" -> 00021
-      "21.0" -> 00021
-    """
-    if value is None:
-        return ""
-    s = str(value).strip().replace(" ", "").replace(",", "")
-    if s == "" or s.lower() == "nan":
-        return ""
-    if re.fullmatch(r"\d+(\.0)?", s):
-        s = s.split(".")[0]
-    s = re.sub(r"\D", "", s)
-    if s == "":
-        return ""
-    return s.zfill(5)
-
-
-# garder uniquement le site concerné
-df["CODE_HOPITAL"] = df["CODE_HOPITAL"].apply(normalize_code_hopital)
-df = df[df["CODE_HOPITAL"] == site5]
-
-
+def parse_excel_name(excel_filename: str):
+    m = XLS_MCO_RE.match(excel_filename or "")
+    if not m:
+        return None
+    return {
+        "domain": "MCO",
+        "site5": m.group(1),
+        "yyyymm": m.group(2),
+        "ext": m.group(3).lower(),
+    }
 
 XLS_MCO_RE = re.compile(
-    r"^CORRE(S)?PONDANCE_UM_MCO_SITE_(\d{5})_APHP_(\d{6})\.(xls|xlsx)$",
+    r"^CORRE(?:S)?PONDANCE_UM_MCO_SITE_(\d{5})_APHP_(\d{6})\.(xls|xlsx)$",
     re.IGNORECASE,
 )
