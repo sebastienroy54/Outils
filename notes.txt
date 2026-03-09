@@ -75,22 +75,6 @@ def safe_encode_singlebyte(text: str) -> bytes:
     return text.encode("latin-1", errors="replace")
 
 
-def show_str_debug(label: str, s: str):
-    """Affiche longueur + repr + codes unicode de chaque char (utile pour espaces invisibles)."""
-    if s is None:
-        st.write(f"{label}: None")
-        return
-    s = str(s)
-    st.write(f"{label}: len={len(s)} repr={repr(s)}")
-    st.write(f"{label} codepoints: {[hex(ord(c)) for c in s]}")
-
-
-def preview_keys_debug(keys, title: str, n: int = 15):
-    st.write(f"--- {title} (n={min(n, len(keys))}) ---")
-    for k in list(keys)[:n]:
-        show_str_debug("key", k)
-
-
 def normalize_um(value, width=4) -> str:
     """
     Normalise un code UM APHP :
@@ -107,6 +91,7 @@ def normalize_um(value, width=4) -> str:
     if s == "" or s.lower() == "nan":
         return ""
     return s.zfill(width)
+
 
 # -----------------------------
 # Excel mapping (UM APHP -> UM SITE)
@@ -149,12 +134,12 @@ def read_um_excel_xlsx_only(excel_bytes: bytes, excel_filename: str) -> pd.DataF
 
     return df
 
+
 def format_date_effet_ddmmyyyy(x) -> str:
     if x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and x.strip() == ""):
-        return "01011900"  # fallback neutre (à ajuster si tu préfères bloquer)
+        return "01011900"
     dt = pd.to_datetime(x, dayfirst=True, errors="coerce")
     if pd.isna(dt):
-        # tente une lecture brute si c'est déjà du type "01012005"
         s = str(x).strip()
         if re.fullmatch(r"\d{8}", s):
             return s
@@ -167,7 +152,6 @@ def format_nb_lits_3(x) -> str:
         return "000"
     s = str(x).strip().replace(" ", "")
     s = s.replace(",", "")
-    # parfois excel peut donner "14.0"
     if re.fullmatch(r"\d+(\.0)?", s):
         s = s.split(".")[0]
     s = re.sub(r"\D", "", s)
@@ -176,11 +160,14 @@ def format_nb_lits_3(x) -> str:
     return s.zfill(3)[-3:]
 
 
-def build_ficum_lines_from_excel(um_df: pd.DataFrame, site5: str, finess: str) -> bytes:
+def build_ficum_lines_from_excel(um_df: pd.DataFrame, site5: str, finess: str):
     """
     Construit ficum{site}.txt à partir de l'excel.
     Colonnes attendues (ligne 3 dans excel) :
       CODE_HOPITAL, URM_SITE, URM_APHP, TYPE_AUTORISATION, DATE_EFFET, NB_LITS, TYPE_HOSPITALISATION
+
+    Retourne:
+      (ficum_bytes, nb_lignes)
     """
     required = ["CODE_HOPITAL", "URM_SITE", "TYPE_AUTORISATION", "DATE_EFFET", "NB_LITS", "TYPE_HOSPITALISATION"]
     missing = [c for c in required if c not in um_df.columns]
@@ -189,9 +176,20 @@ def build_ficum_lines_from_excel(um_df: pd.DataFrame, site5: str, finess: str) -
 
     df = um_df.copy()
 
+    # normaliser le code hôpital avant filtre + garder un aperçu pour message d'erreur
+    df["CODE_HOPITAL_NORM"] = df["CODE_HOPITAL"].apply(normalize_code_hopital)
+    codes_found = sorted([c for c in df["CODE_HOPITAL_NORM"].dropna().unique().tolist() if c])
+
     # garder uniquement le site concerné
-    df["CODE_HOPITAL"] = df["CODE_HOPITAL"].apply(normalize_code_hopital)
-    df = df[df["CODE_HOPITAL"] == site5]
+    df = df[df["CODE_HOPITAL_NORM"] == site5]
+
+    if df.empty:
+        found_txt = ", ".join(codes_found[:20]) if codes_found else "aucun code exploitable"
+        raise ValueError(
+            f"FICUM vide : aucune ligne de l'Excel ne correspond au site {site5} "
+            f"après normalisation de CODE_HOPITAL. "
+            f"Codes trouvés dans l'Excel : {found_txt}."
+        )
 
     # normalisations
     df["URM_SITE"] = df["URM_SITE"].astype(str).str.strip()
@@ -201,19 +199,17 @@ def build_ficum_lines_from_excel(um_df: pd.DataFrame, site5: str, finess: str) -
     # UM sur 4 chars (padding à droite)
     def um4(u: str) -> str:
         u = (u or "").strip()
-        return (u + "    ")[:4] 
+        return (u + "    ")[:4]
 
     df["UM4"] = df["URM_SITE"].apply(um4)
 
-    # règle spéciale CCH: remplacer "$21" par "$$$" dans l'UM (ex "$213" -> "$$$3")
-    # D'après ton besoin: uniquement Cochin (00021)
+    # règle spéciale Cochin : "$21x" -> "$$$x"
     if site5 == "00021":
         df["UM4"] = df["UM4"].apply(lambda s: (s.replace("$21", "$$$", 1) if s.startswith("$21") else s))
 
     df["DATE8"] = df["DATE_EFFET"].apply(format_date_effet_ddmmyyyy)
     df["LITS3"] = df["NB_LITS"].apply(format_nb_lits_3)
 
-    # construit les lignes
     lines = []
     for _, r in df.iterrows():
         line = (
@@ -227,9 +223,14 @@ def build_ficum_lines_from_excel(um_df: pd.DataFrame, site5: str, finess: str) -
         )
         lines.append(line)
 
-    # IMPORTANT: encodage latin-1 comme le reste, + newline final
-    txt = "\n".join(lines) + ("\n" if lines else "")
-    return safe_encode_singlebyte(txt)
+    if not lines:
+        raise ValueError(
+            f"FICUM vide : aucune ligne exploitable n'a pu être construite pour le site {site5}."
+        )
+
+    txt = "\n".join(lines) + "\n"
+    return safe_encode_singlebyte(txt), len(lines)
+
 
 # -----------------------------
 # MCO RSS processing (UM replacement)
@@ -276,6 +277,8 @@ def process_rss_text_mco(rss_bytes: bytes, mapping: dict, start_1_based: int, le
         "match_rate": (matched / total) if total else 0.0,
         "missing_top10": missing_keys.most_common(10),
         "missing_unique": len(missing_keys),
+        "input_line_count": len(text.splitlines()),
+        "output_line_count": len(corrected.splitlines()),
     }
 
     return safe_encode_singlebyte(corrected), stats
@@ -362,7 +365,8 @@ def ano_cle(num_secu_str: str) -> str:
 def anohosp_to_vidhosp_lines(finess: str, ano_bytes: bytes):
     """
     Convert anohosp file content into vidhosp lines.
-    NOTE: currently supports V013/V014/V015 (we'll revisit V016 later).
+    Supporte V013 / V014 / V015 / V016.
+    V016 est traité comme V015 (même logique historique Julia).
     Returns (vid_bytes, stats_dict)
     """
     text = safe_decode_singlebyte(ano_bytes)
@@ -371,11 +375,12 @@ def anohosp_to_vidhosp_lines(finess: str, ano_bytes: bytes):
     seen_nonempty = 0
     produced = 0
     skipped_format = Counter()
+    formats_seen = Counter()
     parse_errors = 0
 
     out = []
     filler30 = " " * 30
-    art51 = " "  # filler(1)
+    art51 = " "
 
     for ano in lines:
         if not ano:
@@ -383,11 +388,12 @@ def anohosp_to_vidhosp_lines(finess: str, ano_bytes: bytes):
         seen_nonempty += 1
 
         fmt = ano_format(ano)
-        if fmt not in ("V013", "V014", "V015"):
+        formats_seen[fmt] += 1
+
+        if fmt not in ("V013", "V014", "V015", "V016"):
             skipped_format[fmt] += 1
             continue
 
-        # Apply the historical fix only for V014 (safer)
         if fmt == "V014":
             ano = fix_anohosp_v014(ano)
 
@@ -430,6 +436,7 @@ def anohosp_to_vidhosp_lines(finess: str, ano_bytes: bytes):
                 + conf
             )
         else:
+            # V014 / V015 / V016
             raw = (
                 fake_num_am
                 + cle
@@ -459,7 +466,9 @@ def anohosp_to_vidhosp_lines(finess: str, ano_bytes: bytes):
         "anohosp_lines_total": len(lines),
         "anohosp_nonempty_seen": seen_nonempty,
         "vidhosp_produced": produced,
+        "formats_seen": formats_seen.most_common(),
         "skipped_format_top10": skipped_format.most_common(10),
+        "skipped_total": sum(skipped_format.values()),
         "parse_errors_cle00": parse_errors,
     }
     return safe_encode_singlebyte(vid_text), stats
@@ -495,10 +504,9 @@ def process_zip_mco(
     zip_filename: str,
     excel_bytes: bytes,
     excel_filename: str,
-    keep_original_rss: bool = True,
     rss_um_start_1based: int = 87,
     rss_um_length: int = 4,
-    min_match_rate: float = 0.98,
+    min_match_rate: float = 1.0,
 ):
     report_lines = []
 
@@ -529,8 +537,6 @@ def process_zip_mco(
     mapping = dict(zip(um_df["URM_APHP"].tolist(), um_df["URM_SITE"].tolist()))
     report_lines.append(f"Mapping UM: {len(mapping)} clés (URM_APHP -> URM_SITE) après déduplication 1->1.")
 
-    # récupérer FINESS à partir des fichiers du ZIP (RSS ou ANO)
-    # on prend le 1er trouvé (dans ton zip il y en a 1 par établissement)
     zin_tmp = zipfile.ZipFile(io.BytesIO(zip_bytes), "r")
     names_tmp = zin_tmp.namelist()
     zin_tmp.close()
@@ -542,10 +548,13 @@ def process_zip_mco(
         if m:
             finess_found = m.group(1)
             break
+
     if not finess_found:
         raise ValueError("Impossible de déterminer le FINESS depuis le ZIP (aucun fichier RSS/ANO reconnu).")
 
-    # déterminer site5 à partir du nom du zip si possible, sinon via excel name
+    if not re.fullmatch(r"\d{9}", finess_found):
+        raise ValueError(f"FINESS invalide détecté dans le ZIP: {finess_found}")
+
     site5 = None
     if zip_meta:
         site5 = site3_to_site5(zip_meta["site3"])
@@ -554,20 +563,12 @@ def process_zip_mco(
     else:
         raise ValueError("Impossible de déterminer le site (nom zip/excel non standard).")
 
-    ficum_bytes = build_ficum_lines_from_excel(um_excel_df, site5=site5, finess=finess_found)
+    ficum_bytes, ficum_lines_count = build_ficum_lines_from_excel(
+        um_excel_df, site5=site5, finess=finess_found
+    )
 
     site_for_name = zip_meta["site3"] if zip_meta else site5
     ficum_name = f"ficum{site_for_name}.txt"
-
-    # ===== DEBUG MAPPING =====
-    # st.write("===== DEBUG MAPPING =====")
-    # st.write("Nb clés mapping:", len(mapping))
-    # preview_keys_debug(list(mapping.keys()), "Premières clés mapping", n=10)
-
-    # for test_key in ["0116", "0565", "0880", "0124", "0123"]:
-    #     st.write(f"Test présence clé {test_key} dans mapping:", test_key in mapping)
-    #     if test_key in mapping:
-    #         show_str_debug(f"mapping[{test_key}]", mapping[test_key])
 
     zin = zipfile.ZipFile(io.BytesIO(zip_bytes), "r")
     names = zin.namelist()
@@ -580,19 +581,19 @@ def process_zip_mco(
 
     zout_buffer = io.BytesIO()
     with zipfile.ZipFile(zout_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zout:
-        # Copy everything as-is
+        # copie de tous les fichiers originaux
         for n in names:
             zout.writestr(n, zin.read(n))
 
         zout.writestr(ficum_name, ficum_bytes)
-        report_lines.append(f"FICUM généré: {ficum_name} (finess={finess_found}, lignes={safe_decode_singlebyte(ficum_bytes).count(chr(10))})")    
+        report_lines.append(
+            f"FICUM généré: {ficum_name} (finess={finess_found}, lignes={ficum_lines_count})"
+        )
 
-        # Add corrected RSS alongside original
         for rss_name in rss_files:
             base = rss_name.split("/")[-1]
-            m = RSS_RE.match(base)
-
             rss_bytes_in = zin.read(rss_name)
+
             corrected_bytes, stats = process_rss_text_mco(
                 rss_bytes_in,
                 mapping,
@@ -602,14 +603,22 @@ def process_zip_mco(
 
             report_lines.append(
                 f"RSS {base}: matched={stats['matched']}/{stats['total_records_checked']} "
-                f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']}"
+                f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']} "
+                f"lines_in={stats['input_line_count']} lines_out={stats['output_line_count']}"
             )
             if stats["missing_top10"]:
                 report_lines.append(f"  Top missing keys (up to 10): {stats['missing_top10']}")
 
+            if stats["input_line_count"] != stats["output_line_count"]:
+                raise ValueError(
+                    f"Le nombre de lignes du RSS corrigé diffère de l'entrée pour {base} "
+                    f"({stats['input_line_count']} -> {stats['output_line_count']})."
+                )
+
             if stats["total_records_checked"] > 0 and stats["match_rate"] < min_match_rate:
                 raise ValueError(
-                    f"Taux de match UM trop faible sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                    f"Taux de match UM insuffisant sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                    f"Le traitement MCO exige 100% de correspondance UM. "
                     f"Probable mauvais fichier de correspondance, mauvais mois/site, ou format inattendu."
                 )
 
@@ -617,7 +626,6 @@ def process_zip_mco(
             corrected_name = prefix + base.replace(".rss.ini.txt", ".rss.ini-corrige.txt")
             zout.writestr(corrected_name, corrected_bytes)
 
-        # VIDHOSP generation unchanged
         for ano_name in ano_files:
             base = ano_name.split("/")[-1]
             m = ANO_RE.match(base)
@@ -628,10 +636,20 @@ def process_zip_mco(
 
             report_lines.append(
                 f"ANO {base}: vidhosp_produced={vid_stats['vidhosp_produced']} "
-                f"(nonempty_seen={vid_stats['anohosp_nonempty_seen']}) parse_errors_cle00={vid_stats['parse_errors_cle00']}"
+                f"(nonempty_seen={vid_stats['anohosp_nonempty_seen']}, skipped={vid_stats['skipped_total']}) "
+                f"parse_errors_cle00={vid_stats['parse_errors_cle00']}"
             )
+            if vid_stats["formats_seen"]:
+                report_lines.append(f"  Formats ANO vus: {vid_stats['formats_seen']}")
             if vid_stats["skipped_format_top10"]:
                 report_lines.append(f"  Formats ignorés (top): {vid_stats['skipped_format_top10']}")
+
+            if vid_stats["vidhosp_produced"] + vid_stats["skipped_total"] != vid_stats["anohosp_nonempty_seen"]:
+                raise ValueError(
+                    f"Incohérence ANO/VIDHOSP sur {base}: "
+                    f"produced({vid_stats['vidhosp_produced']}) + skipped({vid_stats['skipped_total']}) "
+                    f"!= nonempty_seen({vid_stats['anohosp_nonempty_seen']})."
+                )
 
             prefix = ano_name[: -len(base)]
             vid_name = prefix + f"{finess}.{yyyy}.{mm}.vidhosp.txt"
@@ -666,11 +684,7 @@ def main():
     with col2:
         uploaded_excel = st.file_uploader("Excel correspondance UM (.xlsx requis)", type=["xls", "xlsx"])
 
-    keep_original_rss = st.checkbox("Conserver le RSS original", value=True)
-    #min_match_rate = st.slider("Seuil minimum de match UM", 0.0, 1.0, 0.98, 0.01)
-
     if uploaded_zip and uploaded_excel:
-
         if uploaded_excel.name.lower().endswith(".xls"):
             st.error(
                 "Fichier Excel au format .xls détecté.\n\n"
@@ -702,17 +716,16 @@ def main():
                     zip_filename=uploaded_zip.name,
                     excel_bytes=excel_bytes,
                     excel_filename=uploaded_excel.name,
-                    keep_original_rss=keep_original_rss,
                     rss_um_start_1based=87,
                     rss_um_length=4,
-                    #min_match_rate=float(min_match_rate),
+                    min_match_rate=1.0,
                 )
             except Exception as e:
                 st.error(str(e))
                 return
 
             st.success("Traitement terminé.")
-            st.text_area("Rapport", report, height=300)
+            st.text_area("Rapport", report, height=320)
 
             out_name = uploaded_zip.name.replace("_in.zip", "_out.zip")
             st.download_button(
