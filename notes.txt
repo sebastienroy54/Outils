@@ -1,149 +1,49 @@
 from pathlib import Path
-from urllib.parse import quote_plus
-
-from sqlalchemy import create_engine
-
-
-CREDENTIALS_PATH = Path(r"C:\Users\4251352\Documents\.credentials")
-
-
-def read_credentials(path: Path) -> dict:
-    """
-    Lit un fichier .credentials avec une structure du type :
-
-    [dimbdd]
-    dbname: ...
-    host: ...
-    port: ...
-    schema: ...
-    user: ...
-    password: ...
-
-    Retourne un dictionnaire :
-    {
-        "dimbdd": {
-            "dbname": "...",
-            "host": "...",
-            ...
-        }
-    }
-    """
-    creds = {}
-    current_section = None
-
-    with open(path, "r", encoding="utf-8-sig") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-
-            if not line or line.startswith("#") or line.startswith(";"):
-                continue
-
-            if line.startswith("[") and line.endswith("]"):
-                current_section = line[1:-1].strip()
-                creds[current_section] = {}
-                continue
-
-            if current_section is None:
-                continue
-
-            if ":" in line:
-                key, value = line.split(":", 1)
-            elif "=" in line:
-                key, value = line.split("=", 1)
-            else:
-                continue
-
-            creds[current_section][key.strip().lower()] = value.strip()
-
-    return creds
-
-
-def get_dimbdd_config(credentials_path: Path = CREDENTIALS_PATH) -> dict:
-    """
-    Retourne la configuration de la base dimbdd.
-    """
-    creds = read_credentials(credentials_path)
-
-    if "dimbdd" not in creds:
-        raise KeyError("La section [dimbdd] est introuvable dans le fichier .credentials")
-
-    cfg = creds["dimbdd"]
-
-    user = cfg.get("user") or cfg.get("username")
-    if not user:
-        raise KeyError("Champ 'user' ou 'username' introuvable pour [dimbdd]")
-
-    required_fields = {
-        "dbname": cfg.get("dbname"),
-        "host": cfg.get("host"),
-        "port": cfg.get("port", "5432"),
-        "password": cfg.get("password"),
-        "user": user,
-        "schema": cfg.get("schema"),  # optionnel
-    }
-
-    missing = [k for k in ["dbname", "host", "password", "user"] if not required_fields[k]]
-    if missing:
-        raise ValueError(f"Champs manquants pour [dimbdd] : {missing}")
-
-    return required_fields
-
-
-def get_dimbdd_engine(credentials_path: Path = CREDENTIALS_PATH):
-    """
-    Crée et retourne un engine SQLAlchemy pour la base dimbdd.
-    """
-    cfg = get_dimbdd_config(credentials_path)
-
-    user = quote_plus(cfg["user"])
-    password = quote_plus(cfg["password"])
-    host = cfg["host"]
-    port = cfg["port"]
-    dbname = cfg["dbname"]
-
-    url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
-
-    engine = create_engine(url)
-    return engine
-
-
-
 
 import pandas as pd
 from sqlalchemy import text
 
-from connexion_dimbdd import get_dimbdd_engine, get_dimbdd_config
+from connexion_bases import get_dimbdd_engine, get_dimbdd_config
 
 
-def test_connexion():
+OUTPUT_DIR = Path("exports_bdd")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
+def get_schema() -> str:
     """
-    Test simple de connexion à dimbdd.
+    Récupère le schéma depuis le .credentials.
+    Si absent, utilise 'public'.
     """
-    engine = get_dimbdd_engine()
-
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT current_database(), current_user"))
-        db_name, user_name = result.fetchone()
-
-    print(f"Connexion OK à la base '{db_name}' avec l'utilisateur '{user_name}'")
-
-
-def lister_tables():
-    """
-    Liste quelques tables visibles dans la base.
-    Si schema est présent dans le .credentials, on l'utilise.
-    Sinon, on regarde dans 'public'.
-    """
-    engine = get_dimbdd_engine()
     cfg = get_dimbdd_config()
+    return cfg.get("schema") or "public"
 
-    schema = cfg.get("schema") or "public"
+
+def get_engine():
+    """
+    Retourne l'engine SQLAlchemy pour dimbdd.
+    """
+    return get_dimbdd_engine()
+
+
+def lister_tables() -> pd.DataFrame:
+    """
+    Liste les tables du schéma cible avec éventuelle description PostgreSQL.
+    """
+    engine = get_engine()
+    schema = get_schema()
 
     query = text("""
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = :schema
-        ORDER BY table_name
+        SELECT
+            n.nspname AS schema_name,
+            c.relname AS table_name,
+            obj_description(c.oid, 'pg_class') AS table_description
+        FROM pg_class c
+        JOIN pg_namespace n
+            ON n.oid = c.relnamespace
+        WHERE c.relkind = 'r'
+          AND n.nspname = :schema
+        ORDER BY c.relname
     """)
 
     with engine.connect() as conn:
@@ -152,15 +52,90 @@ def lister_tables():
     return df
 
 
-def lire_table_exemple(an: int = 22, limit: int = 10):
+def chercher_tables(mot_cle: str) -> pd.DataFrame:
     """
-    Exemple de lecture de la table mco_XX_rsa_rsa.
+    Recherche les tables contenant un mot-clé.
     """
-    engine = get_dimbdd_engine()
-    cfg = get_dimbdd_config()
+    tables = lister_tables().copy()
 
-    schema = cfg.get("schema")
-    table_name = f"mco_{an}_rsa_rsa"
+    if tables.empty:
+        return tables
+
+    mask = tables["table_name"].str.contains(mot_cle, case=False, na=False)
+    return tables.loc[mask].sort_values("table_name").reset_index(drop=True)
+
+
+def decrire_table(table_name: str) -> pd.DataFrame:
+    """
+    Décrit les colonnes d'une table :
+    nom, type, nullable, défaut, description éventuelle.
+    """
+    engine = get_engine()
+    schema = get_schema()
+
+    query = text("""
+        SELECT
+            cols.table_schema,
+            cols.table_name,
+            cols.ordinal_position,
+            cols.column_name,
+            cols.data_type,
+            cols.udt_name,
+            cols.is_nullable,
+            cols.column_default,
+            pgd.description AS column_description
+        FROM information_schema.columns cols
+        LEFT JOIN pg_catalog.pg_statio_all_tables st
+            ON st.schemaname = cols.table_schema
+           AND st.relname = cols.table_name
+        LEFT JOIN pg_catalog.pg_description pgd
+            ON pgd.objoid = st.relid
+           AND pgd.objsubid = cols.ordinal_position
+        WHERE cols.table_schema = :schema
+          AND cols.table_name = :table_name
+        ORDER BY cols.ordinal_position
+    """)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(
+            query,
+            conn,
+            params={"schema": schema, "table_name": table_name},
+        )
+
+    return df
+
+
+def compter_lignes(table_name: str) -> int | None:
+    """
+    Retourne le nombre de lignes d'une table.
+    Peut être coûteux sur très grosses tables.
+    """
+    engine = get_engine()
+    schema = get_schema()
+
+    if schema:
+        full_table_name = f'"{schema}"."{table_name}"'
+    else:
+        full_table_name = f'"{table_name}"'
+
+    query = text(f"SELECT COUNT(*) AS nb FROM {full_table_name}")
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(query).scalar()
+        return int(result) if result is not None else None
+    except Exception as e:
+        print(f"Impossible de compter les lignes pour {table_name} : {e}")
+        return None
+
+
+def apercu_table(table_name: str, limit: int = 20) -> pd.DataFrame:
+    """
+    Retourne un aperçu des premières lignes d'une table.
+    """
+    engine = get_engine()
+    schema = get_schema()
 
     if schema:
         full_table_name = f'"{schema}"."{table_name}"'
@@ -179,41 +154,167 @@ def lire_table_exemple(an: int = 22, limit: int = 10):
     return df
 
 
-def compter_rsa(an: int = 22):
+def resume_tables_avec_nb_lignes(limit_tables: int | None = None) -> pd.DataFrame:
     """
-    Équivalent simple de :
-    dplyr::tbl(connection_db, "mco_22_rsa_rsa") %>% dplyr::count()
+    Construit un résumé des tables avec nombre de lignes.
+    Attention : peut être long si beaucoup de tables.
     """
-    engine = get_dimbdd_engine()
-    cfg = get_dimbdd_config()
+    tables = lister_tables().copy()
 
-    schema = cfg.get("schema")
-    table_name = f"mco_{an}_rsa_rsa"
+    if limit_tables is not None:
+        tables = tables.head(limit_tables).copy()
 
-    if schema:
-        full_table_name = f'"{schema}"."{table_name}"'
+    row_counts = []
+    for table_name in tables["table_name"]:
+        print(f"Comptage des lignes : {table_name}")
+        nb = compter_lignes(table_name)
+        row_counts.append(nb)
+
+    tables["row_count"] = row_counts
+    return tables
+
+
+def export_table_description_to_excel(table_name: str, include_preview: bool = True, preview_limit: int = 20) -> Path:
+    """
+    Exporte la description d'une table dans un Excel.
+    """
+    output_path = OUTPUT_DIR / f"description_{table_name}.xlsx"
+
+    df_desc = decrire_table(table_name)
+    df_preview = apercu_table(table_name, limit=preview_limit) if include_preview else pd.DataFrame()
+
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df_desc.to_excel(writer, sheet_name="description", index=False)
+
+        if include_preview and not df_preview.empty:
+            df_preview.to_excel(writer, sheet_name="apercu", index=False)
+
+    return output_path
+
+
+def export_database_overview_to_excel(
+    output_filename: str = "exploration_dimbdd.xlsx",
+    include_row_counts: bool = False,
+    preview_table_names: list[str] | None = None,
+    preview_limit: int = 20,
+) -> Path:
+    """
+    Exporte un fichier Excel global avec :
+    - tables
+    - descriptions des tables demandées
+    - aperçus des tables demandées
+
+    include_row_counts :
+        True -> calcule le nombre de lignes pour toutes les tables
+        False -> exporte juste la liste des tables
+    """
+    output_path = OUTPUT_DIR / output_filename
+
+    if include_row_counts:
+        df_tables = resume_tables_avec_nb_lignes()
     else:
-        full_table_name = f'"{table_name}"'
+        df_tables = lister_tables()
 
-    query = text(f"""
-        SELECT COUNT(*) AS nb
-        FROM {full_table_name}
-    """)
+    preview_table_names = preview_table_names or []
 
-    with engine.connect() as conn:
-        df = pd.read_sql(query, conn)
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        df_tables.to_excel(writer, sheet_name="tables", index=False)
 
-    return df
+        for table_name in preview_table_names:
+            print(f"Export de la table : {table_name}")
+
+            try:
+                df_desc = decrire_table(table_name)
+                sheet_desc = f"desc_{table_name}"[:31]
+                df_desc.to_excel(writer, sheet_name=sheet_desc, index=False)
+            except Exception as e:
+                print(f"Erreur description {table_name} : {e}")
+
+            try:
+                df_preview = apercu_table(table_name, limit=preview_limit)
+                sheet_preview = f"data_{table_name}"[:31]
+                df_preview.to_excel(writer, sheet_name=sheet_preview, index=False)
+            except Exception as e:
+                print(f"Erreur aperçu {table_name} : {e}")
+
+    return output_path
+
+
+def export_all_table_descriptions_to_excel(
+    output_filename: str = "dictionnaire_tables_dimbdd.xlsx",
+    max_tables: int | None = None,
+) -> Path:
+    """
+    Exporte un Excel avec :
+    - un onglet 'tables'
+    - un onglet par table contenant la description des colonnes
+
+    Attention :
+    si tu as beaucoup de tables, le fichier peut devenir gros.
+    """
+    output_path = OUTPUT_DIR / output_filename
+    tables = lister_tables()
+
+    if max_tables is not None:
+        tables = tables.head(max_tables).copy()
+
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        tables.to_excel(writer, sheet_name="tables", index=False)
+
+        for table_name in tables["table_name"]:
+            print(f"Description de {table_name}")
+            try:
+                df_desc = decrire_table(table_name)
+                sheet_name = f"{table_name}"[:31]
+                if df_desc.empty:
+                    df_desc = pd.DataFrame({"info": [f"Aucune colonne trouvée pour {table_name}"]})
+                df_desc.to_excel(writer, sheet_name=sheet_name, index=False)
+            except Exception as e:
+                df_error = pd.DataFrame({"erreur": [str(e)]})
+                sheet_name = f"{table_name}"[:31]
+                df_error.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    return output_path
+
+
+def main():
+    print("=== Connexion et schéma utilisés ===")
+    cfg = get_dimbdd_config()
+    print(f"Base : {cfg['dbname']}")
+    print(f"Hôte : {cfg['host']}")
+    print(f"Schéma : {get_schema()}")
+
+    print("\n=== Quelques tables ===")
+    tables = lister_tables()
+    print(tables.head(20))
+
+    print("\n=== Recherche des tables contenant 'rsa' ===")
+    print(chercher_tables("rsa").head(20))
+
+    table_test = "mco_22_rsa_rsa"
+
+    print(f"\n=== Description de {table_test} ===")
+    print(decrire_table(table_test).head(30))
+
+    print(f"\n=== Aperçu de {table_test} ===")
+    print(apercu_table(table_test, limit=5))
+
+    print("\n=== Export Excel simple ===")
+    path1 = export_database_overview_to_excel(
+        output_filename="exploration_dimbdd.xlsx",
+        include_row_counts=False,
+        preview_table_names=["mco_22_rsa_rsa", "mco_22_rum_rum"],
+        preview_limit=20,
+    )
+    print(f"Fichier créé : {path1.resolve()}")
+
+    print("\n=== Export dictionnaire des tables ===")
+    path2 = export_all_table_descriptions_to_excel(
+        output_filename="dictionnaire_tables_dimbdd.xlsx",
+        max_tables=30,  # retire ce paramètre ou mets None pour tout exporter
+    )
+    print(f"Fichier créé : {path2.resolve()}")
 
 
 if __name__ == "__main__":
-    test_connexion()
-
-    print("\nQuelques tables :")
-    print(lister_tables().head(20))
-
-    print("\nNombre de lignes dans mco_22_rsa_rsa :")
-    print(compter_rsa(22))
-
-    print("\nExemple de lecture :")
-    print(lire_table_exemple(22, 5).head())
+    main()
