@@ -1,450 +1,64 @@
-#' Créé une connexion à la base de données
-#'
-#' Lit le fichier de paramètres  ~/.credentials et créé la connexion
-#' à la base de données edsdim
-#' 
-#' Par convention les objets de connexions sont de la forme : get_connexion_xxx
-#' Ou xxx = nom de la base de données
-#' 
-#'
-#' @return Une connexion DBI
-#' @export
-#'
-#' @examples
-#' connextion_db <- get_connexion_edsdim()
-
-get_connexion_dimbdd<-function(){
-  
-  cf<-readConfigFile()
-  db = "dimbdd"
-  cf_source = cf[[db]]
-  
-  
-  db_name <- cf_source$dbname
-  
-  db_host <-   cf_source$host
-  
-  db_port <- cf_source$port  # or any other port specified by the DBA
-  
-  db_user <- cf_source$user
-  
-  db_password <- cf_source$password
-  
-  #pg =  DBI::dbDriver("PostgreSQL")
-  #pg = RPostgres::Postgres()
-  #pg<-DBI::dbConnect(RPostgres::Postgres())
-  library(RPostgreSQL)
-  pg <- dbDriver("PostgreSQL")
-  
-  connection_db <- DBI::dbConnect(pg, dbname = db_name, host=db_host, port=db_port, user=db_user, password=db_password)
-  #connection_db <- dplyr::src_postgres(dbname = db, host=host_db, port=db_port, user =db_user, password=db_password)
-  
-  return(connection_db)
-  
-}
+from pathlib import Path
+from sqlalchemy import create_engine, text
 
 
-get_iuh<-function(yy){
-  
-  connection_db<-get_connexion_dimbdd()
-  
-  df <-  dplyr::tbl( connection_db, "all_" %+% yy %+% "_iuh" ) %>% dplyr::collect()
-  DBI::dbDisconnect(connection_db)
-  
-  return( df )
-  
-  
-  
-  
-  
-}
-#Prepare data :
-# - extract from db_connection by year from tables
-# - rsa,ano,rum,ium
-# - add national DMS
-# - compute charlson score (extract diag data table) + Elixhauser 
-get_rum_etendus<-function(an,db = TRUE, update = FALSE){
-  
-  connection_db<-get_connexion_dimbdd()
-  ############################################  
-  #Si les données sont dans la base, on les utilise
-  ############################################
-  if("mco_" %+% an %+% "_rum_etendus" %in% DBI::dbListTables(connection_db) & update == FALSE & db == TRUE){
-    
-    df <-  dplyr::tbl( connection_db, "mco_" %+% an %+% "_rum_etendus" ) %>% dplyr::collect()
-    DBI::dbDisconnect(connection_db)
-    return( df )
-    
-  }
-  
-  ############################################  
-  #Extraction des données séjours
-  ############################################ 
-  # https://stackoverflow.com/questions/30604107/r-conditional-evaluation-when-using-the-pipe-operator
-  # Seulement pour 2021/2022
-  # Pour les ghs minorés : ELL_GRADATION : Eligibilité gradation, SURVEILLANCE_PARTICULIERE : Contexte patient / Surveillance particulière,
-  # # RESERERVE_HOSP : Administration d'un produit de la RH, RESCRIT_TARIFAIRE, CAT_NB_INTERVENANTS :Catégorie du nombre d'interventions totales
-  # ell_gradation,surveillance_particuliere,resererve_hosp,rescrit_tarifaire,cat_nb_intervenants
-  dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_rsa") %>% dplyr::select(any_of(c('cle_rsa','noseqrum','anseqta','ansor','moissor','ghm','noghs','sexe',
-                                                                                     'agean','agejr','echpmsi','prov','schpmsi','dest','nbrum','duree','cdgeo',
-                                                                                     'ell_gradation','surveillance_particuliere','resererve_hosp',
-                                                                                     'cat_nb_intervenants'))) %>%
-  
-    dplyr::left_join(.,
-                     # rec_totale2 inclue les PIE
-                     dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_valo") %>% dplyr::select(any_of(c('nas', 'cle_rsa', 'rec_base', 'rec_totale', 'rec_totale2')))) %>%
-    
-    dplyr::left_join(.,
-      # any_of parce que les vars d'eligibilite ne sont dans la table que pour 2021/2022
-      dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_ano") %>% dplyr::select(nas,cle_rsa,dtent,dtsort,factam, pbcmu, motnofact, typecont )
-      ) %>% 
-    dplyr::left_join( .,
-      # any_of parce que les vars d'eligibilite ne sont dans la table que pour 2021/2022
-      dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_um") %>% 
-                  dplyr::mutate(typaut = trimws(substr(typaut1,1,3) ),
-                                mode_hospit = trimws(substr(typaut1,4,4)),
-                                norum = ifelse(substr(nseqrum,1,1) =="0" , substr(nseqrum,2,2), nseqrum ) ) %>%
-                  dplyr::select(nas,cle_rsa,norum,typaut,mode_hospit) 
-      ) %>% 
-      
-    #type de séjours
-    dplyr::left_join( .,
-                      dplyr::tbl( connection_db, "mco_" %+% an %+% "_rum_rum" ) %>%  
-                        dplyr::left_join(.,  dplyr::tbl( connection_db, "mco_" %+% an %+% "_ium" ) %>%
-                                           dplyr::rename(cdurm= uma_ej) %>%
-                                           dplyr::distinct(cdurm,.keep_all=TRUE)%>%
-                                           dplyr::select( any_of(c("gh","cdurm","nohop","lib_hop", "uma","lib_uma",
-                                                                   "lib_cc9_uma","spe_uma","lib_spe_uma",
-                                                                   "ua", "lib_ua","lib_cc9_ua", "spe_ua", "lib_spe_ua", "service","lib_service",
-                                                                   "pole","lib_pole") ) ) 
-                                         ) 
-                      ) %>%
-    
-    dplyr::left_join(
-      .,
-      dplyr::tbl(connection_db, "mco_" %+% an %+% "_rum_valo") %>% dplyr::select(any_of(c('nas','uma','rec_rum_bee', 'rec_rum_tot')))) %>%
-    
-    dplyr::collect() -> df
-  
-  
-  df<-df %>% dplyr::mutate(agean = ifelse(is.na(agean),0,agean),
-                           duree = ifelse(grepl("R",nas),0,duree),
-                           dureesejpart = ifelse(grepl("R",nas),0,dureesejpart))
-  
+def read_credentials(path):
+    creds = {}
+    current_section = None
 
-  ############################################    
-  #Ajout de la variable mode_hospit si non présente
-  ############################################  
-  if(! "mode_hospit" %in% names(df)){
-    
-    df <- df %>% dplyr::mutate(mode_hospit = ifelse(duree ==0,"P","C"))
-    
-  }
-  
-  ############################################    
-  #Correction de la provenance :
-  #  - cdpu : nouvelle variable de déclaration du mode d'entrée urgences
-  #  - patients dont la première UMA est une UHCD
-  ############################################
-  
-  nas_uhcd_r1 <- df %>% dplyr::filter(norum ==1 , typaut %in% typeaut_uhcd) %>%
-    dplyr::select(nas) %>% purrr::flatten_chr()
-  
-  if("cdpu" %in% names(df)){
-    df <- df %>% dplyr::mutate( prov = ifelse(nas %in% nas_uhcd_r1 | cdpu =="5",5,prov) )
-  }else{
-    df <- df %>% dplyr::mutate( prov = ifelse(nas %in% nas_uhcd_r1,5,prov) )
-  }
-  
-  ############################################    
-  #Non programmés
-  ############################################
-  #Premiers élements d'une variables des soins non programmés
-  # - entrée par les urgences ou premier RUM unité de soins intensifs
-  # - mode d'entrée != 8
-  
-  nas_sc_r1 <- df %>% dplyr::filter(norum ==1 , typaut %in% typaut_sc) %>%
-    dplyr::select(nas) %>% purrr::flatten_chr()
-  
-  df <- df %>% dplyr::mutate( entree_sc = ifelse( nas %in% nas_sc_r1, 1, 0 ),
-                              prog = ifelse( mdeeue == "8" & tytrpr == "" & prov != 5 & entree_sc != 1 ,
-                                             1, 
-                                             0 )  )
-  
-  
-  ############################################    
-  #Intégration des DMS de la base nationale
-  ############################################
-  
-  #Contrôle de l'intégrité de données au cours du processus d'ajout des dms bn
-  df<- df %>% dplyr::mutate(id = 1:nrow(df))
-  
-  df_dms1<-dplyr::inner_join(df %>% dplyr::mutate(ghs = noghs),
-                             dms_nationales %>% dplyr::filter(ghs!="") %>% dplyr::distinct(anseqta,ghs,.keep_all = T) )
-  
-  #Merge rsa, dms pour les cas ou la référence dans ghm_dms_nationales = ghm
-  df_dms2<-dplyr::inner_join(df%>% dplyr::mutate(ghs = noghs),
-                             dms_nationales%>% dplyr::filter(ghs=="") %>% dplyr::select(-ghs) %>%  dplyr::distinct(anseqta,ghm,.keep_all = T)  )
-  
-  
-  df2 <- dplyr::bind_rows(df_dms1,df_dms2)
-  df <- dplyr::bind_rows(df2, df %>% dplyr::filter(! id %in% c(df_dms1$id,df_dms2$id) ) ) %>%
-    dplyr::mutate(ghs = noghs) %>% dplyr::select(-noghs)
-  
-  rm(df_dms1,df_dms2,df2) 
-  
-  
-  
-  ############################################   
-  #Calcul du score de charlson + Elixhauser 
-  ############################################
-  
-  #Package coder
-  diags <- dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_diags")  %>%  dplyr::collect()
-  charlson <- 
-    coder::categorize(
-      df %>% dplyr::distinct(nas),                 
-      codedata = diags,
-      cc = "charlson",
-      id = "nas", code = "diag"
-    )
-  
-  df <- df %>% dplyr::left_join(., charlson %>% dplyr::select(nas,quan_updated))
-  
-  # https://www.rdocumentation.org/packages/coder/versions/0.13.5/topics/elixhauser
-  elixhauser <- 
-    coder::categorize(
-      df %>% dplyr::distinct(nas),                 
-      codedata = diags,
-      cc = "elixhauser",
-      id = "nas", code = "diag"
-    )
-  
-  df <- df %>% dplyr::left_join(., elixhauser %>% dplyr::select(nas,sum_all, sid30, walraven) )
-  
-  # Package comorbidity
-  # charlson <-  comorbidity::comorbidity(x = diags, 
-  #                                       id = "nas", 
-  #                                       code = "diag", 
-  #                                       score = "charlson", 
-  #                                       icd = "icd10", 
-  #                                       assign0 = FALSE)
-  
-  # df <- df %>% left_join(., charlson %>% dplyr::select(nas,wscore) )
-  
-  
-  ############################################   
-  #Séjours GM de chirurgie ambulatoire
-  ############################################
-  actes <- dplyr::tbl(connection_db, "mco_" %+% an %+% "_rum_actes")  %>%  dplyr::collect()
-  actes <- actes %>% dplyr::inner_join(.,df %>% dplyr::select(nas,norum,agean,cdghm,nohop,moissor ) )
-  rum_gm <- get_rum_geste_marqueur(actes)
-  df <- df %>% dplyr::left_join(., rum_gm )
-  
-  df <- df %>% dplyr::mutate( gm_gp_geste = ifelse( is.na(gm_gp_geste), 0, gm_gp_geste) )
-  
-  actes <- actes %>% dplyr:: select(-agean,-cdghm)
-  
-  
-  ############################################   
-  #Séjours eligiles RAAC
-  ############################################
-  nas_raac <- df %>% dplyr::filter( substr(cdghm,1,5) %in% racines_raac ) %>% 
-    dplyr::select(nas) %>% purrr::flatten_chr()
-  
-  df <- df %>% dplyr::mutate(eligile_raac = ifelse(nas %in% nas_raac, 1 , 0) )
-  
-  ############################################   
-  #Séjours chir le dimanche
-  ############################################
-  chir_dimanche <- actes %>% dplyr::filter(act == 1)  %>% dplyr::select(-phase,-norum) %>%
-    dplyr::inner_join(.,acte_chir %>% dplyr::select(-phase), by = c("cdccam" = "code") ) %>%
-    dplyr::mutate(chir_dimanche = ifelse(lubridate::wday(dtacte) == 1, TRUE, FALSE)) %>% 
-    dplyr::filter(chir_dimanche) %>% 
-    dplyr::distinct(nas, chir_dimanche) 
-  
-  df <- dplyr::left_join(df, chir_dimanche)
-  ############################################   
-  #Chirurgie J 0
-  #Création d'une variable délai entre l'entrée et la date du premier acte chirurgical
-  ############################################
-  delai_chir <- actes %>% dplyr::filter(act == 1)  %>% dplyr::select(-phase,-norum) %>%
-    dplyr::inner_join(.,acte_chir %>% dplyr::select(-phase), by = c("cdccam" = "code") ) %>%
-    #dplyr::distinct(nas,.keep_all = T) %>%
-    dplyr::inner_join(df %>% dplyr::filter(mode_hospit=='C', norum == "1", mdeeue == "8", tytrpr == ""),.)%>%
-    dplyr::mutate(delai = as.numeric( dtacte - d8eeue ) ) %>%
-    dplyr::group_by(nas) %>% dplyr::arrange(delai,desc(icr)) %>% dplyr::slice(1) %>% 
-    dplyr::ungroup() %>%
-    dplyr::select(nas,delai )
-  
-  df<- df %>% dplyr::left_join(., delai_chir, by = "nas" )
-  
-  
-  
-  ############################################
-  #Création de nouvelles variables
-  ############################################
-  
-  df <- df %>% dplyr::mutate( coeftime = (dureesejpart  + 1) / (duree+nbrum),
-                              duree_rum_bn = dms_n * coeftime,
-                              precarite = ifelse( motnofact %in% c(1,4) | typecont == '89', 1, 0 ),
-                              jour_entree = weekdays(dtent),
-                              jour_sortie = weekdays(dtsort),
-                              origine_geo = dplyr::case_when(substr(cdgeo,1,2) == 75 ~ "1-Paris",
-                                                             substr(cdgeo,1,2) %in% c(92,93,94)  ~ "2-Petite Couronne",
-                                                             substr(cdgeo,1,2) %in% c(77,78,95,91)  ~ "3-Grande Couronne",
-                                                             TRUE  ~ "4-Hors IDF" )
-  ) 
-  
-  # On ajoute les distances et temps de trajet entre le finess de l'hop et le codegeo patient
-  # Il faut ajuster les code geo des villes nouvelles pour avoir une correspondance
-  # dans le référentiel distances et temps de trajet ; les CP ne correspondent pas aux 
-  # codes communes équivalents dans les tables ATIH
-  # Les codes pour le referentiel : 
-  # 78C03 = 78100 ou 78112
-  # 91C06 = 91080 ou 91000
-  # 95C03 = 95500
-  # 95C04 = 95220
-  if (an > 20) {
-    df <- df %>% dplyr::mutate(cdgeo = as.character(cdgeo),
-                               cdgeo = ifelse(cdgeo == "78C03", "78100",
-                                              ifelse(cdgeo == "91C06", "91000",
-                                                     ifelse(cdgeo == "95C03", "95500",
-                                                            ifelse(cdgeo == "95C04", "95220", cdgeo))))) %>% 
-      dplyr::left_join(., distances, by = c("nohop", "cdgeo"))
-  }
-  
-  # Cas où les recettes du RUM ne sont pas calculées
-  df <- df %>% dplyr::mutate(rec_rum_bee = ifelse(is.na(rec_rum_bee),rec_totale * coeftime ,rec_rum_bee),
-                             rec_rum_tot = ifelse(is.na(rec_rum_tot),rec_totale * coeftime ,rec_rum_tot))
-  
-  # Pour détecter les séjours chimio
-  df <- df %>%
-    dplyr::mutate(chimio = ifelse(as.numeric(noseqrum) == as.numeric(norum) & dp == "Z511", 1, 0)) %>%
-    dplyr::group_by(cle_rsa) %>%
-    dplyr::mutate(chimio = sum(chimio)) %>%
-    dplyr::ungroup()
-  
-  
-  # Pour détécter les séjours GHS minorés
-  if(an > 20){
-    df <- df %>% 
-      dplyr::mutate(across(c("surveillance_particuliere", "resererve_hosp"), ~ifelse(.=="", NA, as.numeric(.))),
-                    ghs_minore = ifelse(ell_gradation == 1 & is.na(surveillance_particuliere) &
-                                          is.na(resererve_hosp) & rescrit_tarifaire != 1 &
-                                          cat_nb_intervenants == "B",TRUE,FALSE)) 
-  } else {
-    df <- df %>% dplyr::mutate(ghs_minore = FALSE)
-  }
-  
-  # On importe les données de mouvements EDS pour avoir les horaires d'entrée et sortie
-  # Import des données de mouvement EDS
-  # if(an > 20){
-  #   
-  # args <-list("dt_fin_mouv" = c("20" %+% an %+% "-01-01", "20" %+% an %+% "-12-31"), # séjours terminés en 2021/2022
-  #             ids_type_nda = 9, # Hospitalisés
-  #             ids_type_sejour = 91,# MCO
-  #             ids_statut_nda = 95) #séjours cloturés
-  # mvts <- rAphpQueries::get_mouvements(args)
-  # 
-  # mvts <- mvts %>% 
-  #   # On enlève les HAD
-  #   dplyr::filter(num_hop != "099") %>% 
-  #   dplyr::distinct(., .keep_all = TRUE)
-  # 
-  # nas_to_keep <- df %>% dplyr::select(nas) %>% dplyr::distinct()
-  # df_mvts <- dplyr::left_join(df %>% dplyr::select(nas, ansor),
-  #                             mvts %>% dplyr::distinct(., .keep_all = TRUE) %>% dplyr::mutate(ansor = format( dtsort, format = "%Y")), 
-  #                      by = c("nas", "ansor")) %>% 
-  #   dplyr::filter(!is.na(num_hop)) %>% 
-  #   dplyr::mutate(code_uh = substr(uh, 4, 6)) %>% 
-  #   dplyr::left_join(., UH %>% dplyr::select(Hopital, `Code UH`,Libelle, `Libelle court`,`Lien vers l'UMA`) %>%
-  #                      dplyr::rename(num_hop = Hopital, code_uh = `Code UH`, uma = `Lien vers l'UMA`)) %>% 
-  #   dplyr::inner_join(., nas_to_keep)
-  # 
-  # df_mvts <- df_mvts %>% 
-  #   dplyr::group_by(nas, ansor, num_hop, lib_hopital, uma) %>% 
-  #   dplyr::summarize(
-  #             d8eeue = min(d8eeue),
-  #             d8soue = max(d8soue),.groups = "drop") %>% 
-  #   dplyr::mutate(premiere_entree_uma = d8eeue,
-  #          derniere_sortie_uma = d8soue) %>% 
-  #   dplyr::group_by(nas, num_hop) %>% 
-  #   dplyr::mutate(entree_hopital = min(d8eeue),
-  #          sortie_hopital = max(d8soue)) %>% 
-  #   dplyr::ungroup() %>% 
-  #   dplyr::select(nas, ansor, num_hop, lib_hopital, uma,
-  #                 premiere_entree_uma, derniere_sortie_uma, entree_hopital, sortie_hopital)
-  # 
-  # df <- dplyr::left_join(df %>% dplyr::mutate(num_hop = substr(nohop, 3, 5)), df_mvts) %>% 
-  #   dplyr::mutate(heure_entree_uma = format(as.POSIXct(premiere_entree_uma), format = "%H:%M"),
-  #          heure_sortie_uma = format(as.POSIXct(derniere_sortie_uma), format = "%H:%M"),
-  #          heure_entree_hopital = format(as.POSIXct(entree_hopital), format = "%H:%M"),
-  #          heure_sortie_hopital = format(as.POSIXct(sortie_hopital), format = "%H:%M"))
-  # 
-  # }
-  
-  
-  if(db == TRUE & update == TRUE){
-    
-    if("mco_" %+% an %+% "_rum_etendus" %in% DBI::dbListTables(connection_db) ){
-      
-      DBI::dbRemoveTable(connection_db, "mco_" %+% an %+% "_rum_etendus" )
-      
-    }
-    
-    DBI::dbWriteTable(connection_db, "mco_" %+% an %+% "_rum_etendus", df,overwrite = TRUE  )
-    
-  }
-  
-  
-  DBI::dbDisconnect(connection_db)
-  
-  return(df)
-  
-  
-}
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
 
-get_rum_geste_marqueur<-function(actes){
-  # GM    exclusion des séjours suivant :   libellé GM                          Discipline 
-  # ---   ------------------------------    ---------------------------------   -----------
-  # GM11  racine de GHM "09C05"             Chirurgie du sein/tumorectomie      GYNECOLOGIE
-  # GM13  <7 ans                            Chirurgie pour strabisme            OPHTALMO
-  # GM24 <1 et > 16 ans                     Chirurgie des hernies de l'enfant   DIGESTIF
-  # GM25 <2 ans                             Geste sur la vessie                 UROLOGIE
-  # GM28 <1 et > 16 ans                     Cure de paraphimosis                UROLOGIE
-  # GM29 que dans la racine de GHM "07C14"  Cholécystectomie                    DIGESTIF
-  # GM43 <1 et > 16 ans                     Chirurgie des bourses de l'enfant   UROLOGIE
-  # GM45  Contient le geste marqueur GM10*  Chirurgie du glaucome               OPHTALMO
-  # GM46  Contient le geste marqueur GM10*  Chirurgie du trou maculaire         OPHTALMO
-  # GM54  Contient le geste marqueur GM10*  Vitrectomie avec pelage de membrane OPHTALMO
-  # GM55  Contient le geste marqueur GM10*  Vitrectomie postérieure isolée      OPHTALMO
-  
-  actes %>% dplyr::inner_join(.,ccam_gm) %>%
-    dplyr::group_by(nas,norum) %>%
-    dplyr::mutate(gm10 = ifelse(gp_geste == "GM10",1,0))%>%
-    dplyr::ungroup() %>%
-    dplyr::filter(! (gp_geste == "GM11" & substr(cdghm,1,5)== "09C05"),
-                  ! (gp_geste == "GM13" & agean < 7) ,
-                  ! (gp_geste == "GM24" & agean < 1 & agean > 16),
-                  ! (gp_geste == "GM25" & agean < 2),
-                  ! (gp_geste == "GM28" & agean < 1 & agean > 16),
-                  ! (gp_geste == "GM29" & substr(cdghm,1,5)!= "07C14"),
-                  ! (gp_geste == "GM43" & agean < 1 & agean > 16),
-                  ! (gp_geste == "GM45" & gm10 == 1),
-                  ! (gp_geste == "GM46" & gm10 == 1),
-                  ! (gp_geste == "GM54" & gm10 == 1),
-                  ! (gp_geste == "GM55" & gm10 == 1)) %>%
-    dplyr::group_by(nas,norum) %>%
-    dplyr::summarise(gm_gp_geste = paste( unique(gp_geste) , collapse= ","),
-                     gm_nb_actes = length(unique(cdccam[act == 1])),
-                     gm_ag = ifelse(length(unique(cdccam[act == 4])),1,0)) %>%
-    dplyr::ungroup()
-}
+            if not line or line.startswith("#"):
+                continue
 
-compute_duration <- function(from_date, units, floor = TRUE) {
-  to_date = lubridate::today()
-  Duration = lubridate::interval(from_date, to_date) / lubridate::duration(num = 1, units = units)
-  if (floor) return(as.integer(floor(Duration)))
-  return(Duration)
-}
+            # nouvelle section [dbname]
+            if line.startswith("[") and line.endswith("]"):
+                current_section = line[1:-1]
+                creds[current_section] = {}
+                continue
+
+            if ":" in line and current_section:
+                key, value = line.split(":", 1)
+                creds[current_section][key.strip()] = value.strip()
+
+    return creds
+
+
+def test_connection(name, cfg):
+    try:
+        user = cfg["user"]
+        password = cfg["password"]
+        host = cfg["host"]
+        port = cfg.get("port", "5432")
+        dbname = cfg["dbname"]
+
+        url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
+
+        engine = create_engine(url)
+
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+
+        print(f"✅ {name} : connexion OK")
+
+    except Exception as e:
+        print(f"❌ {name} : échec connexion")
+        print("   ", e)
+
+
+def main():
+
+    cred_path = Path(r"C:\Users\4251352\Documents\.credentials")
+
+    creds = read_credentials(cred_path)
+
+    print(f"{len(creds)} bases trouvées\n")
+
+    for name, cfg in creds.items():
+        test_connection(name, cfg)
+
+
+if __name__ == "__main__":
+    main()
