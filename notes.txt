@@ -1,64 +1,219 @@
 from pathlib import Path
-from sqlalchemy import create_engine, text
+from urllib.parse import quote_plus
+
+from sqlalchemy import create_engine
 
 
-def read_credentials(path):
+CREDENTIALS_PATH = Path(r"C:\Users\4251352\Documents\.credentials")
+
+
+def read_credentials(path: Path) -> dict:
+    """
+    Lit un fichier .credentials avec une structure du type :
+
+    [dimbdd]
+    dbname: ...
+    host: ...
+    port: ...
+    schema: ...
+    user: ...
+    password: ...
+
+    Retourne un dictionnaire :
+    {
+        "dimbdd": {
+            "dbname": "...",
+            "host": "...",
+            ...
+        }
+    }
+    """
     creds = {}
     current_section = None
 
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
+    with open(path, "r", encoding="utf-8-sig") as f:
+        for raw_line in f:
+            line = raw_line.strip()
 
-            if not line or line.startswith("#"):
+            if not line or line.startswith("#") or line.startswith(";"):
                 continue
 
-            # nouvelle section [dbname]
             if line.startswith("[") and line.endswith("]"):
-                current_section = line[1:-1]
+                current_section = line[1:-1].strip()
                 creds[current_section] = {}
                 continue
 
-            if ":" in line and current_section:
+            if current_section is None:
+                continue
+
+            if ":" in line:
                 key, value = line.split(":", 1)
-                creds[current_section][key.strip()] = value.strip()
+            elif "=" in line:
+                key, value = line.split("=", 1)
+            else:
+                continue
+
+            creds[current_section][key.strip().lower()] = value.strip()
 
     return creds
 
 
-def test_connection(name, cfg):
-    try:
-        user = cfg["user"]
-        password = cfg["password"]
-        host = cfg["host"]
-        port = cfg.get("port", "5432")
-        dbname = cfg["dbname"]
+def get_dimbdd_config(credentials_path: Path = CREDENTIALS_PATH) -> dict:
+    """
+    Retourne la configuration de la base dimbdd.
+    """
+    creds = read_credentials(credentials_path)
 
-        url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
+    if "dimbdd" not in creds:
+        raise KeyError("La section [dimbdd] est introuvable dans le fichier .credentials")
 
-        engine = create_engine(url)
+    cfg = creds["dimbdd"]
 
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
+    user = cfg.get("user") or cfg.get("username")
+    if not user:
+        raise KeyError("Champ 'user' ou 'username' introuvable pour [dimbdd]")
 
-        print(f"✅ {name} : connexion OK")
+    required_fields = {
+        "dbname": cfg.get("dbname"),
+        "host": cfg.get("host"),
+        "port": cfg.get("port", "5432"),
+        "password": cfg.get("password"),
+        "user": user,
+        "schema": cfg.get("schema"),  # optionnel
+    }
 
-    except Exception as e:
-        print(f"❌ {name} : échec connexion")
-        print("   ", e)
+    missing = [k for k in ["dbname", "host", "password", "user"] if not required_fields[k]]
+    if missing:
+        raise ValueError(f"Champs manquants pour [dimbdd] : {missing}")
+
+    return required_fields
 
 
-def main():
+def get_dimbdd_engine(credentials_path: Path = CREDENTIALS_PATH):
+    """
+    Crée et retourne un engine SQLAlchemy pour la base dimbdd.
+    """
+    cfg = get_dimbdd_config(credentials_path)
 
-    cred_path = Path(r"C:\Users\4251352\Documents\.credentials")
+    user = quote_plus(cfg["user"])
+    password = quote_plus(cfg["password"])
+    host = cfg["host"]
+    port = cfg["port"]
+    dbname = cfg["dbname"]
 
-    creds = read_credentials(cred_path)
+    url = f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{dbname}"
 
-    print(f"{len(creds)} bases trouvées\n")
+    engine = create_engine(url)
+    return engine
 
-    for name, cfg in creds.items():
-        test_connection(name, cfg)
+
+
+
+import pandas as pd
+from sqlalchemy import text
+
+from connexion_dimbdd import get_dimbdd_engine, get_dimbdd_config
+
+
+def test_connexion():
+    """
+    Test simple de connexion à dimbdd.
+    """
+    engine = get_dimbdd_engine()
+
+    with engine.connect() as conn:
+        result = conn.execute(text("SELECT current_database(), current_user"))
+        db_name, user_name = result.fetchone()
+
+    print(f"Connexion OK à la base '{db_name}' avec l'utilisateur '{user_name}'")
+
+
+def lister_tables():
+    """
+    Liste quelques tables visibles dans la base.
+    Si schema est présent dans le .credentials, on l'utilise.
+    Sinon, on regarde dans 'public'.
+    """
+    engine = get_dimbdd_engine()
+    cfg = get_dimbdd_config()
+
+    schema = cfg.get("schema") or "public"
+
+    query = text("""
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = :schema
+        ORDER BY table_name
+    """)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn, params={"schema": schema})
+
+    return df
+
+
+def lire_table_exemple(an: int = 22, limit: int = 10):
+    """
+    Exemple de lecture de la table mco_XX_rsa_rsa.
+    """
+    engine = get_dimbdd_engine()
+    cfg = get_dimbdd_config()
+
+    schema = cfg.get("schema")
+    table_name = f"mco_{an}_rsa_rsa"
+
+    if schema:
+        full_table_name = f'"{schema}"."{table_name}"'
+    else:
+        full_table_name = f'"{table_name}"'
+
+    query = text(f"""
+        SELECT *
+        FROM {full_table_name}
+        LIMIT :limit
+    """)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn, params={"limit": limit})
+
+    return df
+
+
+def compter_rsa(an: int = 22):
+    """
+    Équivalent simple de :
+    dplyr::tbl(connection_db, "mco_22_rsa_rsa") %>% dplyr::count()
+    """
+    engine = get_dimbdd_engine()
+    cfg = get_dimbdd_config()
+
+    schema = cfg.get("schema")
+    table_name = f"mco_{an}_rsa_rsa"
+
+    if schema:
+        full_table_name = f'"{schema}"."{table_name}"'
+    else:
+        full_table_name = f'"{table_name}"'
+
+    query = text(f"""
+        SELECT COUNT(*) AS nb
+        FROM {full_table_name}
+    """)
+
+    with engine.connect() as conn:
+        df = pd.read_sql(query, conn)
+
+    return df
 
 
 if __name__ == "__main__":
-    main()
+    test_connexion()
+
+    print("\nQuelques tables :")
+    print(lister_tables().head(20))
+
+    print("\nNombre de lignes dans mco_22_rsa_rsa :")
+    print(compter_rsa(22))
+
+    print("\nExemple de lecture :")
+    print(lire_table_exemple(22, 5).head())
