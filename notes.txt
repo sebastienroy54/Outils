@@ -1,12 +1,167 @@
-ZIP détecté: domaine=PSY site=041 periode=202512
-EXCEL détecté: domaine=PSY site=00041 periode=202512 ext=xlsx
-Mapping UM PSY: 19 clés.
-Fichiers RPA trouvés: 1
-Fichiers RPS trouvés: 1
-Fichiers ANOHOSP trouvés: 1
-FICUM généré: ficum041.txt (finess=750100018, lignes=19)
-RPA 750100018.2025.12.rpa.txt: matched=9764/9764 rate=1.0000 missing_unique=0 lines_in=9764 lines_out=9764
-RPS 750100018.2025.12.rps.txt: matched=828/828 rate=1.0000 missing_unique=0 lines_in=828 lines_out=828
-ANOHOSP 750100018.2025.12.anohosp.txt: vidhosp_produced=390 (prepared=3720, skipped=3330) parse_errors_cle00=0
-  Formats ANO vus: [('V00B', 3330), ('V015', 390)]
-  Formats ignorés: [('V00B', 3330)]
+connection_db<- get_connexion_dimbdd()
+
+#################################################################################
+#################################################################################
+### #Liste des tables dans la base
+#################################################################################
+#################################################################################
+
+
+DBI::dbListTables(connection_db)
+an = 22
+
+
+#Pour mémoire dictionnaire des variables pmeasyr
+# Les variables de toutes les tables (et pour toutes les années)
+pmeasyr::formats%>% View()
+# Sélection de certaines tables
+pmeasyr::formats %>% dplyr::filter(an == 22, table == "rsa") %>% View()
+
+#################################################################################
+#################################################################################
+###Table des RSA
+#################################################################################
+#################################################################################
+
+# 
+dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_rsa") %>% dplyr::count()
+
+
+dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_rsa")%>%
+  dplyr::mutate("type_hospit" = ifelse(duree ==0,"ONuit","HC")) %>%
+  dplyr::group_by(moissor,type_hospit) %>%
+  dplyr::summarise(nb = dplyr::n(),.groups = "drop") -> res
+
+res %>% tidyr::pivot_wider(names_from = "type_hospit",values_from = nb) %>% dplyr::show_query()
+
+
+
+#################################################################################
+#################################################################################
+###Nombre de séjour par type de prise en charge
+#################################################################################
+#################################################################################
+
+dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_rsa") %>%
+  #type de séjours
+  dplyr::left_join( .,
+                    dplyr::tbl( connection_db, "mco_" %+% an %+% "_rum_rum" ) %>%  
+                      dplyr::left_join(.,  dplyr::tbl( connection_db, "mco_" %+% an %+% "_ium" ) %>% dplyr::select( cdurm, typaut, mode_hospit ) ) %>%   
+                      dplyr::distinct( nas, mode_hospit ) ) %>%
+
+  dplyr::group_by(moissor,mode_hospit) %>%
+  dplyr::summarise(nb = dplyr::n(),.groups = "drop") %>%
+  tidyr::pivot_wider(names_from = "mode_hospit",values_from = nb) 
+
+
+dplyr::tbl(connection_db, "mco_" %+% an %+% "_rsa_rsa")%>%
+  dplyr::mutate("type_hospit" = ifelse(duree ==0,"ONuit","HC")) %>%
+  dplyr::group_by(moissor,type_hospit) %>%
+  dplyr::summarise(nb = dplyr::n(),.groups = "drop") -> res
+
+#################################################################################
+#################################################################################
+### Echantillon de séjours
+#################################################################################
+#################################################################################
+an = 22
+Sejours = NULL
+for(an in c("20","21","22")){
+  # Table des RSA
+  dplyr::tbl(connection_db, "mco_" %+% an %+% "_rum_etendus") %>%
+    dplyr::select( cle_rsa,nas, nohop,lib_spe_uma,ghm,   ghs ,rec_totale ,sexe ,
+                   agean, mode_hospit,dp,dr,dureesejpart,duree,dms_n,
+                   ansor,moissor) %>%
+    dplyr::mutate(nda = substr(nas,1,9)) %>%
+    dplyr::right_join(dplyr::tbl(connection_db, "venues_administratives_" %+% an ) %>%
+                        dplyr::distinct(nda,ipp),.) %>%
+    
+    dplyr::collect()-> Sej
+  
+  Sej %>% dplyr::mutate(NumPat = round(as.numeric(ipp)*5,4),
+                        NumHospi = round(as.numeric(cle_rsa)*5,4)) %>%
+    dplyr::rename(SERVICE = lib_spe_uma,
+                  Annee =ansor,
+                  Mois = moissor,
+                  TypeHospi = mode_hospit,
+                  DureeSejour= duree,
+                  DureeRUM =dureesejpart,
+                  DMS = dms_n) %>%
+    dplyr::select(NumPat,NumHospi,SERVICE,Annee,Mois,TypeHospi,DureeSejour,DureeRUM,DMS) -> Sej
+  
+  
+  Sejours<-dplyr::bind_rows(Sejours,Sej %>%   dplyr::sample_n(2000))
+}
+
+
+save(Sejours,file = "C:/data/wd/TD.RData")
+
+
+
+
+
+
+#################################################################################
+#################################################################################
+####Greffes de moelle
+#################################################################################
+#################################################################################
+
+
+yy = 22
+lactes <- c("FELF010","FELF009")
+dplyr::tbl(connection_db,"mco_" %+% yy %+%"_rsa_actes") %>%
+  dplyr::filter(cdccam %in% lactes) %>%
+  dplyr::distinct(cle_rsa) %>%
+  dplyr::inner_join(., dplyr::tbl(connection_db,"mco_" %+% yy %+%"_rsa_rsa") %>%
+                      dplyr::select(cle_rsa,ghm))%>%
+  dplyr::group_by(ghm) %>%
+  dplyr::summarise(nb = dplyr::n())
+
+
+
+
+#Nombre de greffe de moelle identifiées sur la date de greffe en 2022
+ghu <- readr::read_delim("referentiels/ghu.tsv", delim="\t")
+actes_greffes <- c("FELF009","FELF010")
+df<- NULL
+for(yy in 21:22){
+  dt_deb = "2022-01-01"
+  dt_fin= "2022-12-31"
+  dplyr::tbl(connection_db, "mco_" %+% yy %+% "_rum_actes") %>%
+    dplyr::filter(dtacte >= dt_deb , 
+                  dtacte <= dt_fin,
+                  cdccam %in% actes_greffes ) %>%
+    dplyr::distinct(nas,dtacte,cdccam) %>%
+    dplyr::left_join(.,
+                            dplyr::tbl( connection_db, "mco_" %+% yy %+% "_rum_rum" ) %>%  
+                              dplyr::left_join(.,  dplyr::tbl( connection_db, "mco_" %+% yy %+% "_ium" ) %>% dplyr::select( cdurm, nohop ) ) %>%   
+                              dplyr::distinct( nas, nohop )) %>%
+    dplyr::distinct(nas,nohop,dtacte,cdccam) %>% 
+    dplyr::left_join(.,   dplyr::tbl( connection_db, "mco_" %+% yy %+% "_rsa_ano" ) %>%
+                       dplyr::select(nas,dtent,dtsort)) %>%
+    dplyr::mutate(nda = substr(nas,1,9)) %>%
+    dplyr::left_join(.,  dplyr::tbl( connection_db, "venues_administratives_" %+% yy  ) %>%
+                       dplyr::select(nda,ipp)) %>%
+    dplyr::left_join(.,  dplyr::tbl( connection_db, "mco_" %+% yy %+% "_rsa_cancer"  ) %>%
+                       dplyr::mutate(cancer = "Cancer") %>%
+                       dplyr::select(nas,cancer)) %>%
+    dplyr::collect() -> tmp
+  
+  df <- df %>% dplyr::bind_rows(., tmp)
+  
+  
+}
+
+df %>% dplyr::left_join(., ghu) %>%
+  dplyr::group_by(ghu) %>%
+  dplyr::summarise(nb = dplyr::n())
+
+ df %>% 
+   dplyr::left_join(., ghu) %>%
+   dplyr::filter(ghu == "AP-HP.Nord" ) %>%
+   dplyr::mutate(cancer = ifelse(is.na(cancer),"Autres",cancer),
+                 type = ifelse(cdccam =="FELF009","Allogreffe","Autogreffe")) %>%
+   dplyr::select(hopital,ipp,nas,dtent,dtsort,type,dtacte,cdccam,cancer)  %>%
+   dplyr::arrange(hopital,dtsort) %>% View()
+ 
