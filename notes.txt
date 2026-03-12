@@ -1,2 +1,15 @@
-Ligne(s) d'autorisations rejetée(s) (mauvais format, ou ligne en doublons) :
-528K75010016651A 01011900000P : La longueur de la ligne est invalide : "29" caratères au lieu de "33" / Le format de la date de fin est invalide: 000P au lieu de JJMMAAAA / La date de fin "000P" est inférieur ou égale à la date d'effet "01011900"
+import pandas as pd
+
+# Chemin du fichier
+fichier = r"C:/Users/4251352/Documents/Resultats_requetes/mucoviscidose_2025.csv"
+
+# Lire le CSV
+df = pd.read_csv(fichier)
+
+# Compter les occurrences de chaque IPP
+compte_ipp = df['IPP'].value_counts()
+
+# Calcul des doublons (occurrences - 1)
+doublons = (compte_ipp - 1).clip(lower=0).sum()
+
+print("Nombre total de doublons IPP :", doublons)
