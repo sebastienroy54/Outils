@@ -1,20 +1,37 @@
-import pandas as pd
-
-fichier = r"C:/Users/4251352/Documents/Resultats_requetes/mucoviscidose_2025.csv"
-
-# Lire le fichier avec séparateur français
-df = pd.read_csv(fichier, sep=";", encoding="utf-8")
-
-# Nettoyer les noms de colonnes (enlever espaces)
-df.columns = df.columns.str.strip()
-
-# Voir les colonnes disponibles
-print("Colonnes du fichier :", df.columns.tolist())
-
-# Vérifier si IPP existe
-if "IPP" not in df.columns:
-    print("La colonne IPP n'existe pas dans le fichier")
-else:
-    compte_ipp = df["IPP"].value_counts()
-    doublons = (compte_ipp - 1).clip(lower=0).sum()
-    print("Nombre total de doublons IPP :", doublons)
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+SPOOL C:/Users/4251352/Documents/Resultats_requetes/mucoviscidose_2024.csv
+SELECT DISTINCT
+    SDO.KYNOIP AS IPP,
+    SDO.NMMAL AS NOM,
+    SDO.NMPMAL AS PRENOM,
+    TO_CHAR(SDO.DANAIS,'DD/MM/YYYY') AS DDN,
+    RSM.NODA AS NDA,
+    EPI.TYEPI AS TYPE,
+    EPI.D8EEUE,
+    EPI.D8SOUE
+FROM
+    SDO,
+    RSM,
+    EPI,
+    DGN
+WHERE
+    SDO.KYNODA = RSM.NODA
+    AND RSM.KYRES = EPI.NORES
+    AND DGN.KYRES(+) = RSM.KYRES
+    AND EPI.D8SOUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+    AND EPI.D8SOUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+    AND (
+        RSM.CDDNC9  IN ('E840','Z942','E841','Z943','E848','E849')
+        OR RSM.CDRELIE IN ('E840','Z942','E841','Z943','E848','E849')
+        OR DGN.KYCDDG  IN ('E840','Z942','E841','Z943','E848','E849')
+    )
+ORDER BY
+    EPI.D8SOUE;
+SPOOL OFF;
