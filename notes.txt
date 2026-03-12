@@ -1,15 +1,20 @@
 import pandas as pd
 
-# Chemin du fichier
 fichier = r"C:/Users/4251352/Documents/Resultats_requetes/mucoviscidose_2025.csv"
 
-# Lire le CSV
-df = pd.read_csv(fichier)
+# Lire le fichier avec séparateur français
+df = pd.read_csv(fichier, sep=";", encoding="utf-8")
 
-# Compter les occurrences de chaque IPP
-compte_ipp = df['IPP'].value_counts()
+# Nettoyer les noms de colonnes (enlever espaces)
+df.columns = df.columns.str.strip()
 
-# Calcul des doublons (occurrences - 1)
-doublons = (compte_ipp - 1).clip(lower=0).sum()
+# Voir les colonnes disponibles
+print("Colonnes du fichier :", df.columns.tolist())
 
-print("Nombre total de doublons IPP :", doublons)
+# Vérifier si IPP existe
+if "IPP" not in df.columns:
+    print("La colonne IPP n'existe pas dans le fichier")
+else:
+    compte_ipp = df["IPP"].value_counts()
+    doublons = (compte_ipp - 1).clip(lower=0).sum()
+    print("Nombre total de doublons IPP :", doublons)
