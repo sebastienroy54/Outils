@@ -1,7 +1,71 @@
-SELECT DISTINCT ACS.CDPHCO
-FROM ACS
-WHERE ACS.NOUFCO = '670'
-  AND ACS.TYMAJ <> 'D'
-  AND UPPER(ACS.CDPHCO) LIKE '%MOR%'
-ORDER BY ACS.CDPHCO
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:/Users/4251352/Documents/Resultats_requetes/activite_Pr_Moro_UH670_externe_MCO_2025.csv
+
+SELECT
+    '670' AS UH,
+    'MDA MORO' AS CONSULTANT,
+
+    /* File active 2025 = patients vus en 2025 */
+    (
+        SELECT COUNT(DISTINCT A1.NOIP)
+        FROM ACS A1
+        WHERE A1.NOUFCO = '670'
+          AND A1.CDPHCO = 'MDA MORO'
+          AND A1.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A1.TYMAJ <> 'D'
+    ) AS FILE_ACTIVE_2025,
+
+    /* Nombre total de patients vus par le Pr Moro jusqu'à fin 2025 */
+    (
+        SELECT COUNT(DISTINCT A2.NOIP)
+        FROM ACS A2
+        WHERE A2.NOUFCO = '670'
+          AND A2.CDPHCO = 'MDA MORO'
+          AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A2.TYMAJ <> 'D'
+    ) AS NB_PATIENTS_TOTAL,
+
+    /* Nouveaux patients 2025 = première consultation avec le Pr Moro en 2025 */
+    (
+        SELECT COUNT(DISTINCT A3.NOIP)
+        FROM ACS A3
+        WHERE A3.NOUFCO = '670'
+          AND A3.CDPHCO = 'MDA MORO'
+          AND A3.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A3.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A3.TYMAJ <> 'D'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM ACS A4
+              WHERE A4.NOIP = A3.NOIP
+                AND A4.NOUFCO = '670'
+                AND A4.CDPHCO = 'MDA MORO'
+                AND A4.DACO < TO_DATE('01/01/2025','DD/MM/YYYY')
+                AND A4.TYMAJ <> 'D'
+          )
+    ) AS NB_NOUVEAUX_PATIENTS_2025,
+
+    /* Nombre de consultations MCO 2025 */
+    (
+        SELECT COUNT(DISTINCT A5.NOACS)
+        FROM ACS A5
+        WHERE A5.NOUFCO = '670'
+          AND A5.CDPHCO = 'MDA MORO'
+          AND A5.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A5.TYMAJ <> 'D'
+    ) AS NB_CONSULTATIONS_MCO_2025
+
+FROM DUAL
 ;
+
+SPOOL OFF;
