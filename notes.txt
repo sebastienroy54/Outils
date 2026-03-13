@@ -1,18 +1,62 @@
-Le Pr Moro souhaite avoir des données pour son activité 2025 pour la maison des adolescents sur l’externe MCO.
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
 
-Elle voudrait par UH d’externe, champs MCO:
--	File active/Nb de patients / Nb de nouveaux patients
--	Nombre de consultations MCO 
+SPOOL C:/Users/4251352/Documents/Resultats_requetes/activite_Pr_Moro_UH670_externe_MCO_2025.csv
 
-set verify off
-set linesize 300
-set pagesize 6000
-spool M:/GILDA/UH_CS_PSY.txt
-set termout off
-
-SELECT DISTINCT to_char(ACS.NOACS), ACS.NOIP, ACS.DACO, ACS.NOUFCO
-FROM ACS WHERE 
-ACS.NOUFCO in ('231','232','233')
-AND ACS.DACO >= to_date('20/11/2025','DD/MM/YYYY')  AND ACS.TYMAJ <> 'D' 
+SELECT
+    '670' AS UH,
+    'APH_MORO' AS CDPHCO,
+    (
+        SELECT COUNT(DISTINCT A1.NOIP)
+        FROM ACS A1
+        WHERE A1.NOUFCO = '670'
+          AND A1.CDPHCO = 'APH_MORO'
+          AND A1.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A1.TYMAJ <> 'D'
+    ) AS FILE_ACTIVE_2025,
+    (
+        SELECT COUNT(DISTINCT A2.NOIP)
+        FROM ACS A2
+        WHERE A2.NOUFCO = '670'
+          AND A2.CDPHCO = 'APH_MORO'
+          AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A2.TYMAJ <> 'D'
+    ) AS NB_PATIENTS_TOTAL,
+    (
+        SELECT COUNT(DISTINCT A3.NOIP)
+        FROM ACS A3
+        WHERE A3.NOUFCO = '670'
+          AND A3.CDPHCO = 'APH_MORO'
+          AND A3.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A3.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A3.TYMAJ <> 'D'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM ACS A4
+              WHERE A4.NOIP = A3.NOIP
+                AND A4.NOUFCO = '670'
+                AND A4.CDPHCO = 'APH_MORO'
+                AND A4.DACO < TO_DATE('01/01/2025','DD/MM/YYYY')
+                AND A4.TYMAJ <> 'D'
+          )
+    ) AS NB_NOUVEAUX_PATIENTS_2025,
+    (
+        SELECT COUNT(DISTINCT A5.NOACS)
+        FROM ACS A5
+        WHERE A5.NOUFCO = '670'
+          AND A5.CDPHCO = 'APH_MORO'
+          AND A5.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A5.TYMAJ <> 'D'
+    ) AS NB_CONSULTATIONS_MCO_2025
+FROM DUAL
 ;
-spool off;
+
+SPOOL OFF;
