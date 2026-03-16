@@ -1,1 +1,1 @@
-=SI(ET(SUPPRESPACE(M2)="";SUPPRESPACE(AJ2)<>"");"A vérifier";"")
+=SI(ET(NBCAR(SUPPRESPACE(M2&""))=0;NBCAR(SUPPRESPACE(AJ2&""))>0;AJ2<>0);"A vérifier";"")
