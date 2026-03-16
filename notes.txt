@@ -1,1 +1,3 @@
-=SI(ET(NBCAR(SUPPRESPACE(M2&""))=0;NBCAR(SUPPRESPACE(AJ2&""))>0;AJ2<>0);"A vérifier";"")
+=RECHERCHEX(A2;'[Exportation_SIMPA_save.xlsx]Sheet1'!$A:$A;'[Exportation_SIMPA_save.xlsx]Sheet1'!$M:$M;"")&""
+
+=SI(ET(NBCAR(SUPPRESPACE(M2&""))=0;NBCAR(SUPPRESPACE(AJ2&""))>0);"A vérifier";"")
