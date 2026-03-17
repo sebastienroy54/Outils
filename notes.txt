@@ -1,5 +1,50 @@
-CREATE TABLE TMP_ACTES_SIEGE (
-    IPP      VARCHAR2(20),
-    CDCCAM   VARCHAR2(20),
-    DATE_EXE DATE
-);
+# =========================
+# GENERATION DE REQUETES SQL PAR BLOCS
+# =========================
+
+chunk_size = 500
+sql_chunks_dir = out_dir / "sql_chunks"
+sql_chunks_dir.mkdir(exist_ok=True)
+
+rows = work_unique.to_dict("records")
+
+for i in range(0, len(rows), chunk_size):
+    chunk = rows[i:i+chunk_size]
+    file_path = sql_chunks_dir / f"req_chunk_{i//chunk_size + 1}.sql"
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write("SET HEADING ON\nSET COLSEP ';'\n\n")
+
+        f.write("SELECT DISTINCT\n")
+        f.write("    RSM.NODA AS NDA,\n")
+        f.write("    RSS.CDGHM AS GHM\n")
+        f.write("FROM\n(\n")
+
+        for j, row in enumerate(chunk):
+            ipp = row["ipp"].replace("'", "''")
+            ccam = row["cdccam"].replace("'", "''")
+            date_exe = row["date_exe"]
+
+            line = f"SELECT '{ipp}' AS IPP, '{ccam}' AS CDCCAM, TO_DATE('{date_exe}','DD/MM/YYYY') AS DATE_EXE FROM DUAL"
+
+            if j < len(chunk) - 1:
+                line += "\nUNION ALL\n"
+            else:
+                line += "\n"
+
+            f.write(line)
+
+        f.write(") T,\n")
+        f.write("RSM,\nRAC,\nRUM,\nRSS\n")
+
+        f.write("WHERE\n")
+        f.write("    RSM.NOIP = T.IPP\n")
+        f.write("    AND RAC.KYRES = RSM.KYRES\n")
+        f.write("    AND RAC.KYCDAC = T.CDCCAM\n")
+        f.write("    AND TRUNC(RAC.D8REAL) = T.DATE_EXE\n")
+        f.write("    AND RAC.KYACTIVITE = '1'\n")
+        f.write("    AND RUM.NORES = RSM.KYRES\n")
+        f.write("    AND RSS.KYRSS = RUM.KYRSS\n")
+        f.write("    AND RSS.CDGHM LIKE '%M%'\n")
+
+    print(f"Fichier créé : {file_path}")
