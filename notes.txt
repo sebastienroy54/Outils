@@ -6,11 +6,9 @@ SET COLSEP ';'
 SET TRIMSPOOL ON
 SET WRAP OFF
 SET TERMOUT OFF
-
-SPOOL C:/Users/4251352/Documents/Resultats_requetes/activite_MDA_670_676_par_praticien_2025.csv
-
+SPOOL C:/Users/4251352/Documents/Resultats_requetes/activite_MDA_670_676_par_UF_2025.csv
 SELECT
-    Z.PRATICIEN,
+    Z.UF,
     Z.FILE_ACTIVE_2025,
     Z.NB_PATIENTS_TOTAL,
     Z.NB_NOUVEAUX_PATIENTS_2025,
@@ -18,32 +16,26 @@ SELECT
 FROM
 (
     SELECT
-        P.CDPHCO AS PRATICIEN,
-
+        U.NOUFCO AS UF,
         (
             SELECT COUNT(DISTINCT A1.NOIP)
             FROM ACS A1
-            WHERE A1.NOUFCO IN ('670','676')
-              AND A1.CDPHCO = P.CDPHCO
+            WHERE A1.NOUFCO = U.NOUFCO
               AND A1.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
               AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A1.TYMAJ <> 'D'
         ) AS FILE_ACTIVE_2025,
-
         (
             SELECT COUNT(DISTINCT A2.NOIP)
             FROM ACS A2
-            WHERE A2.NOUFCO IN ('670','676')
-              AND A2.CDPHCO = P.CDPHCO
+            WHERE A2.NOUFCO = U.NOUFCO
               AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A2.TYMAJ <> 'D'
         ) AS NB_PATIENTS_TOTAL,
-
         (
             SELECT COUNT(DISTINCT A3.NOIP)
             FROM ACS A3
-            WHERE A3.NOUFCO IN ('670','676')
-              AND A3.CDPHCO = P.CDPHCO
+            WHERE A3.NOUFCO = U.NOUFCO
               AND A3.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
               AND A3.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A3.TYMAJ <> 'D'
@@ -51,40 +43,28 @@ FROM
                   SELECT 1
                   FROM ACS A4
                   WHERE A4.NOIP = A3.NOIP
-                    AND A4.NOUFCO IN ('670','676')
-                    AND A4.CDPHCO = P.CDPHCO
+                    AND A4.NOUFCO = U.NOUFCO
                     AND A4.DACO < TO_DATE('01/01/2025','DD/MM/YYYY')
                     AND A4.TYMAJ <> 'D'
               )
         ) AS NB_NOUVEAUX_PATIENTS_2025,
-
         (
             SELECT COUNT(DISTINCT A5.NOACS)
             FROM ACS A5
-            WHERE A5.NOUFCO IN ('670','676')
-              AND A5.CDPHCO = P.CDPHCO
+            WHERE A5.NOUFCO = U.NOUFCO
               AND A5.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
               AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A5.TYMAJ <> 'D'
         ) AS NB_CONSULTATIONS_MCO_2025
-
     FROM
     (
-        SELECT DISTINCT
-            ACS.CDPHCO
-        FROM ACS
-        WHERE ACS.NOUFCO IN ('670','676')
-          AND ACS.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-          AND ACS.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-          AND ACS.TYMAJ <> 'D'
-          AND ACS.CDPHCO IS NOT NULL
-    ) P
-
+        SELECT '670' AS NOUFCO FROM DUAL
+        UNION ALL
+        SELECT '676' AS NOUFCO FROM DUAL
+    ) U
     UNION ALL
-
     SELECT
-        'TOTAL' AS PRATICIEN,
-
+        'TOTAL' AS UF,
         (
             SELECT COUNT(DISTINCT A1.NOIP)
             FROM ACS A1
@@ -93,7 +73,6 @@ FROM
               AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A1.TYMAJ <> 'D'
         ) AS FILE_ACTIVE_2025,
-
         (
             SELECT COUNT(DISTINCT A2.NOIP)
             FROM ACS A2
@@ -101,7 +80,6 @@ FROM
               AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A2.TYMAJ <> 'D'
         ) AS NB_PATIENTS_TOTAL,
-
         (
             SELECT COUNT(DISTINCT A3.NOIP)
             FROM ACS A3
@@ -118,7 +96,6 @@ FROM
                     AND A4.TYMAJ <> 'D'
               )
         ) AS NB_NOUVEAUX_PATIENTS_2025,
-
         (
             SELECT COUNT(DISTINCT A5.NOACS)
             FROM ACS A5
@@ -127,12 +104,13 @@ FROM
               AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
               AND A5.TYMAJ <> 'D'
         ) AS NB_CONSULTATIONS_MCO_2025
-
     FROM DUAL
 ) Z
 ORDER BY
-    CASE WHEN Z.PRATICIEN = 'TOTAL' THEN 2 ELSE 1 END,
-    Z.PRATICIEN
+    CASE Z.UF
+        WHEN '670' THEN 1
+        WHEN '676' THEN 2
+        ELSE 3
+    END
 ;
-
 SPOOL OFF;
