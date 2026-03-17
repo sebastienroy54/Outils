@@ -1,215 +1,96 @@
-import pandas as pd
-from pathlib import Path
+Lecture du fichier : C:\Users\4251352\projets\2025_actes4_absents_du_SAG.xlsx
 
-# =========================
-# PARAMETRES
-# =========================
-excel_file = Path("2025_acte4_absents_du_SAG.xlsx")
+Feuilles trouvées : ['Activité 4', 'Activité 4 cch']
 
-# Noms de sortie
-out_dir = Path("resultats_requetes")
-out_dir.mkdir(exist_ok=True)
+========================
+FEUILLE 1
+========================
+Nom : Activité 4
+Colonnes : ['nohop', 'ipp', 'cdccam', 'descri', 'phase', 'act', 'date_exe', 'TRG', 'ind_appli', 'libelle_long']
+Nb lignes : 49841
 
-# =========================
-# FONCTIONS UTILES
-# =========================
-def normalize_text(x):
-    if pd.isna(x):
-        return ""
-    return str(x).strip()
+Aperçu :
+ nohop        ipp  cdccam descri  phase  act   date_exe TRG  ind_appli                                                                                                 
+                                         libelle_long
+     5 8001707444 AFPA001    NaN      0    4 2025-01-15 BJN          1                               Mise à plat de lésion infectieuse péridurale rachidienne et/ou paravertébrale postopératoire [sepsis], par abord direct
+     5 8004800790 NZFA004    NaN      0    4 2025-01-01 BJN          1                                                                                                 
+   Amputation ou désarticulation de plusieurs orteils
+     5 8004914959 MEKA008    -01      0    4 2025-01-06 BJN          1 Remplacement de l'articulation scapulohumérale par prothèse totale, avec réinsertion, suture et/ou autoplastie de la coiffe des rotateurs de l'épaule
+     5 8004844997 NEKA005    -01      0    4 2025-01-16 BJN          1                       Changement de la pièce acétabulaire ou fémorale d'une prothèse totale de hanche, avec ostéosynthèse de l'acétabulum ou du fémur
+     5 8004844997 NEJA001    NaN      0    4 2025-01-16 BJN          1                                                                                             Nettoyage de l'articulation coxofémorale, par arthrotomie
 
-def normalize_ipp(x):
-    if pd.isna(x):
-        return ""
-    s = str(x).strip()
-    if s.endswith(".0"):
-        s = s[:-2]
-    return s
+========================
+FEUILLE 2
+========================
+Nom : Activité 4 cch
+Colonnes : ['nohop', 'cle', 'ipp', 'simpa', 'sag', 'cdccam', 'descri', 'phase', 'act', 'date_exe', 'TRG', 'ind_appli', 'libelle_long']
+Nb lignes : 5974
 
-def normalize_date_for_key(x):
-    if pd.isna(x):
-        return ""
-    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
-    if pd.isna(dt):
-        return str(x).strip()
-    return dt.strftime("%d/%m/%Y")
+Aperçu :
+ nohop                       cle        ipp       simpa  sag  cdccam  descri  phase  act   date_exe TRG  ind_appli                                                     
+                       libelle_long
+    21 8007767627NFKA002-0245684 8007767627 213202771.0  NaN NFKA002    -2.0      0    4 2025-01-27 CCH          1     Changement d'une prothèse tricompartimentaire du genou, avec reconstruction osseuse
+    21 8007767627NBMA811-0145684 8007767627 213202771.0  NaN NBMA811    -1.0      0    4 2025-01-27 CCH          1 Reconstruction du fémur par prothèse, après résection "en bloc" de la totalité du fémur
+    21 8011910260NBMA811-0145693 8011910260 213217625.0  NaN NBMA811    -1.0      0    4 2025-02-05 CCH          1 Reconstruction du fémur par prothèse, après résection "en bloc" de la totalité du fémur
+    21 8017312453HLFC801-0145706 8017312453 213223433.0  NaN HLFC801    -1.0      0    4 2025-02-18 CCH          1                                                   Hépatectomie droite, par coelioscopie
+    21 8007024263JQGA003-1145748 8007024263 213247916.0  NaN JQGA003   -11.0      0    4 2025-04-01 CCH          1                        Accouchement par césarienne au cours du travail, par laparotomie
 
-def build_simple_key(df):
-    return (
-        df["ipp_norm"] + "|" +
-        df["cdccam_norm"] + "|" +
-        df["date_exe_norm"]
-    )
+========================
+ANALYSE DE LA COLONNE 'cle' FEUILLE 2
+========================
 
-# =========================
-# LECTURE DU FICHIER
-# =========================
-print(f"\nLecture du fichier : {excel_file.resolve()}\n")
+Exemples de 'cle' :
+8007767627NFKA002-0245684
+8007767627NBMA811-0145684
+8011910260NBMA811-0145693
+8017312453HLFC801-0145706
+8007024263JQGA003-1145748
+   8018274789KEFC00245789
+8011408186NBMA811-0145761
+8011408186NBFA807-0145761
+   8011097007GGLC00145769
+   8011097007ZBQC00145769
 
-xls = pd.ExcelFile(excel_file)
-print("Feuilles trouvées :", xls.sheet_names)
+Nombre de lignes où cle == cle_simple : 0 / 5974
 
-# On prend les 2 premières feuilles
-sheet1_name = xls.sheet_names[0]
-sheet2_name = xls.sheet_names[1]
+Exemples de différences entre 'cle' et 'cle_simple' :
+       ipp  cdccam   date_exe                   cle_txt                    cle_simple
+8007767627 NFKA002 2025-01-27 8007767627NFKA002-0245684 8007767627|NFKA002|27/01/2025
+8007767627 NBMA811 2025-01-27 8007767627NBMA811-0145684 8007767627|NBMA811|27/01/2025
+8011910260 NBMA811 2025-02-05 8011910260NBMA811-0145693 8011910260|NBMA811|05/02/2025
+8017312453 HLFC801 2025-02-18 8017312453HLFC801-0145706 8017312453|HLFC801|18/02/2025
+8007024263 JQGA003 2025-04-01 8007024263JQGA003-1145748 8007024263|JQGA003|01/04/2025
+8018274789 KEFC002 2025-05-12    8018274789KEFC00245789 8018274789|KEFC002|12/05/2025
+8011408186 NBMA811 2025-04-14 8011408186NBMA811-0145761 8011408186|NBMA811|14/04/2025
+8011408186 NBFA807 2025-04-14 8011408186NBFA807-0145761 8011408186|NBFA807|14/04/2025
+8011097007 GGLC001 2025-04-22    8011097007GGLC00145769 8011097007|GGLC001|22/04/2025
+8011097007 ZBQC001 2025-04-22    8011097007ZBQC00145769 8011097007|ZBQC001|22/04/2025
+8009724369 JJFJ001 2025-04-28    8009724369JJFJ00145775 8009724369|JJFJ001|28/04/2025
+8013758361 KEFC001 2025-05-12    8013758361KEFC00145789 8013758361|KEFC001|12/05/2025
+8009163203 KDFA002 2025-05-12    8009163203KDFA00245789 8009163203|KDFA002|12/05/2025
+8011604154 JQGA003 2025-05-02 8011604154JQGA003-1145779 8011604154|JQGA003|02/05/2025
+8007157848 JQGA004 2025-05-02 8007157848JQGA004-1245779 8007157848|JQGA004|02/05/2025
+8018655013 NFKA002 2025-05-12 8018655013NFKA002-0245789 8018655013|NFKA002|12/05/2025
+8017706279 JQGA003 2025-07-04 8017706279JQGA003-1145842 8017706279|JQGA003|04/07/2025
+8017746082 HLFC801 2025-11-17 8017746082HLFC801-0145978 8017746082|HLFC801|17/11/2025
+8006671511 HLFC801 2025-12-23 8006671511HLFC801-0146014 8006671511|HLFC801|23/12/2025
+8019218796 HLFC801 2025-11-18 8019218796HLFC801-0145979 8019218796|HLFC801|18/11/2025
 
-df1 = pd.read_excel(excel_file, sheet_name=sheet1_name)
-df2 = pd.read_excel(excel_file, sheet_name=sheet2_name)
+========================
+ANALYSE DES COLONNES SIMPA / SAG
+========================
+Nb lignes avec SIMPA renseigné : 33
+Nb lignes avec SAG renseigné   : 15
+Nb lignes SIMPA oui / SAG non  : 18
+Nb lignes SIMPA oui / SAG oui  : 15
 
-print("\n========================")
-print("FEUILLE 1")
-print("========================")
-print("Nom :", sheet1_name)
-print("Colonnes :", list(df1.columns))
-print("Nb lignes :", len(df1))
-print("\nAperçu :")
-print(df1.head(5).to_string(index=False))
+========================
+TABLE DE TRAVAIL FEUILLE 1
+========================
+Nb lignes valides : 49841
+Nb lignes uniques : 49575
 
-print("\n========================")
-print("FEUILLE 2")
-print("========================")
-print("Nom :", sheet2_name)
-print("Colonnes :", list(df2.columns))
-print("Nb lignes :", len(df2))
-print("\nAperçu :")
-print(df2.head(5).to_string(index=False))
+CSV exporté : C:\Users\4251352\projets\resultats_requetes\actes_siege_feuille1_cle_simple.csv
+SQL d'insertion exporté : C:\Users\4251352\projets\resultats_requetes\insert_tmp_actes_siege.sql
 
-# =========================
-# NORMALISATION DES COLONNES
-# =========================
-# On met les noms de colonnes en minuscules pour simplifier
-df1.columns = [str(c).strip().lower() for c in df1.columns]
-df2.columns = [str(c).strip().lower() for c in df2.columns]
-
-required_cols_sheet1 = ["ipp", "cdccam", "date_exe"]
-required_cols_sheet2 = ["ipp", "cdccam", "date_exe"]
-
-for col in required_cols_sheet1:
-    if col not in df1.columns:
-        raise ValueError(f"Colonne absente de la feuille 1 : {col}")
-
-for col in required_cols_sheet2:
-    if col not in df2.columns:
-        raise ValueError(f"Colonne absente de la feuille 2 : {col}")
-
-# Normalisation feuille 1
-df1["ipp_norm"] = df1["ipp"].apply(normalize_ipp)
-df1["cdccam_norm"] = df1["cdccam"].apply(normalize_text)
-df1["date_exe_norm"] = df1["date_exe"].apply(normalize_date_for_key)
-df1["cle_simple"] = build_simple_key(df1)
-
-# Normalisation feuille 2
-df2["ipp_norm"] = df2["ipp"].apply(normalize_ipp)
-df2["cdccam_norm"] = df2["cdccam"].apply(normalize_text)
-df2["date_exe_norm"] = df2["date_exe"].apply(normalize_date_for_key)
-df2["cle_simple"] = build_simple_key(df2)
-
-# =========================
-# ANALYSE DE LA COLONNE CLE EN FEUILLE 2
-# =========================
-print("\n========================")
-print("ANALYSE DE LA COLONNE 'cle' FEUILLE 2")
-print("========================")
-
-if "cle" in df2.columns:
-    df2["cle_txt"] = df2["cle"].astype(str).str.strip()
-
-    print("\nExemples de 'cle' :")
-    print(df2["cle_txt"].dropna().head(10).to_string(index=False))
-
-    # Comparaison simple
-    df2["cle_identique_simple"] = df2["cle_txt"] == df2["cle_simple"]
-
-    nb_equal = df2["cle_identique_simple"].sum()
-    nb_total = len(df2)
-
-    print(f"\nNombre de lignes où cle == cle_simple : {nb_equal} / {nb_total}")
-
-    # On sort quelques lignes où ça ne matche pas
-    diff = df2.loc[df2["cle_identique_simple"] == False, ["ipp", "cdccam", "date_exe", "cle_txt", "cle_simple"]].head(20)
-
-    if len(diff) > 0:
-        print("\nExemples de différences entre 'cle' et 'cle_simple' :")
-        print(diff.to_string(index=False))
-    else:
-        print("\nLa colonne 'cle' semble identique à la clé simple.")
-else:
-    print("Pas de colonne 'cle' dans la feuille 2.")
-
-# =========================
-# COMPTAGE DES LIGNES DEJA TRAITEES EN FEUILLE 2
-# =========================
-print("\n========================")
-print("ANALYSE DES COLONNES SIMPA / SAG")
-print("========================")
-
-if "simpa" in df2.columns:
-    df2["simpa_txt"] = df2["simpa"].astype(str).str.strip()
-else:
-    df2["simpa_txt"] = ""
-
-if "sag" in df2.columns:
-    df2["sag_txt"] = df2["sag"].astype(str).str.strip()
-else:
-    df2["sag_txt"] = ""
-
-simpa_renseigne = df2["simpa_txt"].ne("") & df2["simpa_txt"].ne("nan") & df2["simpa_txt"].ne("#N/A")
-sag_renseigne = df2["sag_txt"].ne("") & df2["sag_txt"].ne("nan") & df2["sag_txt"].ne("#N/A")
-
-print("Nb lignes avec SIMPA renseigné :", int(simpa_renseigne.sum()))
-print("Nb lignes avec SAG renseigné   :", int(sag_renseigne.sum()))
-print("Nb lignes SIMPA oui / SAG non  :", int((simpa_renseigne & ~sag_renseigne).sum()))
-print("Nb lignes SIMPA oui / SAG oui  :", int((simpa_renseigne & sag_renseigne).sum()))
-
-# =========================
-# EXPORT D'UNE TABLE DE TRAVAIL PROPRE DEPUIS FEUILLE 1
-# =========================
-work = df1[["ipp_norm", "cdccam_norm", "date_exe_norm", "cle_simple"]].copy()
-work.columns = ["ipp", "cdccam", "date_exe", "cle_simple"]
-
-# On enlève les lignes vides
-work = work[
-    (work["ipp"] != "") &
-    (work["cdccam"] != "") &
-    (work["date_exe"] != "")
-].copy()
-
-# Déduplication
-work_unique = work.drop_duplicates().copy()
-
-print("\n========================")
-print("TABLE DE TRAVAIL FEUILLE 1")
-print("========================")
-print("Nb lignes valides :", len(work))
-print("Nb lignes uniques :", len(work_unique))
-
-csv_out = out_dir / "actes_siege_feuille1_cle_simple.csv"
-work_unique.to_csv(csv_out, sep=";", index=False, encoding="utf-8")
-
-print(f"\nCSV exporté : {csv_out.resolve()}")
-
-# =========================
-# GENERATION D'UN FICHIER SQL D'INSERT
-# =========================
-# Pour le cas où tu peux créer une table Oracle de travail
-sql_out = out_dir / "insert_tmp_actes_siege.sql"
-
-with open(sql_out, "w", encoding="utf-8") as f:
-    f.write("-- Script d'insertion Oracle\n")
-    f.write("-- Adapter le nom de la table si besoin\n\n")
-
-    for _, row in work_unique.iterrows():
-        ipp = row["ipp"].replace("'", "''")
-        ccam = row["cdccam"].replace("'", "''")
-        date_exe = row["date_exe"]
-
-        f.write(
-            "INSERT INTO TMP_ACTES_SIEGE (IPP, CDCCAM, DATE_EXE) VALUES "
-            f"('{ipp}', '{ccam}', TO_DATE('{date_exe}','DD/MM/YYYY'));\n"
-        )
-
-    f.write("\nCOMMIT;\n")
-
-print(f"SQL d'insertion exporté : {sql_out.resolve()}")
-
-print("\nTerminé.")
+Terminé.
