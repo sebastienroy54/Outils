@@ -1,6 +1,215 @@
-feuille 1:
-nohop	ipp	cdccam	descri	phase	act	date_exe	TRG	ind_appli	libelle_long
+import pandas as pd
+from pathlib import Path
 
+# =========================
+# PARAMETRES
+# =========================
+excel_file = Path("2025_acte4_absents_du_SAG.xlsx")
 
-feuille 2 :
-nohop	cle	ipp	simpa	sag	cdccam	descri	phase	act	date_exe	TRG	ind_appli	libelle_long
+# Noms de sortie
+out_dir = Path("resultats_requetes")
+out_dir.mkdir(exist_ok=True)
+
+# =========================
+# FONCTIONS UTILES
+# =========================
+def normalize_text(x):
+    if pd.isna(x):
+        return ""
+    return str(x).strip()
+
+def normalize_ipp(x):
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+def normalize_date_for_key(x):
+    if pd.isna(x):
+        return ""
+    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
+    if pd.isna(dt):
+        return str(x).strip()
+    return dt.strftime("%d/%m/%Y")
+
+def build_simple_key(df):
+    return (
+        df["ipp_norm"] + "|" +
+        df["cdccam_norm"] + "|" +
+        df["date_exe_norm"]
+    )
+
+# =========================
+# LECTURE DU FICHIER
+# =========================
+print(f"\nLecture du fichier : {excel_file.resolve()}\n")
+
+xls = pd.ExcelFile(excel_file)
+print("Feuilles trouvées :", xls.sheet_names)
+
+# On prend les 2 premières feuilles
+sheet1_name = xls.sheet_names[0]
+sheet2_name = xls.sheet_names[1]
+
+df1 = pd.read_excel(excel_file, sheet_name=sheet1_name)
+df2 = pd.read_excel(excel_file, sheet_name=sheet2_name)
+
+print("\n========================")
+print("FEUILLE 1")
+print("========================")
+print("Nom :", sheet1_name)
+print("Colonnes :", list(df1.columns))
+print("Nb lignes :", len(df1))
+print("\nAperçu :")
+print(df1.head(5).to_string(index=False))
+
+print("\n========================")
+print("FEUILLE 2")
+print("========================")
+print("Nom :", sheet2_name)
+print("Colonnes :", list(df2.columns))
+print("Nb lignes :", len(df2))
+print("\nAperçu :")
+print(df2.head(5).to_string(index=False))
+
+# =========================
+# NORMALISATION DES COLONNES
+# =========================
+# On met les noms de colonnes en minuscules pour simplifier
+df1.columns = [str(c).strip().lower() for c in df1.columns]
+df2.columns = [str(c).strip().lower() for c in df2.columns]
+
+required_cols_sheet1 = ["ipp", "cdccam", "date_exe"]
+required_cols_sheet2 = ["ipp", "cdccam", "date_exe"]
+
+for col in required_cols_sheet1:
+    if col not in df1.columns:
+        raise ValueError(f"Colonne absente de la feuille 1 : {col}")
+
+for col in required_cols_sheet2:
+    if col not in df2.columns:
+        raise ValueError(f"Colonne absente de la feuille 2 : {col}")
+
+# Normalisation feuille 1
+df1["ipp_norm"] = df1["ipp"].apply(normalize_ipp)
+df1["cdccam_norm"] = df1["cdccam"].apply(normalize_text)
+df1["date_exe_norm"] = df1["date_exe"].apply(normalize_date_for_key)
+df1["cle_simple"] = build_simple_key(df1)
+
+# Normalisation feuille 2
+df2["ipp_norm"] = df2["ipp"].apply(normalize_ipp)
+df2["cdccam_norm"] = df2["cdccam"].apply(normalize_text)
+df2["date_exe_norm"] = df2["date_exe"].apply(normalize_date_for_key)
+df2["cle_simple"] = build_simple_key(df2)
+
+# =========================
+# ANALYSE DE LA COLONNE CLE EN FEUILLE 2
+# =========================
+print("\n========================")
+print("ANALYSE DE LA COLONNE 'cle' FEUILLE 2")
+print("========================")
+
+if "cle" in df2.columns:
+    df2["cle_txt"] = df2["cle"].astype(str).str.strip()
+
+    print("\nExemples de 'cle' :")
+    print(df2["cle_txt"].dropna().head(10).to_string(index=False))
+
+    # Comparaison simple
+    df2["cle_identique_simple"] = df2["cle_txt"] == df2["cle_simple"]
+
+    nb_equal = df2["cle_identique_simple"].sum()
+    nb_total = len(df2)
+
+    print(f"\nNombre de lignes où cle == cle_simple : {nb_equal} / {nb_total}")
+
+    # On sort quelques lignes où ça ne matche pas
+    diff = df2.loc[df2["cle_identique_simple"] == False, ["ipp", "cdccam", "date_exe", "cle_txt", "cle_simple"]].head(20)
+
+    if len(diff) > 0:
+        print("\nExemples de différences entre 'cle' et 'cle_simple' :")
+        print(diff.to_string(index=False))
+    else:
+        print("\nLa colonne 'cle' semble identique à la clé simple.")
+else:
+    print("Pas de colonne 'cle' dans la feuille 2.")
+
+# =========================
+# COMPTAGE DES LIGNES DEJA TRAITEES EN FEUILLE 2
+# =========================
+print("\n========================")
+print("ANALYSE DES COLONNES SIMPA / SAG")
+print("========================")
+
+if "simpa" in df2.columns:
+    df2["simpa_txt"] = df2["simpa"].astype(str).str.strip()
+else:
+    df2["simpa_txt"] = ""
+
+if "sag" in df2.columns:
+    df2["sag_txt"] = df2["sag"].astype(str).str.strip()
+else:
+    df2["sag_txt"] = ""
+
+simpa_renseigne = df2["simpa_txt"].ne("") & df2["simpa_txt"].ne("nan") & df2["simpa_txt"].ne("#N/A")
+sag_renseigne = df2["sag_txt"].ne("") & df2["sag_txt"].ne("nan") & df2["sag_txt"].ne("#N/A")
+
+print("Nb lignes avec SIMPA renseigné :", int(simpa_renseigne.sum()))
+print("Nb lignes avec SAG renseigné   :", int(sag_renseigne.sum()))
+print("Nb lignes SIMPA oui / SAG non  :", int((simpa_renseigne & ~sag_renseigne).sum()))
+print("Nb lignes SIMPA oui / SAG oui  :", int((simpa_renseigne & sag_renseigne).sum()))
+
+# =========================
+# EXPORT D'UNE TABLE DE TRAVAIL PROPRE DEPUIS FEUILLE 1
+# =========================
+work = df1[["ipp_norm", "cdccam_norm", "date_exe_norm", "cle_simple"]].copy()
+work.columns = ["ipp", "cdccam", "date_exe", "cle_simple"]
+
+# On enlève les lignes vides
+work = work[
+    (work["ipp"] != "") &
+    (work["cdccam"] != "") &
+    (work["date_exe"] != "")
+].copy()
+
+# Déduplication
+work_unique = work.drop_duplicates().copy()
+
+print("\n========================")
+print("TABLE DE TRAVAIL FEUILLE 1")
+print("========================")
+print("Nb lignes valides :", len(work))
+print("Nb lignes uniques :", len(work_unique))
+
+csv_out = out_dir / "actes_siege_feuille1_cle_simple.csv"
+work_unique.to_csv(csv_out, sep=";", index=False, encoding="utf-8")
+
+print(f"\nCSV exporté : {csv_out.resolve()}")
+
+# =========================
+# GENERATION D'UN FICHIER SQL D'INSERT
+# =========================
+# Pour le cas où tu peux créer une table Oracle de travail
+sql_out = out_dir / "insert_tmp_actes_siege.sql"
+
+with open(sql_out, "w", encoding="utf-8") as f:
+    f.write("-- Script d'insertion Oracle\n")
+    f.write("-- Adapter le nom de la table si besoin\n\n")
+
+    for _, row in work_unique.iterrows():
+        ipp = row["ipp"].replace("'", "''")
+        ccam = row["cdccam"].replace("'", "''")
+        date_exe = row["date_exe"]
+
+        f.write(
+            "INSERT INTO TMP_ACTES_SIEGE (IPP, CDCCAM, DATE_EXE) VALUES "
+            f"('{ipp}', '{ccam}', TO_DATE('{date_exe}','DD/MM/YYYY'));\n"
+        )
+
+    f.write("\nCOMMIT;\n")
+
+print(f"SQL d'insertion exporté : {sql_out.resolve()}")
+
+print("\nTerminé.")
