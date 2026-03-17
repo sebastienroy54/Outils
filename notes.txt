@@ -1,3 +1,61 @@
-=RECHERCHEX(A2;'[Exportation_SIMPA_save.xlsx]Sheet1'!$A:$A;'[Exportation_SIMPA_save.xlsx]Sheet1'!$M:$M;"")&""
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
 
-=SI(ET(NBCAR(SUPPRESPACE(M2&""))=0;NBCAR(SUPPRESPACE(AJ2&""))>0);"A vérifier";"")
+SPOOL C:/Users/4251352/Documents/Resultats_requetes/activite_MDA_670_676_externe_MCO_2025.csv
+
+SELECT
+    '670_676' AS PERIMETRE,
+
+    (
+        SELECT COUNT(DISTINCT A1.NOIP)
+        FROM ACS A1
+        WHERE A1.NOUFCO IN ('670','676')
+          AND A1.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A1.TYMAJ <> 'D'
+    ) AS FILE_ACTIVE_2025,
+
+    (
+        SELECT COUNT(DISTINCT A2.NOIP)
+        FROM ACS A2
+        WHERE A2.NOUFCO IN ('670','676')
+          AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A2.TYMAJ <> 'D'
+    ) AS NB_PATIENTS_TOTAL,
+
+    (
+        SELECT COUNT(DISTINCT A3.NOIP)
+        FROM ACS A3
+        WHERE A3.NOUFCO IN ('670','676')
+          AND A3.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A3.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A3.TYMAJ <> 'D'
+          AND NOT EXISTS (
+              SELECT 1
+              FROM ACS A4
+              WHERE A4.NOIP = A3.NOIP
+                AND A4.NOUFCO IN ('670','676')
+                AND A4.DACO < TO_DATE('01/01/2025','DD/MM/YYYY')
+                AND A4.TYMAJ <> 'D'
+          )
+    ) AS NB_NOUVEAUX_PATIENTS_2025,
+
+    (
+        SELECT COUNT(DISTINCT A5.NOACS)
+        FROM ACS A5
+        WHERE A5.NOUFCO IN ('670','676')
+          AND A5.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
+          AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
+          AND A5.TYMAJ <> 'D'
+    ) AS NB_CONSULTATIONS_MCO_2025
+
+FROM DUAL
+;
+
+SPOOL OFF;
