@@ -1,116 +1,86 @@
-SET HEADING ON
-SET FEEDBACK OFF
-SET PAGESIZE 6000
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-SPOOL C:/Users/4251352/Documents/Resultats_requetes/activite_MDA_670_676_par_UF_2025.csv
-SELECT
-    Z.UF,
-    Z.FILE_ACTIVE_2025,
-    Z.NB_PATIENTS_TOTAL,
-    Z.NB_NOUVEAUX_PATIENTS_2025,
-    Z.NB_CONSULTATIONS_MCO_2025
-FROM
-(
-    SELECT
-        U.NOUFCO AS UF,
-        (
-            SELECT COUNT(DISTINCT A1.NOIP)
-            FROM ACS A1
-            WHERE A1.NOUFCO = U.NOUFCO
-              AND A1.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A1.TYMAJ <> 'D'
-        ) AS FILE_ACTIVE_2025,
-        (
-            SELECT COUNT(DISTINCT A2.NOIP)
-            FROM ACS A2
-            WHERE A2.NOUFCO = U.NOUFCO
-              AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A2.TYMAJ <> 'D'
-        ) AS NB_PATIENTS_TOTAL,
-        (
-            SELECT COUNT(DISTINCT A3.NOIP)
-            FROM ACS A3
-            WHERE A3.NOUFCO = U.NOUFCO
-              AND A3.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND A3.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A3.TYMAJ <> 'D'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM ACS A4
-                  WHERE A4.NOIP = A3.NOIP
-                    AND A4.NOUFCO = U.NOUFCO
-                    AND A4.DACO < TO_DATE('01/01/2025','DD/MM/YYYY')
-                    AND A4.TYMAJ <> 'D'
-              )
-        ) AS NB_NOUVEAUX_PATIENTS_2025,
-        (
-            SELECT COUNT(DISTINCT A5.NOACS)
-            FROM ACS A5
-            WHERE A5.NOUFCO = U.NOUFCO
-              AND A5.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A5.TYMAJ <> 'D'
-        ) AS NB_CONSULTATIONS_MCO_2025
-    FROM
-    (
-        SELECT '670' AS NOUFCO FROM DUAL
-        UNION ALL
-        SELECT '676' AS NOUFCO FROM DUAL
-    ) U
-    UNION ALL
-    SELECT
-        'TOTAL' AS UF,
-        (
-            SELECT COUNT(DISTINCT A1.NOIP)
-            FROM ACS A1
-            WHERE A1.NOUFCO IN ('670','676')
-              AND A1.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND A1.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A1.TYMAJ <> 'D'
-        ) AS FILE_ACTIVE_2025,
-        (
-            SELECT COUNT(DISTINCT A2.NOIP)
-            FROM ACS A2
-            WHERE A2.NOUFCO IN ('670','676')
-              AND A2.DACO < TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A2.TYMAJ <> 'D'
-        ) AS NB_PATIENTS_TOTAL,
-        (
-            SELECT COUNT(DISTINCT A3.NOIP)
-            FROM ACS A3
-            WHERE A3.NOUFCO IN ('670','676')
-              AND A3.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND A3.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A3.TYMAJ <> 'D'
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM ACS A4
-                  WHERE A4.NOIP = A3.NOIP
-                    AND A4.NOUFCO IN ('670','676')
-                    AND A4.DACO < TO_DATE('01/01/2025','DD/MM/YYYY')
-                    AND A4.TYMAJ <> 'D'
-              )
-        ) AS NB_NOUVEAUX_PATIENTS_2025,
-        (
-            SELECT COUNT(DISTINCT A5.NOACS)
-            FROM ACS A5
-            WHERE A5.NOUFCO IN ('670','676')
-              AND A5.DACO >= TO_DATE('01/01/2025','DD/MM/YYYY')
-              AND A5.DACO <  TO_DATE('01/01/2026','DD/MM/YYYY')
-              AND A5.TYMAJ <> 'D'
-        ) AS NB_CONSULTATIONS_MCO_2025
-    FROM DUAL
-) Z
-ORDER BY
-    CASE Z.UF
-        WHEN '670' THEN 1
-        WHEN '676' THEN 2
-        ELSE 3
-    END
+set verify off
+set linesize 300
+set pagesize 6000
+spool M:/IPP_actes4_simpa.txt
+set termout off
+SELECT DISTINCT SDO.KYNOIP, RSM.NODA, RAC.KYCDAC, RAC.D8REAL, RAC.KYACTIVITE
+FROM RSM, RSS, RUM, RAC, SDO WHERE RSS.KYRSS = RUM.KYRSS AND RUM.NORES = RSM.KYRES AND RSM.KYRES = RAC.KYRES AND RSS.NODA = SDO.KYNODA
+AND  RAC.D8REAL >= to_date('01/01/2025','DD/MM/YYYY') 
+AND  RAC.D8REAL < to_date('01/01/2026','DD/MM/YYYY') 
+AND
+SDO.KYNOIP in ('8012757987','8016860995','8017716898','8010100726','8015132548','8007524979','8014714535','8002649204','8008365226','8014107268','8017888000','8002355999','8007760149','8011407112','8017924430','8012760165','8017072835','8003980679','8002011089','8013683852','8018461248','8009230211','8009230211','8001579291','8002748385','8007154845','8013254979','8017383752','8015545126','8001220297','8002899386','8018341789','8017973608','8010584249','8013812999','8007107046','8007719041','8007719041','8016036926','8001550350','8013118722','8018550183','8018550183','8010868677','8006870707','8012687407','8018555293','8006477388','8018154257','8002269308','8010648539','8018563271','8018570068','8017971560','8018563730','8014244145','8018570631','8018550339','8018550339','8018550339','8011334776','8007223952','8018497499','8002869593','8007504914','8015308200','8018343245','8007353292','8018577981','8016777072','8016826073','8005966161','8013076321','8018401465','8011608616','8009414167','8018582193','8004988282','8004059790','8007593937','8007932331','8002142795','8004395185','8018584253','8007672738','8005114171','8007823071','8018514651','8018514651','8015544608','8006107855','8003046741','8011522053','8002106974','8011981104','8018554537','8016404219','8014246848','8006116708','8018587714','8018558533','8015809893','8010840904','8005272134','8018576581','8005121191','8005121191','8018589942','8018589942','8014576785','8014576785','8007197044','8003503148','8017422208','8006023921','8007769167','8007663538','8018542251','8008368452','8009635545','8007502815','8018581811','8005057248','8009254184','8004943156','8007156687','8015635151','8017041885','8007728743','8006825320','8017912513','8018594566','8018384416','8003398393','8018111583','8018111583','8008759307','8009445333','8018594110','8004483843','8001683736','8003924202','8018295596','8006475283','8018555651','8004193705','8004696160','8004696160')
+AND RAC.KYACTIVITE = '4'
+AND RAC.KYCDAC like 'AEKA001%'
 ;
-SPOOL OFF;
+spool off;
+
+
+
+Bonjour à tous,
+
+En guise de hors d’œuvre pour les travaux à mener dans le cadre des contrôles compensatoires, vous trouverez sur Dispose 
+un classeur excel (2025_actes_absents_du_SAG.xlsx) dans lequel vous trouverez pour 2025 la liste de actes codés dans Orbis en MCO hors externe appartenant 
+à la liste des actes classants définis par Isabelle Choudat et absents du SAG.
+L’appariement est réalisé avec la même clef qu’en 2024 : IPP, acte, extension PMSI, activité, phase, hôpital d’exécution et date de l’acte.
+On trouve 55 563 lignes avec la répartition suivante pour les types d’activité :
+-	1 : 5 629
+-	2 : 85
+-	4 : 49 841
+-	5 : 8
+
+L’impact pour la valorisation des séjours devrait être faible.
+Pour les activités 1, on a potentiellement des problèmes liés à l’exonération des tickets modérateurs.
+
+Mais, je ne saurai expliquer l’origine de ces écarts entre Orbis et SAG.
+
+
+
+
+Bonjour à tous,
+
+Merci pour le temps que vous avez consacré à regarder le fichier contenant les actes Orbis absent d’Opale.
+Suite à vos réponses, je me suis donc inquiété de la qualité de la source que j’utilisais pour ces comparatifs (une vue d’Opale, Opale qui est alimenté par tous les SAG).
+Voici en pj l’analyse de Christine Mayeux (DEFIP). Vous verrez qu’il y a bien des problèmes de codage et de transmission.
+
+Je suis allé regarder, sur la vue du SAG disponible dans InfoMed, les 3 activités 5 que Pierre a examiné.
+Pour ces trois actes, l’état constaté ce matin est à D (détruit : acte supprimé dans le SAG ou dans l’appli en amont et suppression transmise au SAG) et non à A (actif).
+C’est mystérieux.
+
+
+
+Hello
+Pouvez vous regarder les dossiers de vos sites svp ? il y a quand meme des interrogations surtout sur les RUMs absents (gros souci sur actes avec activité 4 « coupé »)
+Pour info Pas de nouvelle di tirage au sort à partir du M12 consolidé. On a le droit de corriger jusqu’à la veille du tirage au sort. Va redemander comment on fait nos contrôles sur infomed
+
+
+
+
+Pour NCK
+
+Avec une clef = ipp + code + extension descriptive + phase + date de réalisation.
+On regarde les RUM et le SAG en leurs états à date de la remontée M12.
+
+En activité 1 la liste comporte 105 actes, dont 102 sont présents dans les RUM avec cette clef.
+•	6 sont présents dans le SAG, ces 6 sont présents dans les RUM
+•	99 sont absents du SAG
+o	Dont 96 présents dans les RUM
+o	Dont 3 absents des RUM avec la clef supra
+	Dans 2 cas l’acte est en fait dans le RUM mais avec une phase incohérente
+	1 est ‘vraiment’ manquant dans les RUM, un acte EQLF005
+
+En activité 2 la liste comporte 4 actes, tous présents dans les RUM.
+Dont 1 absent du SAG, 3 présents dans le SAG (mais sans la précision du type d’activité 2 disponible dans la SAG)
+
+En activité 4 la liste comporte 526 actes dont 24 sont présents dans les RUM en activité 4, mais dont 523 sont présents en activité 1(dont 2 en incohérence de phase).
+Donc : 502 manquants dans les RUM en tant qu’acte d’activité 4. Dont 3 complètement manquants à tous égards dans les RUM (HGCA008, ZCQA001, JQGA002).
+
+Par rapport au SAG, les 526 actes sont bien tous manquants dans le SAG en tant qu’activité 4.
+Mais 512 sont présents en activité 1, 14 manquent complètement dans le SAG.
+
+
+Non. Ne je trouve pas que ce soit hyper inquiétant, car il nous manque des activité 4, mais en activité 1  il y a un seul acte manque au final dans les RUM. Et comme il se trouve que c’est un séjour avec par ailleurs d’autres actes classant plus lourds, il n’y a aucun GHM affecté.
+
+
+Pour Cochin, 100% des 54 actes en activité 1 sont dans le RUM Simpa, mais 31 ne sont pas retrouvés dans le SAG, majoritairement en périnat du mois de mai 2025.
+Je regarderai, avec Sébastien, les autres activités next week.
+
