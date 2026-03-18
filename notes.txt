@@ -1,176 +1,35 @@
-import pandas as pd
-from pathlib import Path
-
-# =========================
-# PARAMETRES
-# =========================
-
-EXCEL_FILE = Path(r"C:\Users\4251352\projets\2025_actes4_absents_du_SAG.xlsx")
-SIMPA_FILE = Path(r"C:\Users\4251352\projets\resultats_requetes\simpa_activite1_2025.csv")
-
-OUT_DIR = Path(r"C:\Users\4251352\projets\resultats_requetes")
-OUT_DIR.mkdir(exist_ok=True)
-
-OUTPUT_FILE_M = OUT_DIR / "resultat_NDA_GHM_match_M.csv"
-OUTPUT_FILE_HORS_M_PAR_ACTE = OUT_DIR / "resultat_hors_M_par_acte.csv"
-
-SHEET_NAME = "Activité 4"
-
-# =========================
-# NORMALISATION
-# =========================
-
-def normalize_ipp(x):
-    if pd.isna(x):
-        return ""
-    s = str(x).strip()
-    if s.endswith(".0"):
-        s = s[:-2]
-    return s
-
-def normalize_text(x):
-    if pd.isna(x):
-        return ""
-    return str(x).strip()
-
-def normalize_date(x):
-    if pd.isna(x):
-        return ""
-    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
-    if pd.isna(dt):
-        return ""
-    return dt.strftime("%d/%m/%Y")
-
-def build_key(ipp, acte, date):
-    return f"{ipp}|{acte}|{date}"
-
-# =========================
-# LECTURE EXCEL
-# =========================
-
-print("Lecture Excel...")
-df_excel = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME)
-df_excel.columns = [c.lower().strip() for c in df_excel.columns]
-
-df_excel["ipp"] = df_excel["ipp"].apply(normalize_ipp)
-df_excel["cdccam"] = df_excel["cdccam"].apply(normalize_text)
-df_excel["date_exe"] = df_excel["date_exe"].apply(normalize_date)
-
-# libellé si présent
-if "libelle_long" in df_excel.columns:
-    df_excel["libelle_long"] = df_excel["libelle_long"].apply(normalize_text)
-else:
-    df_excel["libelle_long"] = ""
-
-df_excel = df_excel[
-    (df_excel["ipp"] != "") &
-    (df_excel["cdccam"] != "") &
-    (df_excel["date_exe"] != "")
-].copy()
-
-df_excel["cle"] = df_excel.apply(
-    lambda r: build_key(r["ipp"], r["cdccam"], r["date_exe"]),
-    axis=1
-)
-
-print(f"Lignes Excel : {len(df_excel)}")
-
-# =========================
-# LECTURE SIMPA
-# =========================
-
-print("Lecture SIMPA...")
-df_simpa = pd.read_csv(SIMPA_FILE, sep=";")
-df_simpa.columns = [c.lower().strip() for c in df_simpa.columns]
-
-df_simpa["ipp"] = df_simpa["ipp"].apply(normalize_ipp)
-df_simpa["acte"] = df_simpa["acte"].apply(normalize_text)
-df_simpa["date_exe"] = df_simpa["date_exe"].apply(normalize_date)
-df_simpa["cdghm"] = df_simpa["cdghm"].apply(normalize_text)
-
-df_simpa["cle"] = df_simpa.apply(
-    lambda r: build_key(r["ipp"], r["acte"], r["date_exe"]),
-    axis=1
-)
-
-print(f"Lignes SIMPA : {len(df_simpa)}")
-
-# =========================
-# MATCHING
-# =========================
-
-print("Matching...")
-
-df_merge = df_excel.merge(
-    df_simpa[["cle", "noda", "cdghm"]],
-    on="cle",
-    how="inner"
-)
-
-print(f"Lignes matchées : {len(df_merge)}")
-
-# =========================
-# DECOUPAGE M / HORS M
-# =========================
-
-mask_m = df_merge["cdghm"].str.contains("M", na=False)
-
-df_merge_M = df_merge[mask_m].copy()
-df_merge_hors_M = df_merge[~mask_m].copy()
-
-print(f"Nb lignes matchées avec GHM en M : {len(df_merge_M)}")
-print(f"Nb lignes matchées hors GHM en M : {len(df_merge_hors_M)}")
-
-print(f"Nb séjours distincts avec GHM en M : {df_merge_M['noda'].nunique()}")
-print(f"Nb séjours distincts hors GHM en M : {df_merge_hors_M['noda'].nunique()}")
-
-# =========================
-# RESULTAT FINAL M (comme avant)
-# =========================
-
-df_final_M = df_merge_M[["noda", "cdghm"]].drop_duplicates()
-df_final_M = df_final_M.sort_values(["noda", "cdghm"])
-
-df_final_M.to_csv(OUTPUT_FILE_M, sep=";", index=False, encoding="utf-8")
-
-print(f"\nRésultat final M : {OUTPUT_FILE_M}")
-print(f"Nb NDA/GHM distincts en M : {len(df_final_M)}")
-
-# =========================
-# REGROUPEMENT HORS M PAR ACTE
-# =========================
-
-# on prend un libellé par acte si disponible
-df_libelles = (
-    df_excel[["cdccam", "libelle_long"]]
-    .drop_duplicates()
-    .sort_values(["cdccam", "libelle_long"])
-    .drop_duplicates(subset=["cdccam"], keep="first")
-)
-
-df_hors_M_par_acte = (
-    df_merge_hors_M.groupby("cdccam", dropna=False)
-    .agg(
-        nb_lignes_matchees=("cdccam", "size"),
-        nb_sejours_distincts=("noda", pd.Series.nunique)
-    )
-    .reset_index()
-)
-
-df_hors_M_par_acte = df_hors_M_par_acte.merge(
-    df_libelles,
-    on="cdccam",
-    how="left"
-)
-
-df_hors_M_par_acte = df_hors_M_par_acte[
-    ["cdccam", "libelle_long", "nb_lignes_matchees", "nb_sejours_distincts"]
-].sort_values(
-    ["nb_lignes_matchees", "cdccam"],
-    ascending=[False, True]
-)
-
-df_hors_M_par_acte.to_csv(OUTPUT_FILE_HORS_M_PAR_ACTE, sep=";", index=False, encoding="utf-8")
-
-print(f"\nRésultat hors M par acte : {OUTPUT_FILE_HORS_M_PAR_ACTE}")
-print(f"Nb actes distincts hors M : {df_hors_M_par_acte['cdccam'].nunique()}")
+cdccam	nb_lignes_matchees	nb_sejours_distincts
+DDQH009	1081	1073
+JJFJ001	1064	1064
+JNJD002	592	592
+DDAF008	447	430
+QAMA002	154	154
+DDAF006	153	151
+JCKE002	119	117
+QZFA011	110	110
+DDAF007	93	92
+JCLE002	89	88
+KDFA002	69	69
+DDPF002	67	67
+QZMA001	55	55
+DDAF010	52	51
+PAGA011	43	43
+DDAF004	41	41
+DDQH012	40	40
+JDFE001	40	40
+DDAF001	39	39
+DDQH013	34	34
+QZJA011	32	32
+HMFC004	31	31
+JCQE003	30	30
+JDFE002	30	30
+JANE002	26	26
+GAMA018	23	23
+JCKE001	23	23
+KCFA008	23	23
+QZEA031	21	21
+JBQE001	19	19
+HHQE005	17	17
+JCGE001	17	17
+JHFA009	17	17
+NBCA006	17	17
