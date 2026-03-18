@@ -1,10 +1,28 @@
-# Contrôle sur les clés
-nb_cles_cch = df_cch["cle"].nunique()
-nb_cles_matchees_cch = df_merge_cch["cle"].nunique()
-nb_doublons_match = len(df_merge_cch) - nb_cles_matchees_cch
-nb_non_match_theorique = nb_cles_cch - nb_cles_matchees_cch
+Lecture Excel source...
+Lignes Excel : 49841
+Lecture SIMPA...
+Lignes SIMPA : 309434
+Matching...
+Lignes matchées : 5734
+Nb lignes matchées avec GHM en M : 288
+Nb lignes matchées hors GHM en M : 5446
+Nb séjours distincts avec GHM en M : 275
+Nb séjours distincts hors GHM en M : 5041
 
-print(f"Clés CCH distinctes (feuille 2) : {nb_cles_cch}")
-print(f"Clés matchées CCH distinctes : {nb_cles_matchees_cch}")
-print(f"Doublons de match (lignes matchées - clés distinctes) : {nb_doublons_match}")
-print(f"Non matchés théoriques par clé : {nb_non_match_theorique}")
+Résultat final M : C:\Users\4251352\projets\resultats_requetes\resultat_NDA_GHM_match_M.csv
+Nb NDA/GHM distincts en M : 275
+
+Résultat hors M par acte : C:\Users\4251352\projets\resultats_requetes\resultat_hors_M_par_acte.csv
+Nb actes distincts hors M : 314
+
+Analyse des actes NON matchés (CCH)...
+Lignes CCH (feuille 2, nohop=00021) : 5974
+Lignes matchées CCH (NDA commençant par 21) : 5734
+Clés CCH distinctes (feuille 2) : 5974
+Clés matchées CCH distinctes : 5734
+Doublons de match (lignes matchées - clés distinctes) : 0
+Non matchés théoriques par clé : 240
+Nb actes NON matchés CCH : 271
+Fichier non matchés CCH : C:\Users\4251352\projets\resultats_requetes\actes_non_matches_CCH.csv
+Fichier non matchés par acte : C:\Users\4251352\projets\resultats_requetes\actes_non_matches_par_acte.csv
+Nb actes distincts non matchés : 47
