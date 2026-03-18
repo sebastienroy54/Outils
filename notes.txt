@@ -1,35 +1,16 @@
-cdccam	nb_lignes_matchees	nb_sejours_distincts
-DDQH009	1081	1073
-JJFJ001	1064	1064
-JNJD002	592	592
-DDAF008	447	430
-QAMA002	154	154
-DDAF006	153	151
-JCKE002	119	117
-QZFA011	110	110
-DDAF007	93	92
-JCLE002	89	88
-KDFA002	69	69
-DDPF002	67	67
-QZMA001	55	55
-DDAF010	52	51
-PAGA011	43	43
-DDAF004	41	41
-DDQH012	40	40
-JDFE001	40	40
-DDAF001	39	39
-DDQH013	34	34
-QZJA011	32	32
-HMFC004	31	31
-JCQE003	30	30
-JDFE002	30	30
-JANE002	26	26
-GAMA018	23	23
-JCKE001	23	23
-KCFA008	23	23
-QZEA031	21	21
-JBQE001	19	19
-HHQE005	17	17
-JCGE001	17	17
-JHFA009	17	17
-NBCA006	17	17
+Lecture Excel...
+Lignes Excel : 49841
+Lecture SIMPA...
+Lignes SIMPA : 309434
+Matching...
+Lignes matchées : 5734
+Nb lignes matchées avec GHM en M : 288
+Nb lignes matchées hors GHM en M : 5446
+Nb séjours distincts avec GHM en M : 275
+Nb séjours distincts hors GHM en M : 5041
+
+Résultat final M : C:\Users\4251352\projets\resultats_requetes\resultat_NDA_GHM_match_M.csv
+Nb NDA/GHM distincts en M : 275
+
+Résultat hors M par acte : C:\Users\4251352\projets\resultats_requetes\resultat_hors_M_par_acte.csv
+Nb actes distincts hors M : 314
