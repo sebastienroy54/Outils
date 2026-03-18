@@ -1,72 +1,262 @@
+import pandas as pd
+from pathlib import Path
+
 # =========================
-# ANALYSE DES NON MATCHES (CCH)
+# PARAMETRES
 # =========================
 
-print("\nAnalyse des actes NON matchés (CCH)...")
+EXCEL_FILE = Path(r"C:\Users\4251352\projets\2025_actes4_absents_du_SAG.xlsx")
+SIMPA_FILE = Path(r"C:\Users\4251352\projets\resultats_requetes\simpa_activite1_2025.csv")
 
-# --- Lecture feuille 2 (CCH)
-df_cch = pd.read_excel(EXCEL_FILE, sheet_name="Activité 4 cch")
-df_cch.columns = [c.lower().strip() for c in df_cch.columns]
+OUT_DIR = Path(r"C:\Users\4251352\projets\resultats_requetes")
+OUT_DIR.mkdir(exist_ok=True)
 
-# --- Normalisation nohop
+OUTPUT_FILE_M = OUT_DIR / "resultat_NDA_GHM_match_M.csv"
+OUTPUT_FILE_HORS_M_PAR_ACTE = OUT_DIR / "resultat_hors_M_par_acte.csv"
+OUTPUT_NON_MATCH = OUT_DIR / "actes_non_matches_CCH.csv"
+OUTPUT_NON_MATCH_ACTE = OUT_DIR / "actes_non_matches_par_acte.csv"
+
+SHEET_NAME_SOURCE = "Activité 4"
+SHEET_NAME_CCH = "Activité 4 cch"
+
+# =========================
+# NORMALISATION
+# =========================
+
+def normalize_ipp(x):
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+def normalize_text(x):
+    if pd.isna(x):
+        return ""
+    return str(x).strip()
+
+def normalize_date(x):
+    if pd.isna(x):
+        return ""
+    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
+    if pd.isna(dt):
+        return ""
+    return dt.strftime("%d/%m/%Y")
+
 def normalize_nohop(x):
     if pd.isna(x):
         return ""
     s = str(x).strip()
     if s.endswith(".0"):
         s = s[:-2]
-    return s.zfill(5)  # force format 00021
+    return s.zfill(5)
 
-df_cch["nohop"] = df_cch["nohop"].apply(normalize_nohop)
+def build_key(ipp, acte, date):
+    return f"{ipp}|{acte}|{date}"
 
-# --- Filtre CCH (00021)
+# =========================
+# LECTURE EXCEL SOURCE
+# =========================
+
+print("Lecture Excel source...")
+df_excel = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME_SOURCE)
+df_excel.columns = [c.lower().strip() for c in df_excel.columns]
+
+df_excel["ipp"] = df_excel["ipp"].apply(normalize_ipp)
+df_excel["cdccam"] = df_excel["cdccam"].apply(normalize_text)
+df_excel["date_exe"] = df_excel["date_exe"].apply(normalize_date)
+
+if "libelle_long" in df_excel.columns:
+    df_excel["libelle_long"] = df_excel["libelle_long"].apply(normalize_text)
+else:
+    df_excel["libelle_long"] = ""
+
+df_excel = df_excel[
+    (df_excel["ipp"] != "") &
+    (df_excel["cdccam"] != "") &
+    (df_excel["date_exe"] != "")
+].copy()
+
+df_excel["cle"] = df_excel.apply(
+    lambda r: build_key(r["ipp"], r["cdccam"], r["date_exe"]),
+    axis=1
+)
+
+print(f"Lignes Excel : {len(df_excel)}")
+
+# =========================
+# LECTURE SIMPA
+# =========================
+
+print("Lecture SIMPA...")
+df_simpa = pd.read_csv(SIMPA_FILE, sep=";")
+df_simpa.columns = [c.lower().strip() for c in df_simpa.columns]
+
+df_simpa["ipp"] = df_simpa["ipp"].apply(normalize_ipp)
+df_simpa["acte"] = df_simpa["acte"].apply(normalize_text)
+df_simpa["date_exe"] = df_simpa["date_exe"].apply(normalize_date)
+df_simpa["cdghm"] = df_simpa["cdghm"].apply(normalize_text)
+df_simpa["noda"] = df_simpa["noda"].apply(normalize_text)
+
+df_simpa["cle"] = df_simpa.apply(
+    lambda r: build_key(r["ipp"], r["acte"], r["date_exe"]),
+    axis=1
+)
+
+print(f"Lignes SIMPA : {len(df_simpa)}")
+
+# =========================
+# MATCHING GLOBAL
+# =========================
+
+print("Matching...")
+df_merge = df_excel.merge(
+    df_simpa[["cle", "noda", "cdghm"]],
+    on="cle",
+    how="inner"
+)
+
+print(f"Lignes matchées : {len(df_merge)}")
+
+# =========================
+# DECOUPAGE M / HORS M
+# =========================
+
+mask_m = df_merge["cdghm"].str.contains("M", na=False)
+
+df_merge_M = df_merge[mask_m].copy()
+df_merge_hors_M = df_merge[~mask_m].copy()
+
+print(f"Nb lignes matchées avec GHM en M : {len(df_merge_M)}")
+print(f"Nb lignes matchées hors GHM en M : {len(df_merge_hors_M)}")
+
+print(f"Nb séjours distincts avec GHM en M : {df_merge_M['noda'].nunique()}")
+print(f"Nb séjours distincts hors GHM en M : {df_merge_hors_M['noda'].nunique()}")
+
+# =========================
+# RESULTAT FINAL M
+# =========================
+
+df_final_M = df_merge_M[["noda", "cdghm"]].drop_duplicates()
+df_final_M = df_final_M.sort_values(["noda", "cdghm"])
+
+df_final_M.to_csv(OUTPUT_FILE_M, sep=";", index=False, encoding="utf-8")
+
+print(f"\nRésultat final M : {OUTPUT_FILE_M}")
+print(f"Nb NDA/GHM distincts en M : {len(df_final_M)}")
+
+# =========================
+# REGROUPEMENT HORS M PAR ACTE
+# =========================
+
+df_libelles = (
+    df_excel[["cdccam", "libelle_long"]]
+    .drop_duplicates()
+    .sort_values(["cdccam", "libelle_long"])
+    .drop_duplicates(subset=["cdccam"], keep="first")
+)
+
+df_hors_M_par_acte = (
+    df_merge_hors_M.groupby("cdccam", dropna=False)
+    .agg(
+        nb_lignes_matchees=("cdccam", "size"),
+        nb_sejours_distincts=("noda", pd.Series.nunique)
+    )
+    .reset_index()
+)
+
+df_hors_M_par_acte = df_hors_M_par_acte.merge(
+    df_libelles,
+    on="cdccam",
+    how="left"
+)
+
+df_hors_M_par_acte = df_hors_M_par_acte[
+    ["cdccam", "libelle_long", "nb_lignes_matchees", "nb_sejours_distincts"]
+].sort_values(
+    ["nb_lignes_matchees", "cdccam"],
+    ascending=[False, True]
+)
+
+df_hors_M_par_acte.to_csv(OUTPUT_FILE_HORS_M_PAR_ACTE, sep=";", index=False, encoding="utf-8")
+
+print(f"\nRésultat hors M par acte : {OUTPUT_FILE_HORS_M_PAR_ACTE}")
+print(f"Nb actes distincts hors M : {df_hors_M_par_acte['cdccam'].nunique()}")
+
+# =========================
+# ANALYSE DES NON MATCHES CCH
+# =========================
+
+print("\nAnalyse des actes NON matchés (CCH)...")
+
+df_cch = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME_CCH)
+df_cch.columns = [c.lower().strip() for c in df_cch.columns]
+
+if "nohop" in df_cch.columns:
+    df_cch["nohop"] = df_cch["nohop"].apply(normalize_nohop)
+else:
+    df_cch["nohop"] = ""
+
+# Filtre CCH = 00021
 df_cch = df_cch[df_cch["nohop"] == "00021"].copy()
 
-print(f"Lignes CCH (feuille 2) : {len(df_cch)}")
-
-# --- Normalisation colonnes
 df_cch["ipp"] = df_cch["ipp"].apply(normalize_ipp)
 df_cch["cdccam"] = df_cch["cdccam"].apply(normalize_text)
 df_cch["date_exe"] = df_cch["date_exe"].apply(normalize_date)
 
-# libellé si présent
 if "libelle_long" in df_cch.columns:
     df_cch["libelle_long"] = df_cch["libelle_long"].apply(normalize_text)
 else:
     df_cch["libelle_long"] = ""
 
-# --- Construction clé
+df_cch = df_cch[
+    (df_cch["ipp"] != "") &
+    (df_cch["cdccam"] != "") &
+    (df_cch["date_exe"] != "")
+].copy()
+
 df_cch["cle"] = df_cch.apply(
     lambda r: build_key(r["ipp"], r["cdccam"], r["date_exe"]),
     axis=1
 )
 
-# --- Clés matchées
-cles_matchees = set(df_merge["cle"])
+print(f"Lignes CCH (feuille 2, nohop=00021) : {len(df_cch)}")
 
-# --- NON matchés
-df_non_match = df_cch[~df_cch["cle"].isin(cles_matchees)].copy()
+# sécurité : si besoin, on restreint les matchés au CCH via NDA commençant par 21
+# même si normalement le SIMPA CCH est déjà le bon périmètre
+df_merge_cch = df_merge[df_merge["noda"].astype(str).str.startswith("21")].copy()
 
-print(f"Nb actes NON matchés : {len(df_non_match)}")
+print(f"Lignes matchées CCH (NDA commençant par 21) : {len(df_merge_cch)}")
 
-# =========================
-# EXPORT DETAIL NON MATCHES
-# =========================
+cles_matchees_cch = set(df_merge_cch["cle"])
 
-OUTPUT_NON_MATCH = OUT_DIR / "actes_non_matches_CCH.csv"
+df_non_match = df_cch[~df_cch["cle"].isin(cles_matchees_cch)].copy()
 
-df_non_match[
-    ["ipp", "cdccam", "date_exe", "libelle_long"]
-].to_csv(OUTPUT_NON_MATCH, sep=";", index=False, encoding="utf-8")
-
-print(f"Fichier non matchés : {OUTPUT_NON_MATCH}")
+print(f"Nb actes NON matchés CCH : {len(df_non_match)}")
 
 # =========================
-# REGROUPEMENT PAR ACTE
+# EXPORT DETAIL NON MATCHES CCH
+# =========================
+
+cols_non_match = ["nohop", "ipp", "cdccam", "date_exe", "libelle_long"]
+cols_non_match = [c for c in cols_non_match if c in df_non_match.columns]
+
+df_non_match[cols_non_match].to_csv(
+    OUTPUT_NON_MATCH,
+    sep=";",
+    index=False,
+    encoding="utf-8"
+)
+
+print(f"Fichier non matchés CCH : {OUTPUT_NON_MATCH}")
+
+# =========================
+# REGROUPEMENT NON MATCHES PAR ACTE
 # =========================
 
 df_non_match_par_acte = (
-    df_non_match.groupby("cdccam")
+    df_non_match.groupby("cdccam", dropna=False)
     .agg(
         nb_actes=("cdccam", "size"),
         nb_patients=("ipp", pd.Series.nunique)
@@ -80,7 +270,12 @@ df_non_match_par_acte = df_non_match_par_acte.merge(
     how="left"
 )
 
-OUTPUT_NON_MATCH_ACTE = OUT_DIR / "actes_non_matches_par_acte.csv"
+df_non_match_par_acte = df_non_match_par_acte[
+    ["cdccam", "libelle_long", "nb_actes", "nb_patients"]
+].sort_values(
+    ["nb_actes", "cdccam"],
+    ascending=[False, True]
+)
 
 df_non_match_par_acte.to_csv(
     OUTPUT_NON_MATCH_ACTE,
@@ -90,3 +285,4 @@ df_non_match_par_acte.to_csv(
 )
 
 print(f"Fichier non matchés par acte : {OUTPUT_NON_MATCH_ACTE}")
+print(f"Nb actes distincts non matchés : {df_non_match_par_acte['cdccam'].nunique()}")
