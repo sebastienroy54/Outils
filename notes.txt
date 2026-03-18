@@ -1,115 +1,22 @@
-import pandas as pd
-from pathlib import Path
-
-# =========================
-# PARAMETRES
-# =========================
-
-EXCEL_FILE = Path(r"C:\Users\4251352\projets\2025_actes4_absents_du_SAG.xlsx")
-SIMPA_FILE = Path(r"C:\Users\4251352\projets\resultats_requetes\simpa_activite1_M_2025.csv")
-
-OUT_DIR = Path(r"C:\Users\4251352\projets\resultats_requetes")
-OUT_DIR.mkdir(exist_ok=True)
-
-OUTPUT_FILE = OUT_DIR / "resultat_NDA_GHM_match.csv"
-
-SHEET_NAME = "Activité 4"
-
-# =========================
-# NORMALISATION
-# =========================
-
-def normalize_ipp(x):
-    if pd.isna(x):
-        return ""
-    s = str(x).strip()
-    if s.endswith(".0"):
-        s = s[:-2]
-    return s
-
-def normalize_text(x):
-    if pd.isna(x):
-        return ""
-    return str(x).strip()
-
-def normalize_date(x):
-    if pd.isna(x):
-        return ""
-    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
-    if pd.isna(dt):
-        return ""
-    return dt.strftime("%d/%m/%Y")
-
-def build_key(ipp, acte, date):
-    return f"{ipp}|{acte}|{date}"
-
-# =========================
-# LECTURE EXCEL
-# =========================
-
-print("Lecture Excel...")
-df_excel = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME)
-df_excel.columns = [c.lower().strip() for c in df_excel.columns]
-
-df_excel["ipp"] = df_excel["ipp"].apply(normalize_ipp)
-df_excel["cdccam"] = df_excel["cdccam"].apply(normalize_text)
-df_excel["date_exe"] = df_excel["date_exe"].apply(normalize_date)
-
-df_excel = df_excel[
-    (df_excel["ipp"] != "") &
-    (df_excel["cdccam"] != "") &
-    (df_excel["date_exe"] != "")
-].copy()
-
-df_excel["cle"] = df_excel.apply(
-    lambda r: build_key(r["ipp"], r["cdccam"], r["date_exe"]),
-    axis=1
-)
-
-print(f"Lignes Excel : {len(df_excel)}")
-
-# =========================
-# LECTURE SIMPA
-# =========================
-
-print("Lecture SIMPA...")
-df_simpa = pd.read_csv(SIMPA_FILE, sep=";")
-
-df_simpa.columns = [c.lower().strip() for c in df_simpa.columns]
-
-df_simpa["ipp"] = df_simpa["ipp"].apply(normalize_ipp)
-df_simpa["acte"] = df_simpa["acte"].apply(normalize_text)
-df_simpa["date_exe"] = df_simpa["date_exe"].apply(normalize_date)
-
-df_simpa["cle"] = df_simpa.apply(
-    lambda r: build_key(r["ipp"], r["acte"], r["date_exe"]),
-    axis=1
-)
-
-print(f"Lignes SIMPA : {len(df_simpa)}")
-
-# =========================
-# MATCHING
-# =========================
-
-print("Matching...")
-
-df_merge = df_excel.merge(
-    df_simpa[["cle", "noda", "cdghm"]],
-    on="cle",
-    how="inner"
-)
-
-print(f"Lignes matchées : {len(df_merge)}")
-
-# =========================
-# RESULTAT FINAL
-# =========================
-
-df_final = df_merge[["noda", "cdghm"]].drop_duplicates()
-df_final = df_final.sort_values(["noda", "cdghm"])
-
-df_final.to_csv(OUTPUT_FILE, sep=";", index=False, encoding="utf-8")
-
-print(f"\nRésultat final : {OUTPUT_FILE}")
-print(f"Nb NDA/GHM distincts : {len(df_final)}")
+Traceback (most recent call last):
+  File "c:\Users\4251352\projets\acte4_SAG.py", line 76, in <module>
+    df_simpa = pd.read_csv(SIMPA_FILE, sep=";")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\io\parsers\readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\io\parsers\readers.py", line 626, in _read
+    return parser.read(nrows)
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\io\parsers\readers.py", line 1923, in read
+    ) = self._engine.read(  # type: ignore[attr-defined]
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\4251352\projets\env\Lib\site-packages\pandas\io\parsers\c_parser_wrapper.py", line 234, in read
+    chunks = self._reader.read_low_memory(nrows)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pandas/_libs/parsers.pyx", line 838, in pandas._libs.parsers.TextReader.read_low_memory
+  File "pandas/_libs/parsers.pyx", line 905, in pandas._libs.parsers.TextReader._read_rows
+  File "pandas/_libs/parsers.pyx", line 874, in pandas._libs.parsers.TextReader._tokenize_rows
+  File "pandas/_libs/parsers.pyx", line 891, in pandas._libs.parsers.TextReader._check_tokenize_status
+  File "pandas/_libs/parsers.pyx", line 2061, in pandas._libs.parsers.raise_parser_error
+pandas.errors.ParserError: Error tokenizing data. C error: Expected 1 fields in line 19, saw 2
