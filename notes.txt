@@ -1,28 +1,40 @@
-SELECT
-    T.IPP,
-    T.CDCCAM,
-    COUNT(*) AS NB_MATCH
-FROM
-(
-    SELECT '...' AS IPP, '...' AS CDCCAM, TO_DATE('...','DD/MM/YYYY') AS DATE_EXE FROM DUAL
-    UNION ALL
-    SELECT '...' AS IPP, '...' AS CDCCAM, TO_DATE('...','DD/MM/YYYY') AS DATE_EXE FROM DUAL
-    UNION ALL
-    SELECT '...' AS IPP, '...' AS CDCCAM, TO_DATE('...','DD/MM/YYYY') AS DATE_EXE FROM DUAL
-    UNION ALL
-    SELECT '...' AS IPP, '...' AS CDCCAM, TO_DATE('...','DD/MM/YYYY') AS DATE_EXE FROM DUAL
-    UNION ALL
-    SELECT '...' AS IPP, '...' AS CDCCAM, TO_DATE('...','DD/MM/YYYY') AS DATE_EXE FROM DUAL
-) T,
-RSM,
-RAC
-WHERE
-    RSM.NOIP = T.IPP
-    AND RAC.KYRES = RSM.KYRES
-    AND RAC.KYCDAC = T.CDCCAM
-GROUP BY
-    T.IPP,
-    T.CDCCAM
-ORDER BY
-    T.IPP,
-    T.CDCCAM;
+def test_oracle_connection(user, password, tns_alias):
+    cmd = ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{TEST_SQL}"]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=10
+        )
+        if result.returncode != 0:
+            return False, (result.stderr or result.stdout)
+        return True, ""
+    except subprocess.TimeoutExpired:
+        return False, "Connexion Oracle: timeout"
+    except Exception as e:
+        return False, f"Connexion Oracle: erreur inattendue: {e}"
+
+def run_main_sql(user, password, tns_alias, date_debut_str, date_fin_str, spool_path_str):
+    # contigus.sql attend &1 &2 &3
+    cmd = [
+        "sqlplus", "-S",
+        f"{user}/{password}@{tns_alias}",
+        f"@{MAIN_SQL}",
+        date_debut_str,
+        date_fin_str,
+        spool_path_str
+    ]
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    return result
+
+
+
+
+tns : "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
