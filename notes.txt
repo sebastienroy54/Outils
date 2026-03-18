@@ -1,16 +1,92 @@
-Lecture Excel...
-Lignes Excel : 49841
-Lecture SIMPA...
-Lignes SIMPA : 309434
-Matching...
-Lignes matchées : 5734
-Nb lignes matchées avec GHM en M : 288
-Nb lignes matchées hors GHM en M : 5446
-Nb séjours distincts avec GHM en M : 275
-Nb séjours distincts hors GHM en M : 5041
+# =========================
+# ANALYSE DES NON MATCHES (CCH)
+# =========================
 
-Résultat final M : C:\Users\4251352\projets\resultats_requetes\resultat_NDA_GHM_match_M.csv
-Nb NDA/GHM distincts en M : 275
+print("\nAnalyse des actes NON matchés (CCH)...")
 
-Résultat hors M par acte : C:\Users\4251352\projets\resultats_requetes\resultat_hors_M_par_acte.csv
-Nb actes distincts hors M : 314
+# --- Lecture feuille 2 (CCH)
+df_cch = pd.read_excel(EXCEL_FILE, sheet_name="Activité 4 cch")
+df_cch.columns = [c.lower().strip() for c in df_cch.columns]
+
+# --- Normalisation nohop
+def normalize_nohop(x):
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s.zfill(5)  # force format 00021
+
+df_cch["nohop"] = df_cch["nohop"].apply(normalize_nohop)
+
+# --- Filtre CCH (00021)
+df_cch = df_cch[df_cch["nohop"] == "00021"].copy()
+
+print(f"Lignes CCH (feuille 2) : {len(df_cch)}")
+
+# --- Normalisation colonnes
+df_cch["ipp"] = df_cch["ipp"].apply(normalize_ipp)
+df_cch["cdccam"] = df_cch["cdccam"].apply(normalize_text)
+df_cch["date_exe"] = df_cch["date_exe"].apply(normalize_date)
+
+# libellé si présent
+if "libelle_long" in df_cch.columns:
+    df_cch["libelle_long"] = df_cch["libelle_long"].apply(normalize_text)
+else:
+    df_cch["libelle_long"] = ""
+
+# --- Construction clé
+df_cch["cle"] = df_cch.apply(
+    lambda r: build_key(r["ipp"], r["cdccam"], r["date_exe"]),
+    axis=1
+)
+
+# --- Clés matchées
+cles_matchees = set(df_merge["cle"])
+
+# --- NON matchés
+df_non_match = df_cch[~df_cch["cle"].isin(cles_matchees)].copy()
+
+print(f"Nb actes NON matchés : {len(df_non_match)}")
+
+# =========================
+# EXPORT DETAIL NON MATCHES
+# =========================
+
+OUTPUT_NON_MATCH = OUT_DIR / "actes_non_matches_CCH.csv"
+
+df_non_match[
+    ["ipp", "cdccam", "date_exe", "libelle_long"]
+].to_csv(OUTPUT_NON_MATCH, sep=";", index=False, encoding="utf-8")
+
+print(f"Fichier non matchés : {OUTPUT_NON_MATCH}")
+
+# =========================
+# REGROUPEMENT PAR ACTE
+# =========================
+
+df_non_match_par_acte = (
+    df_non_match.groupby("cdccam")
+    .agg(
+        nb_actes=("cdccam", "size"),
+        nb_patients=("ipp", pd.Series.nunique)
+    )
+    .reset_index()
+)
+
+df_non_match_par_acte = df_non_match_par_acte.merge(
+    df_cch[["cdccam", "libelle_long"]].drop_duplicates(),
+    on="cdccam",
+    how="left"
+)
+
+OUTPUT_NON_MATCH_ACTE = OUT_DIR / "actes_non_matches_par_acte.csv"
+
+df_non_match_par_acte.to_csv(
+    OUTPUT_NON_MATCH_ACTE,
+    sep=";",
+    index=False,
+    encoding="utf-8"
+)
+
+print(f"Fichier non matchés par acte : {OUTPUT_NON_MATCH_ACTE}")
