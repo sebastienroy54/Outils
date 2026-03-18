@@ -1,30 +1,163 @@
-def test_oracle_connection(user, password, tns_alias):
-    cmd = ["sqlplus", "-S", f"{user}/{password}@{tns_alias}", f"@{TEST_SQL}"]
-    try:
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=10
-        )
-        if result.returncode != 0:
-            return False, (result.stderr or result.stdout)
-        return True, ""
-    except subprocess.TimeoutExpired:
-        return False, "Connexion Oracle: timeout"
-    except Exception as e:
-        return False, f"Connexion Oracle: erreur inattendue: {e}"
+import pandas as pd
+from pathlib import Path
+import subprocess
+import re
 
-def run_main_sql(user, password, tns_alias, date_debut_str, date_fin_str, spool_path_str):
-    # contigus.sql attend &1 &2 &3
+# =========================
+# PARAMETRES
+# =========================
+
+EXCEL_FILE = Path(r"C:\Users\4251352\projets\2025_actes4_absents_du_SAG.xlsx")
+SHEET_NAME = "Activité 4"
+
+OUT_DIR = Path(r"C:\Users\4251352\projets\resultats_requetes")
+OUT_DIR.mkdir(exist_ok=True)
+
+SQL_DIR = OUT_DIR / "sql_chunks_simpa"
+SQL_DIR.mkdir(exist_ok=True)
+
+RAW_DIR = OUT_DIR / "raw_sqlplus_outputs"
+RAW_DIR.mkdir(exist_ok=True)
+
+FINAL_CSV = OUT_DIR / "NDA_GHM_activite1_GHM_M.csv"
+
+CHUNK_SIZE = 500
+
+# Connexion SQL*Plus en dur
+ORACLE_USER = "TON_USER"
+ORACLE_PASSWORD = "TON_MDP"
+TNS_ALIAS = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
+
+# =========================
+# FONCTIONS DE NORMALISATION
+# =========================
+
+def normalize_text(x):
+    if pd.isna(x):
+        return ""
+    return str(x).strip()
+
+def normalize_ipp(x):
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+def normalize_date(x):
+    if pd.isna(x):
+        return None
+    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
+    if pd.isna(dt):
+        return None
+    return dt.strftime("%d/%m/%Y")
+
+def sql_escape(s):
+    return str(s).replace("'", "''")
+
+# =========================
+# LECTURE EXCEL
+# =========================
+
+print(f"Lecture du fichier : {EXCEL_FILE}")
+df = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME)
+df.columns = [str(c).strip().lower() for c in df.columns]
+
+required = ["ipp", "cdccam", "date_exe"]
+for col in required:
+    if col not in df.columns:
+        raise ValueError(f"Colonne manquante : {col}")
+
+df["ipp"] = df["ipp"].apply(normalize_ipp)
+df["cdccam"] = df["cdccam"].apply(normalize_text)
+df["date_exe"] = df["date_exe"].apply(normalize_date)
+
+work = df[["ipp", "cdccam", "date_exe"]].copy()
+work = work[
+    (work["ipp"] != "") &
+    (work["cdccam"] != "") &
+    (work["date_exe"].notna())
+].drop_duplicates()
+
+print(f"Lignes source uniques : {len(work)}")
+
+rows = work.to_dict("records")
+chunks = [rows[i:i + CHUNK_SIZE] for i in range(0, len(rows), CHUNK_SIZE)]
+print(f"Nombre de chunks : {len(chunks)}")
+
+# =========================
+# GENERATION SQL
+# =========================
+
+def build_union_block(chunk_rows):
+    parts = []
+    for row in chunk_rows:
+        ipp = sql_escape(row["ipp"])
+        ccam = sql_escape(row["cdccam"])
+        date_exe = row["date_exe"]
+
+        parts.append(
+            f"SELECT '{ipp}' AS IPP, "
+            f"'{ccam}' AS CDCCAM, "
+            f"TO_DATE('{date_exe}','DD/MM/YYYY') AS DATE_EXE "
+            f"FROM DUAL"
+        )
+    return "\nUNION ALL\n".join(parts)
+
+def build_sql_script(chunk_rows):
+    union_block = build_union_block(chunk_rows)
+
+    sql = f"""
+SET HEADING ON
+SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SELECT DISTINCT
+    RSM.NODA AS NDA,
+    RSS.CDGHM AS GHM
+FROM
+(
+{union_block}
+) T,
+RSM,
+RSS,
+RUM,
+RAC,
+SDO
+WHERE
+    RSS.KYRSS = RUM.KYRSS
+    AND RUM.NORES = RSM.KYRES
+    AND RSM.KYRES = RAC.KYRES
+    AND RSS.NODA = SDO.KYNODA
+    AND SDO.KYNOIP = T.IPP
+    AND RAC.KYCDAC = T.CDCCAM
+    AND TRUNC(RAC.D8REAL) = T.DATE_EXE
+    AND RAC.KYACTIVITE = '1'
+    AND RSS.CDGHM LIKE '%M%'
+ORDER BY
+    RSM.NODA,
+    RSS.CDGHM
+;
+EXIT
+"""
+    return sql.strip() + "\n"
+
+# =========================
+# EXECUTION SQLPLUS
+# =========================
+
+def run_sqlplus_script(user, password, tns_alias, sql_file):
     cmd = [
-        "sqlplus", "-S",
+        "sqlplus",
+        "-S",
         f"{user}/{password}@{tns_alias}",
-        f"@{MAIN_SQL}",
-        date_debut_str,
-        date_fin_str,
-        spool_path_str
+        f"@{sql_file}"
     ]
     result = subprocess.run(
         cmd,
@@ -34,7 +167,98 @@ def run_main_sql(user, password, tns_alias, date_debut_str, date_fin_str, spool_
     )
     return result
 
+# =========================
+# PARSING SORTIE SQLPLUS
+# =========================
 
+def parse_sqlplus_output(stdout_text):
+    """
+    Attend un format :
+    NDA;GHM
+    xxxx;yyyy
+    xxxx;yyyy
+    """
+    rows = []
+    lines = [line.strip() for line in stdout_text.splitlines() if line.strip()]
 
+    for line in lines:
+        if ";" not in line:
+            continue
+        if line.upper().startswith("NDA;GHM"):
+            continue
+        if set(line) <= {"-", ";"}:
+            continue
 
-tns : "CCH": "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
+        parts = line.split(";")
+        if len(parts) < 2:
+            continue
+
+        nda = parts[0].strip()
+        ghm = parts[1].strip()
+
+        if nda and ghm:
+            rows.append((nda, ghm))
+
+    return rows
+
+# =========================
+# TRAITEMENT PAR CHUNKS
+# =========================
+
+all_pairs = []
+errors = []
+
+for idx, chunk in enumerate(chunks, start=1):
+    print(f"Chunk {idx}/{len(chunks)} - {len(chunk)} lignes")
+
+    sql_text = build_sql_script(chunk)
+    sql_file = SQL_DIR / f"chunk_{idx}.sql"
+    raw_file = RAW_DIR / f"chunk_{idx}_output.txt"
+
+    sql_file.write_text(sql_text, encoding="utf-8")
+
+    result = run_sqlplus_script(
+        ORACLE_USER,
+        ORACLE_PASSWORD,
+        TNS_ALIAS,
+        sql_file
+    )
+
+    raw_file.write_text(
+        "=== STDOUT ===\n" + (result.stdout or "") +
+        "\n=== STDERR ===\n" + (result.stderr or ""),
+        encoding="utf-8"
+    )
+
+    if result.returncode != 0:
+        print(f"  !! Erreur SQL*Plus chunk {idx}")
+        errors.append((idx, result.stderr or result.stdout))
+        continue
+
+    pairs = parse_sqlplus_output(result.stdout or "")
+    all_pairs.extend(pairs)
+    print(f"  -> {len(pairs)} couples NDA/GHM")
+
+# =========================
+# CONSOLIDATION
+# =========================
+
+if all_pairs:
+    final_df = pd.DataFrame(all_pairs, columns=["NDA", "GHM"]).drop_duplicates()
+    final_df = final_df.sort_values(["NDA", "GHM"])
+
+    final_df.to_csv(FINAL_CSV, sep=";", index=False, encoding="utf-8")
+
+    print(f"\nCouples bruts récupérés : {len(all_pairs)}")
+    print(f"Couples distincts NDA/GHM : {len(final_df)}")
+    print(f"Export final : {FINAL_CSV}")
+else:
+    print("\nAucun couple NDA/GHM récupéré.")
+
+if errors:
+    err_file = OUT_DIR / "erreurs_sqlplus_chunks.txt"
+    with open(err_file, "w", encoding="utf-8") as f:
+        for idx, err in errors:
+            f.write(f"--- CHUNK {idx} ---\n")
+            f.write((err or "") + "\n\n")
+    print(f"Erreurs enregistrées dans : {err_file}")
