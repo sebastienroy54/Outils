@@ -1,7 +1,121 @@
-SELECT
-    COUNT(DISTINCT RSS.KYRSS) AS NB_RSS
-FROM
-    RSS
-WHERE
-    RSS.D8FIN >= TO_DATE('01/01/2025','DD/MM/YYYY')
-    AND RSS.D8FIN <  TO_DATE('01/01/2026','DD/MM/YYYY');
+import pandas as pd
+from pathlib import Path
+
+# =========================
+# PARAMETRES
+# =========================
+
+EXCEL_FILE = Path(r"C:\Users\4251352\projets\2025_actes4_absents_du_SAG.xlsx")
+SIMPA_FILE = Path(r"C:\Users\4251352\projets\resultats_requetes\simpa_activite1_M_2025.csv")
+
+SHEET_NAME = "Activité 4"
+
+# =========================
+# NORMALISATION
+# =========================
+
+def normalize_ipp(x):
+    if pd.isna(x):
+        return ""
+    s = str(x).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s
+
+def normalize_text(x):
+    if pd.isna(x):
+        return ""
+    return str(x).strip()
+
+def normalize_date(x):
+    if pd.isna(x):
+        return ""
+    dt = pd.to_datetime(x, errors="coerce", dayfirst=True)
+    if pd.isna(dt):
+        return ""
+    return dt.strftime("%d/%m/%Y")
+
+def build_key(ipp, acte, date):
+    return f"{ipp}|{acte}|{date}"
+
+# =========================
+# LECTURE EXCEL
+# =========================
+
+print("Lecture Excel...")
+df_excel = pd.read_excel(EXCEL_FILE, sheet_name=SHEET_NAME)
+df_excel.columns = [c.lower().strip() for c in df_excel.columns]
+
+df_excel["ipp"] = df_excel["ipp"].apply(normalize_ipp)
+df_excel["cdccam"] = df_excel["cdccam"].apply(normalize_text)
+df_excel["date_exe"] = df_excel["date_exe"].apply(normalize_date)
+
+df_excel = df_excel[
+    (df_excel["ipp"] != "") &
+    (df_excel["cdccam"] != "") &
+    (df_excel["date_exe"] != "")
+].copy()
+
+df_excel["cle"] = df_excel.apply(
+    lambda r: build_key(r["ipp"], r["cdccam"], r["date_exe"]),
+    axis=1
+)
+
+print(f"Lignes Excel : {len(df_excel)}")
+
+# =========================
+# LECTURE SIMPA (MEME FICHIER MAIS ON IGNORE GHM)
+# =========================
+
+print("Lecture SIMPA...")
+
+with open(SIMPA_FILE, "r", encoding="utf-8", errors="ignore") as f:
+    lines = [line.strip() for line in f.readlines()]
+
+header_idx = None
+for i, line in enumerate(lines):
+    if line.upper().startswith("IPP;"):
+        header_idx = i
+        break
+
+data_lines = []
+for line in lines[header_idx + 1:]:
+    if not line:
+        continue
+    parts = line.split(";")
+    if len(parts) >= 5:
+        data_lines.append(parts[:5])
+
+df_simpa = pd.DataFrame(data_lines, columns=["ipp", "acte", "date_exe", "noda", "cdghm"])
+
+df_simpa["ipp"] = df_simpa["ipp"].apply(normalize_ipp)
+df_simpa["acte"] = df_simpa["acte"].apply(normalize_text)
+df_simpa["date_exe"] = df_simpa["date_exe"].apply(normalize_date)
+
+df_simpa["cle"] = df_simpa.apply(
+    lambda r: build_key(r["ipp"], r["acte"], r["date_exe"]),
+    axis=1
+)
+
+print(f"Lignes SIMPA : {len(df_simpa)}")
+
+# =========================
+# MATCHING
+# =========================
+
+print("Matching sans filtre GHM...")
+
+df_merge = df_excel.merge(
+    df_simpa[["cle", "noda"]],
+    on="cle",
+    how="inner"
+)
+
+# =========================
+# RESULTATS
+# =========================
+
+print("\nRESULTATS :")
+print(f"Nb actes matchés (activité 1) : {len(df_merge)}")
+
+print(f"Nb séjours distincts (NDA) : {df_merge['noda'].nunique()}")
