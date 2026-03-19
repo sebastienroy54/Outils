@@ -1,134 +1,8 @@
-Agenda
-021MDA GRAN-DR GRANDCLERC S.
-021MDA HELL-HELLIER Eloise
-021MDA MINA-DR MINASSIAN Sevan
-021MDA ZIMM-ZIMMERMAN
-021MDA ROY-ROY EDWARD Tony
-021MDA GRAN-DR GRANDCLERC S.
-021MDA RADJ-DR RADJACK R.
-021MDA MAHE-Mme MAHERZI Alia
-021MDA NONG-DR NONG Chenyuan
-021MDA NONG-DR NONG Chenyuan
-021MDA DI-DI
-021MDA MINA-DR MINASSIAN Sevan
-021MDA LUDO-DR LUDOT Maude
-021MDA REZE-Mme REZE Caroline
-021MDA WAVE-M. WAVELET G.
-021MDA INT2-INTERNE DEUX
-021MDA MASS-Mme MASSARI Nelly
-021MDA GRAN-DR GRANDCLERC S.
-021MDA HELL-HELLIER Eloise
-021MDA MINA-DR MINASSIAN Sevan
-021MDA MAHE-Mme MAHERZI Alia
-021MDA INT1-INTERNE UN
-021MDA INT1-INTERNE UN
-021MDA GALI-Mme GALIE Alix
-021MDA ZIMM-ZIMMERMAN
-021MDA MAHE-Mme MAHERZI Alia
-021MDA LUDO-DR LUDOT Maude
-021MDA ZIMM-ZIMMERMAN
-021MDA INTL-INTERNE de Liaison
-021MDA MOLI-Mme MOLINO Luisa
-021MDA HELL-HELLIER Eloise
-021MDA ZIMM-ZIMMERMAN
-021MDA WAVE-M. WAVELET G.
-021MDA TEIN-Mme TEINTURIER M.
-021MDA HARF-DR HARF
-021MDA GRAN-DR GRANDCLERC S.
-021MDA HELL-HELLIER Eloise
-021MDA FOLL-Mme FOLLET Nath.
-021MDA INTL-INTERNE de Liaison
-021MDA HARF-DR HARF
-021MDA RICH-M. RICHARDEAU M.
-021MDA GAL-DR GAL
-021MDA LUDO-DR LUDOT Maude
-021MDA CAMA-Mme CAMARA Hawa
-021MDA MAHE-Mme MAHERZI Alia
-021MDA JOSS-M. JOSSELIN NJ
-021MDA JOSS-M. JOSSELIN NJ
-021MDA INT1-INTERNE UN
-021MDA INTL-INTERNE de Liaison
-021MDA HENRY-DR HENRY Vincent
-021MDA INT1-INTERNE UN
-021MDA HARF-DR HARF
-021MDA INTL-INTERNE de Liaison
-021MDA ROY-ROY EDWARD Tony
-021MDA ZIMM-ZIMMERMAN
-021MDA GRAN-DR GRANDCLERC S.
-021MDA HELL-HELLIER Eloise
-021MDA SNEG-Mme SNEGAROFF C.
-021MDA COMP-Mme COMPEYRON A.
-021MDA GRAN-DR GRANDCLERC S.
-021MDA HELL-HELLIER Eloise
-021MDA SNEG-Mme SNEGAROFF C.
-021MDA COMP-Mme COMPEYRON A.
-021MDA INH2-INTERNE 2
-021MDA MINA-DR MINASSIAN Sevan
-021MDA NONG-DR NONG Chenyuan
-021MDA NONG-DR NONG Chenyuan
-021MDA LUDO-DR LUDOT Maude
-021MDA GRAN-DR GRANDCLERC S.
-021MDA GOLS-PR GOLSE
-021MDA LUDO-DR LUDOT Maude
-021MDA INTH-INTERNE
-021MDA COMP-Mme COMPEYRON A.
-021MDA ZIMM-ZIMMERMAN
-021MDA TEIN-Mme TEINTURIER M.
-021MDA BARG-DR BARGE Raphael
-021MDA MINA-DR MINASSIAN Sevan
-021MDA GRAN-DR GRANDCLERC S.
-021MDA HARF-DR HARF
-021MDA NONG-DR NONG Chenyuan
-021MDA INT1-INTERNE UN
-021MDA FOUR-DR FOURNIER
-021MDA DI-DI
-021MDA TOUA-DR TOUATI Marie
-021MDA TOUA-DR TOUATI Marie
-021MDA DI-DI
-021MDA TOUA-DR TOUATI Marie
-021MDA MOLI-Mme MOLINO Luisa
-021MDA NARD-DR NARDOT Fabienne
-021MDA INT1-INTERNE UN
-021MDA ROY-ROY EDWARD Tony
-021MDA ROY-ROY EDWARD Tony
-021MDA HENRY-DR HENRY Vincent
-021MDA HENRY-DR HENRY Vincent
-021MDA INTH-INTERNE
-021MDA MINA-DR MINASSIAN Sevan
-021MDA LUDO-DR LUDOT Maude
-021MDA MAHE-Mme MAHERZI Alia
-021MDA MINA-DR MINASSIAN Sevan
-021MDA GAL-DR GAL
-021MDA TEIN-Mme TEINTURIER M.
-021MDA TEIN-Mme TEINTURIER M.
-021MDA INH2-INTERNE 2
-021MDA ADAM-Mme ADAM Amina
-021MDA INT1-INTERNE UN
-021MDA LUDO-DR LUDOT Maude
-021MDA LEVA-Mme LEVAVASSEUR O.
-021MDA INT1-INTERNE UN
-021MDA GAL-DR GAL
-021MDA TRUE-DR TRUELLE P.E.
-021MDA HARF-DR HARF
-021MDA DI-DI
-021MDA MINA-DR MINASSIAN Sevan
-021MDA INT2-INTERNE DEUX
-021MDA INH2-INTERNE 2
-021MDA INT1-INTERNE UN
-021MDA MOLI-Mme MOLINO Luisa
-021MDA RIZZ-RIZZI
-021MDA SIMO-SIMON
-021MDA TOUH-Mme TOUHAMI Fatima
-021MDA RODR-DR RODRIGUEZ J.
-021MDA ADAM-Mme ADAM Amina
-021MDA DI-DI
-
-
-
-
 import pandas as pd
 import streamlit as st
 from io import BytesIO
+import zipfile
+import re
 
 def main():
     st.title("Croisement RAA")
@@ -146,7 +20,7 @@ def main():
 
                 if df_raw.shape[1] != len(colonnes):
                     raise ValueError(
-                        f"Le fichier IPP contient {df_raw.shape[1]} colonnes"
+                        f"Le fichier IPP contient {df_raw.shape[1]} colonnes "
                         f"mais {len(colonnes)} sont attendues ({colonnes})."
                     )
                 ipp_df = pd.DataFrame(df_raw.values, columns=colonnes)
@@ -158,6 +32,7 @@ def main():
                 agenda = pd.read_excel(agenda_file)
             except Exception as e:
                 st.error(f"Erreur lors de la lecture du fichier Agenda : {e}")
+                return
 
             # Formatage des données
             try:
@@ -173,6 +48,7 @@ def main():
                     ipp_df['Date'] = pd.to_datetime(ipp_df['Date'], errors='coerce')
             except Exception as e:
                 st.error(f"Erreur lors du formatage des données : {e}")
+                return
 
             # Paramètres pour la fusion entre IPP et Patient
             try:
@@ -185,7 +61,8 @@ def main():
                     suffixes=('_ipp', '_agenda')
                 )
             except Exception as e:
-                st.error(f"Erreur lors de la fusions des fichiers : {e}")
+                st.error(f"Erreur lors de la fusion des fichiers : {e}")
+                return
 
             # Condition sur les dates et les EDGAR
             try:
@@ -194,7 +71,7 @@ def main():
                     (merged["Acte EDGAR"] == merged['EDGAR'])
                 )
 
-                resultat = merged.loc[condition, ['IPP', 'Nom', 'Prénom','NDA', 'Date', 'Agenda', 'EDGAR']]
+                resultat = merged.loc[condition, ['IPP', 'Nom', 'Prénom', 'NDA', 'Date', 'Agenda', 'EDGAR']].copy()
                 resultat['Date'] = pd.to_datetime(resultat['Date'], errors='coerce').dt.strftime('%d/%m/%Y')
             except KeyError as e:
                 st.error(f"Colonne manquante pour la condition : {e}")
@@ -205,22 +82,45 @@ def main():
 
             try:
                 if not resultat.empty:
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        resultat.to_excel(writer, index=False, sheet_name='Résultats_manquants_60R')
-                    output.seek(0)
+                    # Extraction du nom praticien : tout ce qu'il y a après le "-"
+                    resultat["Praticien"] = resultat["Agenda"].astype(str).str.split("-", n=1).str[1].str.strip()
+
+                    # Sécurisation du nom de fichier
+                    def nettoyer_nom_fichier(nom):
+                        nom = str(nom).strip()
+                        nom = re.sub(r'[\\/*?:"<>|]', "_", nom)
+                        nom = re.sub(r"\s+", "_", nom)
+                        return nom
+
+                    # Création du ZIP en mémoire
+                    zip_buffer = BytesIO()
+
+                    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                        for praticien, df_praticien in resultat.groupby("Praticien"):
+                            nom_fichier = f"{nettoyer_nom_fichier(praticien)}_manquant_RAA.xlsx"
+
+                            excel_buffer = BytesIO()
+                            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                                df_export = df_praticien.drop(columns=["Praticien"])
+                                df_export.to_excel(writer, index=False, sheet_name='Résultats_manquants_60R')
+                            excel_buffer.seek(0)
+
+                            zip_file.writestr(nom_fichier, excel_buffer.getvalue())
+
+                    zip_buffer.seek(0)
 
                     st.download_button(
-                        label="Télécharger le fichier excel",
-                        data=output,
-                        file_name="Manquant_RAA.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        label="Télécharger le ZIP des fichiers par praticien",
+                        data=zip_buffer,
+                        file_name="Manquants_RAA_par_praticien.zip",
+                        mime="application/zip"
                     )
                 else:
                     st.info("Aucune correspondance trouvée selon les critères définis.")
             except Exception as e:
-                st.erro(f"Erreur lors de la génération du fichier Excel : {e}")
+                st.error(f"Erreur lors de la génération du ZIP : {e}")
                 return
+
         except Exception as e:
             st.error(f"Erreur inattendue : {type(e).__name__} - {e}")
 
