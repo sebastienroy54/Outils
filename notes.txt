@@ -1,2 +1,1454 @@
-021 75010016602A01012005014C
-021 75010016602E01102024012C
+import io
+import re
+import zipfile
+from collections import Counter
+
+import pandas as pd
+import streamlit as st
+
+
+# ============================================================
+# REGEX / CONSTANTES
+# ============================================================
+
+ZIP_MCO_RE = re.compile(r"^mco_(\d{3})_(\d{6})_in\.zip$", re.IGNORECASE)
+ZIP_SMR_RE = re.compile(r"^smr_(\d{3})_(\d{6})_in\.zip$", re.IGNORECASE)
+ZIP_PSY_RE = re.compile(r"^psy_(\d{3})_(\d{6})_in\.zip$", re.IGNORECASE)
+
+XLS_MCO_RE = re.compile(
+    r"^CORRE(?:S)?PONDANCE_UM_MCO_SITE_(\d{5})_APHP_(\d{6})\.(xls|xlsx)$",
+    re.IGNORECASE,
+)
+XLS_SMR_RE = re.compile(
+    r"^CORRE(?:S)?PONDANCE_UM_SSR_SITE_(\d{5})_APHP_(\d{6})\.(xls|xlsx)$",
+    re.IGNORECASE,
+)
+XLS_PSY_RE = re.compile(
+    r"^CORRE(?:S)?PONDANCE_UM_PSY_SITE_(\d{5})_APHP_(\d{6})\.(xls|xlsx)$",
+    re.IGNORECASE,
+)
+
+# MCO
+RSS_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.rss\.ini\.txt$", re.IGNORECASE)
+ANO_MCO_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.ano\.txt$", re.IGNORECASE)
+
+# SMR
+RHS_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.rhs\.ini\.txt$", re.IGNORECASE)
+ANO_SMR_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.ano$", re.IGNORECASE)
+MED_SMR_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.med$", re.IGNORECASE)
+
+# PSY
+RPA_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.rpa\.txt$", re.IGNORECASE)
+RPS_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.rps\.txt$", re.IGNORECASE)
+ANOHOSP_PSY_RE = re.compile(r"^(\d{9})\.(\d{4})\.(\d{2})\.anohosp\.txt$", re.IGNORECASE)
+
+# FICHCOMP MCO uniquement
+DMI_RE = re.compile(r"^(.+)\.dmi$", re.IGNORECASE)
+MED_FICHCOMP_RE = re.compile(r"^(.+)\.med$", re.IGNORECASE)
+PIE_RE = re.compile(r"^(.+)\.pie\.txt$", re.IGNORECASE)
+PORG_RE = re.compile(r"^(.+)\.porg\.txt$", re.IGNORECASE)
+
+VID_ACCEPTED_FORMATS = ("V013", "V014", "V015", "V016", "VA16")
+
+
+# ============================================================
+# HELPERS GÉNÉRAUX
+# ============================================================
+
+def normalize_code_hopital(value) -> str:
+    if value is None:
+        return ""
+    s = str(value).strip().replace(" ", "").replace(",", "")
+    if s == "" or s.lower() == "nan":
+        return ""
+    if re.fullmatch(r"\d+(\.0)?", s):
+        s = s.split(".")[0]
+    s = re.sub(r"\D", "", s)
+    if s == "":
+        return ""
+    return s.zfill(5)
+
+
+def site3_to_site5(site3: str) -> str:
+    return (site3 or "").zfill(5)
+
+
+def safe_decode_singlebyte(data: bytes) -> str:
+    return data.decode("latin-1", errors="replace")
+
+
+def safe_encode_singlebyte(text: str) -> bytes:
+    return text.encode("latin-1", errors="replace")
+
+
+def normalize_um(value, width=4) -> str:
+    if value is None:
+        return ""
+    s = str(value).strip()
+    s = s.replace(" ", "").replace(",", "")
+    if s == "" or s.lower() == "nan":
+        return ""
+    return s.zfill(width)
+
+
+def parse_zip_name_mco(zip_filename: str):
+    m = ZIP_MCO_RE.match(zip_filename or "")
+    if not m:
+        return None
+    return {"domain": "MCO", "site3": m.group(1), "yyyymm": m.group(2)}
+
+
+def parse_zip_name_smr(zip_filename: str):
+    m = ZIP_SMR_RE.match(zip_filename or "")
+    if not m:
+        return None
+    return {"domain": "SMR", "site3": m.group(1), "yyyymm": m.group(2)}
+
+
+def parse_zip_name_psy(zip_filename: str):
+    m = ZIP_PSY_RE.match(zip_filename or "")
+    if not m:
+        return None
+    return {"domain": "PSY", "site3": m.group(1), "yyyymm": m.group(2)}
+
+
+def parse_excel_name_mco(excel_filename: str):
+    m = XLS_MCO_RE.match(excel_filename or "")
+    if not m:
+        return None
+    return {
+        "domain": "MCO",
+        "site5": m.group(1),
+        "yyyymm": m.group(2),
+        "ext": m.group(3).lower(),
+    }
+
+
+def parse_excel_name_smr(excel_filename: str):
+    m = XLS_SMR_RE.match(excel_filename or "")
+    if not m:
+        return None
+    return {
+        "domain": "SMR",
+        "site5": m.group(1),
+        "yyyymm": m.group(2),
+        "ext": m.group(3).lower(),
+    }
+
+
+def parse_excel_name_psy(excel_filename: str):
+    m = XLS_PSY_RE.match(excel_filename or "")
+    if not m:
+        return None
+    return {
+        "domain": "PSY",
+        "site5": m.group(1),
+        "yyyymm": m.group(2),
+        "ext": m.group(3).lower(),
+    }
+
+
+def detect_domain(zip_filename: str, zip_namelist):
+    zn = (zip_filename or "").lower()
+    if zn.startswith("mco_"):
+        return "MCO"
+    if zn.startswith("smr_") or zn.startswith("ssr_"):
+        return "SMR"
+    if zn.startswith("psy_"):
+        return "PSY"
+
+    lowered = [n.lower() for n in zip_namelist]
+    if any(n.endswith(".rss.ini.txt") for n in lowered):
+        return "MCO"
+    if any(n.endswith(".rhs.ini.txt") for n in lowered):
+        return "SMR"
+    if any(n.endswith(".rpa.txt") for n in lowered) or any(n.endswith(".rps.txt") for n in lowered):
+        return "PSY"
+    return "UNKNOWN"
+
+
+def extract_finess_from_zip_names(names, regex_list):
+    for n in names:
+        base = n.split("/")[-1]
+        for rgx in regex_list:
+            m = rgx.match(base)
+            if m:
+                finess = m.group(1)
+                if re.fullmatch(r"\d{9}", finess):
+                    return finess
+    return None
+
+
+# ============================================================
+# LECTURE EXCEL / MAPPING UM
+# ============================================================
+
+def read_um_excel_xlsx_only(excel_bytes: bytes, excel_filename: str) -> pd.DataFrame:
+    ext = (excel_filename or "").lower().split(".")[-1]
+    if ext == "xls":
+        raise ValueError(
+            "Fichier Excel au format .xls détecté.\n"
+            "Merci de l'enregistrer en .xlsx (Fichier > Enregistrer sous > .xlsx), puis de relancer."
+        )
+
+    bio = io.BytesIO(excel_bytes)
+    df = pd.read_excel(bio, engine="openpyxl", skiprows=2)
+    df = df.dropna(how="all")
+
+    cols = {c: str(c).strip() for c in df.columns}
+    df = df.rename(columns=cols)
+    return df
+
+
+def build_um_mapping_from_df(df: pd.DataFrame) -> pd.DataFrame:
+    col_upper = {c.upper().replace(" ", "").replace("-", "_"): c for c in df.columns}
+    urm_aphp_col = col_upper.get("URM_APHP") or col_upper.get("URMAPHP")
+    urm_site_col = col_upper.get("URM_SITE") or col_upper.get("URMSITE")
+
+    if not urm_aphp_col or not urm_site_col:
+        raise ValueError("Colonnes attendues non trouvées dans l'Excel (URM_APHP et URM_SITE).")
+
+    out = df[[urm_aphp_col, urm_site_col]].copy()
+    out.columns = ["URM_APHP", "URM_SITE"]
+
+    out["URM_APHP"] = out["URM_APHP"].apply(lambda x: normalize_um(x, 4))
+    out["URM_SITE"] = out["URM_SITE"].astype(str).str.strip()
+
+    out = out[(out["URM_APHP"] != "")]
+    out = out.drop_duplicates(subset=["URM_APHP"], keep="first")
+    return out
+
+
+# ============================================================
+# FORMATAGE CHAMPS
+# ============================================================
+
+def format_date_effet_ddmmyyyy(x) -> str:
+    if x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and x.strip() == ""):
+        return "01011900"
+    dt = pd.to_datetime(x, dayfirst=True, errors="coerce")
+    if pd.isna(dt):
+        s = str(x).strip()
+        if re.fullmatch(r"\d{8}", s):
+            return s
+        return "01011900"
+    return dt.strftime("%d%m%Y")
+
+
+def format_date_optional_ddmmyyyy_or_spaces(x) -> str:
+    if x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and x.strip() == ""):
+        return " " * 8
+    dt = pd.to_datetime(x, dayfirst=True, errors="coerce")
+    if pd.isna(dt):
+        s = str(x).strip()
+        if re.fullmatch(r"\d{8}", s):
+            return s
+        return " " * 8
+    return dt.strftime("%d%m%Y")
+
+
+def format_nb_lits_3(x) -> str:
+    if x is None or (isinstance(x, float) and pd.isna(x)) or (isinstance(x, str) and x.strip() == ""):
+        return "000"
+    s = str(x).strip().replace(" ", "").replace(",", "")
+    if re.fullmatch(r"\d+(\.0)?", s):
+        s = s.split(".")[0]
+    s = re.sub(r"\D", "", s)
+    if s == "":
+        return "000"
+    return s.zfill(3)[-3:]
+
+
+def um4_site(u: str, site5: str) -> str:
+    u = (u or "").strip()
+    val = (u + "    ")[:4]
+    if site5 == "00021":
+        val = val.replace("$21", "$$$", 1) if val.startswith("$21") else val
+    return val
+
+
+# ============================================================
+# AUTORISATIONS / FICUM PAR DOMAINE
+# ============================================================
+
+def build_autorisations_mco_from_excel(um_df: pd.DataFrame, site5: str, finess: str):
+    required = ["CODE_HOPITAL", "URM_SITE", "TYPE_AUTORISATION", "DATE_EFFET", "NB_LITS", "TYPE_HOSPITALISATION"]
+    missing = [c for c in required if c not in um_df.columns]
+    if missing:
+        raise ValueError(f"Impossible de générer les autorisations MCO: colonnes manquantes dans l'excel: {missing}")
+
+    df = um_df.copy()
+    df["CODE_HOPITAL_NORM"] = df["CODE_HOPITAL"].apply(normalize_code_hopital)
+    codes_found = sorted([c for c in df["CODE_HOPITAL_NORM"].dropna().unique().tolist() if c])
+
+    df = df[df["CODE_HOPITAL_NORM"] == site5]
+
+    if df.empty:
+        found_txt = ", ".join(codes_found[:20]) if codes_found else "aucun code exploitable"
+        raise ValueError(
+            f"FICUM MCO vide : aucune ligne de l'Excel ne correspond au site {site5} "
+            f"après normalisation de CODE_HOPITAL. "
+            f"Codes trouvés dans l'Excel : {found_txt}."
+        )
+
+    df["URM_SITE"] = df["URM_SITE"].astype(str).str.strip()
+    df["TYPE_AUTORISATION"] = (
+        df["TYPE_AUTORISATION"].astype(str).str.strip().str.replace(" ", "", regex=False).str.upper()
+    )
+    df["TYPE_HOSPITALISATION"] = df["TYPE_HOSPITALISATION"].astype(str).str.strip().str[:1]
+    df["UM4"] = df["URM_SITE"].apply(lambda u: um4_site(u, site5))
+    df["DATE8"] = df["DATE_EFFET"].apply(format_date_effet_ddmmyyyy)
+    df["LITS3"] = df["NB_LITS"].apply(format_nb_lits_3)
+
+    lines = []
+    for _, r in df.iterrows():
+        type_aut = r["TYPE_AUTORISATION"]
+        sep = "" if re.search(r"[A-Z]$", type_aut) else " "
+        line = (
+            r["UM4"]
+            + finess
+            + type_aut
+            + sep
+            + r["DATE8"]
+            + r["LITS3"]
+            + r["TYPE_HOSPITALISATION"]
+        )
+        lines.append(line)
+
+    if not lines:
+        raise ValueError(f"FICUM MCO vide : aucune ligne exploitable n'a pu être construite pour le site {site5}.")
+
+    txt = "\n".join(lines) + "\n"
+    return safe_encode_singlebyte(txt), len(lines)
+
+
+def build_autorisations_smr_from_excel(um_df: pd.DataFrame, site5: str, finess: str):
+    required = ["CODE_HOPITAL", "URM_SITE", "TYPE_AUTORISATION", "TYPE_HOSPITALISATION", "DATE_EFFET"]
+    missing = [c for c in required if c not in um_df.columns]
+    if missing:
+        raise ValueError(f"Impossible de générer les autorisations SMR: colonnes manquantes dans l'excel: {missing}")
+
+    df = um_df.copy()
+    df["CODE_HOPITAL_NORM"] = df["CODE_HOPITAL"].apply(normalize_code_hopital)
+    codes_found = sorted([c for c in df["CODE_HOPITAL_NORM"].dropna().unique().tolist() if c])
+
+    df = df[df["CODE_HOPITAL_NORM"] == site5]
+
+    if df.empty:
+        found_txt = ", ".join(codes_found[:20]) if codes_found else "aucun code exploitable"
+        raise ValueError(
+            f"FICUM SMR vide : aucune ligne de l'Excel ne correspond au site {site5} "
+            f"après normalisation de CODE_HOPITAL. "
+            f"Codes trouvés dans l'Excel : {found_txt}."
+        )
+
+    df["URM_SITE"] = df["URM_SITE"].astype(str).str.strip()
+    df["TYPE_AUTORISATION"] = (
+        df["TYPE_AUTORISATION"].astype(str).str.strip().str.replace(" ", "", regex=False).str.upper().str[:3]
+    )
+    df["TYPE_HOSPITALISATION"] = df["TYPE_HOSPITALISATION"].astype(str).str.strip().str[:1]
+    df["UM4"] = df["URM_SITE"].apply(lambda u: um4_site(u, site5))
+    df["DATE_DEBUT8"] = df["DATE_EFFET"].apply(format_date_effet_ddmmyyyy)
+    df["DATE_FIN8"] = " " * 8
+
+    lines = []
+    for _, r in df.iterrows():
+        line = (
+            r["UM4"]
+            + finess
+            + r["TYPE_AUTORISATION"]
+            + r["TYPE_HOSPITALISATION"]
+            + r["DATE_DEBUT8"]
+            + r["DATE_FIN8"]
+        )
+        lines.append(line)
+
+    if not lines:
+        raise ValueError(f"FICUM SMR vide : aucune ligne exploitable n'a pu être construite pour le site {site5}.")
+
+    txt = "\n".join(lines) + "\n"
+    return safe_encode_singlebyte(txt), len(lines)
+
+
+def build_autorisations_psy_from_excel(um_df: pd.DataFrame, site5: str, finess: str):
+    required = ["CODE_HOPITAL", "URM_SITE", "TYPE_AUTORISATION", "DATE_EFFET"]
+    missing = [c for c in required if c not in um_df.columns]
+    if missing:
+        raise ValueError(f"Impossible de générer les autorisations PSY: colonnes manquantes dans l'excel: {missing}")
+
+    df = um_df.copy()
+    df["CODE_HOPITAL_NORM"] = df["CODE_HOPITAL"].apply(normalize_code_hopital)
+    codes_found = sorted([c for c in df["CODE_HOPITAL_NORM"].dropna().unique().tolist() if c])
+
+    df = df[df["CODE_HOPITAL_NORM"] == site5]
+
+    if df.empty:
+        found_txt = ", ".join(codes_found[:20]) if codes_found else "aucun code exploitable"
+        raise ValueError(
+            f"FICUM PSY vide : aucune ligne de l'Excel ne correspond au site {site5} "
+            f"après normalisation de CODE_HOPITAL. "
+            f"Codes trouvés dans l'Excel : {found_txt}."
+        )
+
+    df["URM_SITE"] = df["URM_SITE"].astype(str).str.strip()
+    df["TYPE_AUTORISATION"] = (
+        df["TYPE_AUTORISATION"].astype(str).str.strip().str.replace(" ", "", regex=False).str.upper().str[:1]
+    )
+    df["UM4"] = df["URM_SITE"].apply(lambda u: um4_site(u, site5))
+    df["TYPE_UNITE"] = "000"
+    df["DATE_DEBUT8"] = df["DATE_EFFET"].apply(format_date_effet_ddmmyyyy)
+    df["DATE_FIN8"] = " " * 8
+
+    lines = []
+    for _, r in df.iterrows():
+        line = (
+            "PUM01"
+            + r["UM4"]
+            + finess
+            + r["TYPE_UNITE"]
+            + r["TYPE_AUTORISATION"]
+            + r["DATE_DEBUT8"]
+            + r["DATE_FIN8"]
+        )
+        lines.append(line)
+
+    if not lines:
+        raise ValueError(f"FICUM PSY vide : aucune ligne exploitable n'a pu être construite pour le site {site5}.")
+
+    txt = "\n".join(lines) + "\n"
+    return safe_encode_singlebyte(txt), len(lines)
+
+
+# ============================================================
+# CORRECTION UM DANS LES FICHIERS FIXED-WIDTH
+# ============================================================
+
+def process_fixedwidth_um_replacement(file_bytes: bytes, mapping: dict, start_1_based: int, length: int):
+    text = safe_decode_singlebyte(file_bytes)
+    lines = text.splitlines(True)
+
+    start0 = start_1_based - 1
+    end0 = start0 + length
+
+    total = 0
+    matched = 0
+    missing_keys = Counter()
+    out_lines = []
+
+    for line in lines:
+        if len(line) < end0:
+            out_lines.append(line)
+            continue
+
+        seg = line[start0:end0]
+        key = normalize_um(seg, length)
+        total += 1
+
+        if key in mapping:
+            rep = mapping[key]
+            rep_fixed = (rep + (" " * length))[:length]
+            new_line = line[:start0] + rep_fixed + line[end0:]
+            out_lines.append(new_line)
+            matched += 1
+        else:
+            out_lines.append(line)
+            missing_keys[key] += 1
+
+    corrected = "".join(out_lines)
+    stats = {
+        "total_records_checked": total,
+        "matched": matched,
+        "match_rate": (matched / total) if total else 0.0,
+        "missing_top10": missing_keys.most_common(10),
+        "missing_unique": len(missing_keys),
+        "input_line_count": len(text.splitlines()),
+        "output_line_count": len(corrected.splitlines()),
+    }
+    return safe_encode_singlebyte(corrected), stats
+
+
+# ============================================================
+# FICHCOMP MCO
+# ============================================================
+
+def process_fichcomp_blank_sejour_date(file_bytes: bytes, start_1_based: int = 22, length: int = 8):
+    text = safe_decode_singlebyte(file_bytes)
+    lines = text.splitlines(True)
+
+    start0 = start_1_based - 1
+    end0 = start0 + length
+
+    changed = 0
+    out_lines = []
+
+    for line in lines:
+        newline = ""
+        if line.endswith("\r\n"):
+            core = line[:-2]
+            newline = "\r\n"
+        elif line.endswith("\n"):
+            core = line[:-1]
+            newline = "\n"
+        elif line.endswith("\r"):
+            core = line[:-1]
+            newline = "\r"
+        else:
+            core = line
+
+        if len(core) >= end0:
+            before = core[start0:end0]
+            after = core[:start0] + (" " * length) + core[end0:]
+            if before != (" " * length):
+                changed += 1
+            out_lines.append(after + newline)
+        else:
+            out_lines.append(line)
+
+    corrected = "".join(out_lines)
+    stats = {
+        "input_line_count": len(text.splitlines()),
+        "output_line_count": len(corrected.splitlines()),
+        "blanked_zone_start_1based": start_1_based,
+        "blanked_zone_length": length,
+        "changed_lines": changed,
+    }
+    return safe_encode_singlebyte(corrected), stats
+
+
+# ============================================================
+# MOTEUR VIDHOSP COMMUN
+# ============================================================
+
+def ss_1based(s: str, a: int, b: int) -> str:
+    if a < 1 or b < a:
+        return ""
+    if len(s) < b:
+        s = s + (" " * (b - len(s)))
+    return s[a - 1:b]
+
+
+def fix_anohosp_v014(ano: str) -> str:
+    if len(ano) < 116:
+        ano = ano + (" " * (116 - len(ano)))
+    return ano[:113] + ano[115:]
+
+
+def ano_format(ano: str) -> str:
+    raw = ss_1based(ano, 17, 19).strip().upper()
+
+    if raw in ("013", "014", "015", "016"):
+        return "V" + raw
+    if raw == "A16":
+        return "VA16"
+
+    return "V" + raw
+
+
+def ano_regime(ano: str) -> str:
+    return ss_1based(ano, 141, 142)
+
+
+def ano_gestion(ano: str) -> str:
+    return ss_1based(ano, 143, 144)
+
+
+def ano_ddn(ano: str) -> str:
+    return ss_1based(ano, 248, 255)
+
+
+def ano_nas(ano: str) -> str:
+    return ss_1based(ano, 41, 60)
+
+
+def ano_exo_a_montant_amc(ano: str) -> str:
+    return ss_1based(ano, 145, 247)
+
+
+def ano_participation_a_centre_gestion(ano: str) -> str:
+    return ss_1based(ano, 257, 277)
+
+
+def ano_confirmation_pc_a_ipp(ano: str) -> str:
+    return ss_1based(ano, 278, 420)
+
+
+def ano_sexe(ano: str) -> str:
+    x = ss_1based(ano, 256, 256)
+    return x if x in ("1", "2") else "1"
+
+
+def ano_annee_ddn(ano: str) -> str:
+    return ss_1based(ano, 254, 255)
+
+
+def ano_mois_ddn(ano: str) -> str:
+    return ss_1based(ano, 250, 251)
+
+
+def ano_ipp_cropped(ano: str) -> str:
+    return ss_1based(ano, 403, 410)
+
+
+def ano_cle(num_secu_str: str) -> str:
+    try:
+        n = int(num_secu_str)
+        cle = 97 - (n % 97)
+        return str(cle).zfill(2)
+    except Exception:
+        return "00"
+
+
+def build_vidhosp_line(ano: str, finess: str, fmt: str):
+    fake_num_am = (
+        ano_sexe(ano)
+        + ano_annee_ddn(ano)
+        + ano_mois_ddn(ano)
+        + ano_ipp_cropped(ano)
+    )
+    cle = ano_cle(fake_num_am)
+
+    regime = ano_regime(ano)
+    gestion = ano_gestion(ano)
+    ddn = ano_ddn(ano)
+    sexe = ano_sexe(ano)
+    nas = ano_nas(ano)
+    exo = ano_exo_a_montant_amc(ano)
+    part = ano_participation_a_centre_gestion(ano)
+    conf = ano_confirmation_pc_a_ipp(ano)
+    filler30 = " " * 30
+    art51 = " "
+
+    if fmt == "V013":
+        raw = (
+            fake_num_am
+            + cle
+            + regime
+            + gestion
+            + ddn
+            + sexe
+            + nas
+            + fmt
+            + finess
+            + fake_num_am
+            + cle
+            + exo
+            + part
+            + filler30
+            + conf
+        )
+    else:
+        raw = (
+            fake_num_am
+            + cle
+            + regime
+            + gestion
+            + ddn
+            + sexe
+            + nas
+            + fmt
+            + finess
+            + fake_num_am
+            + cle
+            + exo
+            + part
+            + filler30
+            + conf
+            + fake_num_am
+            + cle
+            + art51
+        )
+
+    return raw, {"fake_num_am": fake_num_am, "cle": cle}
+
+
+def prepare_anohosp_lines_mco(ano_bytes: bytes):
+    text = safe_decode_singlebyte(ano_bytes)
+    raw_lines = text.splitlines()
+    prepared = [ln.rstrip("\r\n") for ln in raw_lines if ln.rstrip("\r\n") != ""]
+    stats = {
+        "raw_total_lines": len(raw_lines),
+        "prepared_nonempty_lines": len(prepared),
+        "filtered_out": len(raw_lines) - len(prepared),
+    }
+    return prepared, stats
+
+
+def prepare_anohosp_lines_smr(ano_bytes: bytes):
+    text = safe_decode_singlebyte(ano_bytes)
+    raw_lines = text.splitlines()
+
+    prepared = []
+    filtered_too_short = 0
+    filtered_first_char = 0
+    filtered_empty = 0
+
+    for ln in raw_lines:
+        s = ln.strip()
+        if s == "":
+            filtered_empty += 1
+            continue
+        if len(s) < 19:
+            filtered_too_short += 1
+            continue
+        if s[0] not in ("3", "8"):
+            filtered_first_char += 1
+            continue
+        prepared.append(s)
+
+    stats = {
+        "raw_total_lines": len(raw_lines),
+        "prepared_nonempty_lines": len(prepared),
+        "filtered_empty": filtered_empty,
+        "filtered_too_short": filtered_too_short,
+        "filtered_first_char": filtered_first_char,
+        "filtered_out": filtered_empty + filtered_too_short + filtered_first_char,
+    }
+    return prepared, stats
+
+
+def prepare_anohosp_lines_psy(ano_bytes: bytes):
+    text = safe_decode_singlebyte(ano_bytes)
+    raw_lines = text.splitlines()
+    prepared = [ln.rstrip("\r\n") for ln in raw_lines if ln.rstrip("\r\n") != ""]
+    stats = {
+        "raw_total_lines": len(raw_lines),
+        "prepared_nonempty_lines": len(prepared),
+        "filtered_out": len(raw_lines) - len(prepared),
+    }
+    return prepared, stats
+
+
+def anohosp_to_vidhosp_lines_common(finess: str, prepared_lines, prep_stats: dict):
+    seen_nonempty = 0
+    produced = 0
+    skipped_format = Counter()
+    formats_seen = Counter()
+    parse_errors = 0
+    out = []
+
+    for ano in prepared_lines:
+        if not ano:
+            continue
+        seen_nonempty += 1
+
+        fmt = ano_format(ano)
+        formats_seen[fmt] += 1
+
+        if fmt not in VID_ACCEPTED_FORMATS:
+            skipped_format[fmt] += 1
+            continue
+
+        if fmt == "V014":
+            ano = fix_anohosp_v014(ano)
+
+        raw, info = build_vidhosp_line(ano=ano, finess=finess, fmt=fmt)
+        if info["cle"] == "00":
+            parse_errors += 1
+
+        out.append(raw)
+        produced += 1
+
+    vid_text = "\n".join(out) + ("\n" if out else "")
+    stats = {
+        **prep_stats,
+        "anohosp_nonempty_seen": seen_nonempty,
+        "vidhosp_produced": produced,
+        "formats_seen": formats_seen.most_common(),
+        "skipped_format_top10": skipped_format.most_common(10),
+        "skipped_total": sum(skipped_format.values()),
+        "parse_errors_cle00": parse_errors,
+    }
+    return safe_encode_singlebyte(vid_text), stats
+
+
+def anohosp_to_vidhosp_lines_mco(finess: str, ano_bytes: bytes):
+    prepared_lines, prep_stats = prepare_anohosp_lines_mco(ano_bytes)
+    return anohosp_to_vidhosp_lines_common(finess=finess, prepared_lines=prepared_lines, prep_stats=prep_stats)
+
+
+def anohosp_to_vidhosp_lines_smr(finess: str, ano_bytes: bytes):
+    prepared_lines, prep_stats = prepare_anohosp_lines_smr(ano_bytes)
+    return anohosp_to_vidhosp_lines_common(finess=finess, prepared_lines=prepared_lines, prep_stats=prep_stats)
+
+
+def anohosp_to_vidhosp_lines_psy(finess: str, ano_bytes: bytes):
+    prepared_lines, prep_stats = prepare_anohosp_lines_psy(ano_bytes)
+    return anohosp_to_vidhosp_lines_common(finess=finess, prepared_lines=prepared_lines, prep_stats=prep_stats)
+
+
+# ============================================================
+# FORMATAGE MED SMR
+# ============================================================
+
+def process_mo_med_smr(med_bytes: bytes, target_length: int = 104):
+    text = safe_decode_singlebyte(med_bytes)
+    lines = text.splitlines()
+
+    out_lines = []
+    for line in lines:
+        padded = line + (" " * 9)
+        out_lines.append(padded[:target_length])
+
+    out_text = "\n".join(out_lines) + ("\n" if out_lines else "")
+    stats = {
+        "input_line_count": len(lines),
+        "output_line_count": len(out_lines),
+        "target_length": target_length,
+    }
+    return safe_encode_singlebyte(out_text), stats
+
+
+# ============================================================
+# TRAITEMENT MCO
+# ============================================================
+
+def process_zip_mco(
+    zip_bytes: bytes,
+    zip_filename: str,
+    excel_bytes: bytes,
+    excel_filename: str,
+    rss_um_start_1based: int = 87,
+    rss_um_length: int = 4,
+    min_match_rate: float = 1.0,
+):
+    report_lines = []
+
+    zip_meta = parse_zip_name_mco(zip_filename)
+    xls_meta = parse_excel_name_mco(excel_filename)
+
+    if zip_meta:
+        report_lines.append(f"ZIP détecté: domaine=MCO site={zip_meta['site3']} periode={zip_meta['yyyymm']}")
+    else:
+        report_lines.append("ZIP MCO: nom non standard.")
+
+    if xls_meta:
+        report_lines.append(f"EXCEL détecté: domaine=MCO site={xls_meta['site5']} periode={xls_meta['yyyymm']} ext={xls_meta['ext']}")
+    else:
+        report_lines.append("EXCEL MCO: nom non standard.")
+
+    if zip_meta and xls_meta:
+        expected_site5 = site3_to_site5(zip_meta["site3"])
+        if xls_meta["site5"] != expected_site5 or xls_meta["yyyymm"] != zip_meta["yyyymm"]:
+            raise ValueError(
+                f"Incohérence ZIP/EXCEL MCO: ZIP site={zip_meta['site3']} periode={zip_meta['yyyymm']} "
+                f"mais EXCEL site={xls_meta['site5']} periode={xls_meta['yyyymm']} "
+                f"(attendu site5={expected_site5})."
+            )
+
+    um_excel_df = read_um_excel_xlsx_only(excel_bytes, excel_filename)
+    um_df = build_um_mapping_from_df(um_excel_df)
+    mapping = dict(zip(um_df["URM_APHP"].tolist(), um_df["URM_SITE"].tolist()))
+    report_lines.append(f"Mapping UM MCO: {len(mapping)} clés.")
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zin_tmp:
+        names_tmp = zin_tmp.namelist()
+
+    finess_found = extract_finess_from_zip_names(names_tmp, [RSS_RE, ANO_MCO_RE])
+    if not finess_found:
+        raise ValueError("Impossible de déterminer le FINESS MCO depuis le ZIP.")
+    if not re.fullmatch(r"\d{9}", finess_found):
+        raise ValueError(f"FINESS MCO invalide détecté: {finess_found}")
+
+    if zip_meta:
+        site5 = site3_to_site5(zip_meta["site3"])
+        site3 = zip_meta["site3"]
+    elif xls_meta:
+        site5 = xls_meta["site5"]
+        site3 = site5[-3:]
+    else:
+        raise ValueError("Impossible de déterminer le site MCO (nom zip/excel non standard).")
+
+    ficum_bytes, ficum_lines_count = build_autorisations_mco_from_excel(um_excel_df, site5=site5, finess=finess_found)
+    ficum_name = f"ficum{site3}.txt"
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zin:
+        names = zin.namelist()
+        rss_files = [n for n in names if RSS_RE.match(n.split("/")[-1])]
+        ano_files = [n for n in names if ANO_MCO_RE.match(n.split("/")[-1])]
+
+        dmi_files = [n for n in names if DMI_RE.match(n.split("/")[-1])]
+        med_fichcomp_files = [n for n in names if MED_FICHCOMP_RE.match(n.split("/")[-1])]
+        pie_files = [n for n in names if PIE_RE.match(n.split("/")[-1])]
+        porg_files = [n for n in names if PORG_RE.match(n.split("/")[-1])]
+
+        report_lines.append(f"Fichiers RSS trouvés: {len(rss_files)}")
+        report_lines.append(f"Fichiers ANO trouvés: {len(ano_files)}")
+        report_lines.append(f"Fichiers DMI trouvés: {len(dmi_files)}")
+        report_lines.append(f"Fichiers MED fichcomp trouvés: {len(med_fichcomp_files)}")
+        report_lines.append(f"Fichiers PIE trouvés: {len(pie_files)}")
+        report_lines.append(f"Fichiers PORG trouvés: {len(porg_files)}")
+
+        zout_buffer = io.BytesIO()
+        with zipfile.ZipFile(zout_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+            for n in names:
+                zout.writestr(n, zin.read(n))
+
+            zout.writestr(ficum_name, ficum_bytes)
+            report_lines.append(f"FICUM généré: {ficum_name} (finess={finess_found}, lignes={ficum_lines_count})")
+
+            for rss_name in rss_files:
+                base = rss_name.split("/")[-1]
+                rss_bytes_in = zin.read(rss_name)
+
+                corrected_bytes, stats = process_fixedwidth_um_replacement(
+                    rss_bytes_in,
+                    mapping,
+                    start_1_based=rss_um_start_1based,
+                    length=rss_um_length,
+                )
+
+                report_lines.append(
+                    f"RSS {base}: matched={stats['matched']}/{stats['total_records_checked']} "
+                    f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']} "
+                    f"lines_in={stats['input_line_count']} lines_out={stats['output_line_count']}"
+                )
+                if stats["missing_top10"]:
+                    report_lines.append(f"  Top missing keys: {stats['missing_top10']}")
+
+                if stats["input_line_count"] != stats["output_line_count"]:
+                    raise ValueError(
+                        f"Le nombre de lignes du RSS corrigé diffère de l'entrée pour {base} "
+                        f"({stats['input_line_count']} -> {stats['output_line_count']})."
+                    )
+
+                if stats["total_records_checked"] > 0 and stats["match_rate"] < min_match_rate:
+                    raise ValueError(
+                        f"Taux de match UM insuffisant sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                        f"Le traitement MCO exige 100% de correspondance UM."
+                    )
+
+                prefix = rss_name[:-len(base)]
+                corrected_name = prefix + base.replace(".rss.ini.txt", ".rss.ini-corrige.txt")
+                zout.writestr(corrected_name, corrected_bytes)
+
+            for ano_name in ano_files:
+                base = ano_name.split("/")[-1]
+                m = ANO_MCO_RE.match(base)
+                finess, yyyy, mm = m.group(1), m.group(2), m.group(3)
+
+                ano_bytes_in = zin.read(ano_name)
+                vid_bytes, vid_stats = anohosp_to_vidhosp_lines_mco(finess=finess, ano_bytes=ano_bytes_in)
+
+                report_lines.append(
+                    f"ANO {base}: vidhosp_produced={vid_stats['vidhosp_produced']} "
+                    f"(prepared={vid_stats['prepared_nonempty_lines']}, skipped={vid_stats['skipped_total']}) "
+                    f"parse_errors_cle00={vid_stats['parse_errors_cle00']}"
+                )
+                if vid_stats["formats_seen"]:
+                    report_lines.append(f"  Formats ANO vus: {vid_stats['formats_seen']}")
+                if vid_stats["skipped_format_top10"]:
+                    report_lines.append(f"  Formats ignorés: {vid_stats['skipped_format_top10']}")
+
+                if vid_stats["vidhosp_produced"] + vid_stats["skipped_total"] != vid_stats["anohosp_nonempty_seen"]:
+                    raise ValueError(
+                        f"Incohérence ANO/VIDHOSP sur {base}: "
+                        f"produced({vid_stats['vidhosp_produced']}) + skipped({vid_stats['skipped_total']}) "
+                        f"!= nonempty_seen({vid_stats['anohosp_nonempty_seen']})."
+                    )
+
+                prefix = ano_name[:-len(base)]
+                vid_name = prefix + f"{finess}.{yyyy}.{mm}.vidhosp.txt"
+                zout.writestr(vid_name, vid_bytes)
+
+            fichcomp_groups = [
+                ("DMI", dmi_files, ".dmi", ".dmi_corrige.txt"),
+                ("MED", med_fichcomp_files, ".med", ".med_corrige.txt"),
+                ("PIE", pie_files, ".pie.txt", ".pie_corrige.txt"),
+                ("PORG", porg_files, ".porg.txt", ".porg_corrige.txt"),
+            ]
+
+            for label, file_list, src_suffix, dst_suffix in fichcomp_groups:
+                for fname in file_list:
+                    base = fname.split("/")[-1]
+                    in_bytes = zin.read(fname)
+
+                    corrected_bytes, fc_stats = process_fichcomp_blank_sejour_date(
+                        in_bytes,
+                        start_1_based=22,
+                        length=8,
+                    )
+
+                    report_lines.append(
+                        f"{label} {base}: lines_in={fc_stats['input_line_count']} "
+                        f"lines_out={fc_stats['output_line_count']} "
+                        f"changed_lines={fc_stats['changed_lines']} "
+                        f"blank_zone={fc_stats['blanked_zone_start_1based']}-{fc_stats['blanked_zone_start_1based'] + fc_stats['blanked_zone_length'] - 1}"
+                    )
+
+                    prefix = fname[:-len(base)]
+                    corrected_name = prefix + base.replace(src_suffix, dst_suffix)
+                    zout.writestr(corrected_name, corrected_bytes)
+
+            report_txt = "\n".join(report_lines) + "\n"
+            zout.writestr("PMSIPilot_report.txt", safe_encode_singlebyte(report_txt))
+
+        zout_buffer.seek(0)
+        return zout_buffer.getvalue(), "\n".join(report_lines)
+
+
+# ============================================================
+# TRAITEMENT SMR
+# ============================================================
+
+def process_zip_smr(
+    zip_bytes: bytes,
+    zip_filename: str,
+    excel_bytes: bytes,
+    excel_filename: str,
+    rhs_um_start_1based: int = 130,
+    rhs_um_length: int = 4,
+    min_match_rate: float = 1.0,
+    med_target_length: int = 104,
+):
+    report_lines = []
+
+    zip_meta = parse_zip_name_smr(zip_filename)
+    xls_meta = parse_excel_name_smr(excel_filename)
+
+    if zip_meta:
+        report_lines.append(f"ZIP détecté: domaine=SMR site={zip_meta['site3']} periode={zip_meta['yyyymm']}")
+    else:
+        report_lines.append("ZIP SMR: nom non standard.")
+
+    if xls_meta:
+        report_lines.append(f"EXCEL détecté: domaine=SMR site={xls_meta['site5']} periode={xls_meta['yyyymm']} ext={xls_meta['ext']}")
+    else:
+        report_lines.append("EXCEL SMR: nom non standard.")
+
+    if zip_meta and xls_meta:
+        expected_site5 = site3_to_site5(zip_meta["site3"])
+        if xls_meta["site5"] != expected_site5 or xls_meta["yyyymm"] != zip_meta["yyyymm"]:
+            raise ValueError(
+                f"Incohérence ZIP/EXCEL SMR: ZIP site={zip_meta['site3']} periode={zip_meta['yyyymm']} "
+                f"mais EXCEL site={xls_meta['site5']} periode={xls_meta['yyyymm']} "
+                f"(attendu site5={expected_site5})."
+            )
+
+    um_excel_df = read_um_excel_xlsx_only(excel_bytes, excel_filename)
+    um_df = build_um_mapping_from_df(um_excel_df)
+    mapping = dict(zip(um_df["URM_APHP"].tolist(), um_df["URM_SITE"].tolist()))
+    report_lines.append(f"Mapping UM SMR: {len(mapping)} clés.")
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zin_tmp:
+        names_tmp = zin_tmp.namelist()
+
+    finess_found = extract_finess_from_zip_names(names_tmp, [RHS_RE, ANO_SMR_RE, MED_SMR_RE])
+    if not finess_found:
+        raise ValueError("Impossible de déterminer le FINESS SMR depuis le ZIP.")
+    if not re.fullmatch(r"\d{9}", finess_found):
+        raise ValueError(f"FINESS SMR invalide détecté: {finess_found}")
+
+    if zip_meta:
+        site5 = site3_to_site5(zip_meta["site3"])
+        site3 = zip_meta["site3"]
+    elif xls_meta:
+        site5 = xls_meta["site5"]
+        site3 = site5[-3:]
+    else:
+        raise ValueError("Impossible de déterminer le site SMR (nom zip/excel non standard).")
+
+    ficum_bytes, ficum_lines_count = build_autorisations_smr_from_excel(um_excel_df, site5=site5, finess=finess_found)
+    ficum_name = f"ficum{site3}.txt"
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zin:
+        names = zin.namelist()
+        rhs_files = [n for n in names if RHS_RE.match(n.split("/")[-1])]
+        ano_files = [n for n in names if ANO_SMR_RE.match(n.split("/")[-1])]
+        med_files = [n for n in names if MED_SMR_RE.match(n.split("/")[-1])]
+
+        report_lines.append(f"Fichiers RHS trouvés: {len(rhs_files)}")
+        report_lines.append(f"Fichiers ANO trouvés: {len(ano_files)}")
+        report_lines.append(f"Fichiers MED trouvés: {len(med_files)}")
+
+        zout_buffer = io.BytesIO()
+        with zipfile.ZipFile(zout_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+            for n in names:
+                zout.writestr(n, zin.read(n))
+
+            zout.writestr(ficum_name, ficum_bytes)
+            report_lines.append(f"FICUM généré: {ficum_name} (finess={finess_found}, lignes={ficum_lines_count})")
+
+            for rhs_name in rhs_files:
+                base = rhs_name.split("/")[-1]
+                rhs_bytes_in = zin.read(rhs_name)
+
+                corrected_bytes, stats = process_fixedwidth_um_replacement(
+                    rhs_bytes_in,
+                    mapping,
+                    start_1_based=rhs_um_start_1based,
+                    length=rhs_um_length,
+                )
+
+                report_lines.append(
+                    f"RHS {base}: matched={stats['matched']}/{stats['total_records_checked']} "
+                    f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']} "
+                    f"lines_in={stats['input_line_count']} lines_out={stats['output_line_count']}"
+                )
+                if stats["missing_top10"]:
+                    report_lines.append(f"  Top missing keys: {stats['missing_top10']}")
+
+                if stats["input_line_count"] != stats["output_line_count"]:
+                    raise ValueError(
+                        f"Le nombre de lignes du RHS corrigé diffère de l'entrée pour {base} "
+                        f"({stats['input_line_count']} -> {stats['output_line_count']})."
+                    )
+
+                if stats["total_records_checked"] > 0 and stats["match_rate"] < min_match_rate:
+                    raise ValueError(
+                        f"Taux de match UM insuffisant sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                        f"Le traitement SMR exige 100% de correspondance UM."
+                    )
+
+                prefix = rhs_name[:-len(base)]
+                corrected_name = prefix + base.replace(".rhs.ini.txt", ".rhs.ini-corrige.txt")
+                zout.writestr(corrected_name, corrected_bytes)
+
+            for ano_name in ano_files:
+                base = ano_name.split("/")[-1]
+                m = ANO_SMR_RE.match(base)
+                finess, yyyy, mm = m.group(1), m.group(2), m.group(3)
+
+                ano_bytes_in = zin.read(ano_name)
+                vid_bytes, vid_stats = anohosp_to_vidhosp_lines_smr(finess=finess, ano_bytes=ano_bytes_in)
+
+                report_lines.append(
+                    f"ANO {base}: vidhosp_produced={vid_stats['vidhosp_produced']} "
+                    f"(prepared={vid_stats['prepared_nonempty_lines']}, skipped={vid_stats['skipped_total']}) "
+                    f"parse_errors_cle00={vid_stats['parse_errors_cle00']}"
+                )
+                report_lines.append(
+                    f"  Pré-filtrage SMR: raw={vid_stats['raw_total_lines']} "
+                    f"filtered_empty={vid_stats.get('filtered_empty', 0)} "
+                    f"filtered_too_short={vid_stats.get('filtered_too_short', 0)} "
+                    f"filtered_first_char={vid_stats.get('filtered_first_char', 0)}"
+                )
+                if vid_stats["formats_seen"]:
+                    report_lines.append(f"  Formats ANO vus: {vid_stats['formats_seen']}")
+                if vid_stats["skipped_format_top10"]:
+                    report_lines.append(f"  Formats ignorés: {vid_stats['skipped_format_top10']}")
+
+                if vid_stats["vidhosp_produced"] + vid_stats["skipped_total"] != vid_stats["anohosp_nonempty_seen"]:
+                    raise ValueError(
+                        f"Incohérence ANO/VIDHOSP sur {base}: "
+                        f"produced({vid_stats['vidhosp_produced']}) + skipped({vid_stats['skipped_total']}) "
+                        f"!= nonempty_seen({vid_stats['anohosp_nonempty_seen']})."
+                    )
+
+                prefix = ano_name[:-len(base)]
+                vid_name = prefix + f"{finess}.{yyyy}.{mm}.vidhosp.txt"
+                zout.writestr(vid_name, vid_bytes)
+
+            for med_name in med_files:
+                base = med_name.split("/")[-1]
+                med_bytes_in = zin.read(med_name)
+                med_corr_bytes, med_stats = process_mo_med_smr(med_bytes_in, target_length=med_target_length)
+
+                report_lines.append(
+                    f"MED {base}: lines_in={med_stats['input_line_count']} "
+                    f"lines_out={med_stats['output_line_count']} target_length={med_stats['target_length']}"
+                )
+
+                prefix = med_name[:-len(base)]
+                corrected_name = prefix + base.replace(".med", "-corrige.med")
+                zout.writestr(corrected_name, med_corr_bytes)
+
+            report_txt = "\n".join(report_lines) + "\n"
+            zout.writestr("PMSIPilot_report.txt", safe_encode_singlebyte(report_txt))
+
+        zout_buffer.seek(0)
+        return zout_buffer.getvalue(), "\n".join(report_lines)
+
+
+# ============================================================
+# TRAITEMENT PSY
+# ============================================================
+
+def process_zip_psy(
+    zip_bytes: bytes,
+    zip_filename: str,
+    excel_bytes: bytes,
+    excel_filename: str,
+    rpa_um_start_1based: int = 60,
+    rpa_um_length: int = 4,
+    rps_um_start_1based: int = 100,
+    rps_um_length: int = 4,
+    min_match_rate: float = 1.0,
+):
+    report_lines = []
+
+    zip_meta = parse_zip_name_psy(zip_filename)
+    xls_meta = parse_excel_name_psy(excel_filename)
+
+    if zip_meta:
+        report_lines.append(f"ZIP détecté: domaine=PSY site={zip_meta['site3']} periode={zip_meta['yyyymm']}")
+    else:
+        report_lines.append("ZIP PSY: nom non standard.")
+
+    if xls_meta:
+        report_lines.append(f"EXCEL détecté: domaine=PSY site={xls_meta['site5']} periode={xls_meta['yyyymm']} ext={xls_meta['ext']}")
+    else:
+        report_lines.append("EXCEL PSY: nom non standard.")
+
+    if zip_meta and xls_meta:
+        expected_site5 = site3_to_site5(zip_meta["site3"])
+        if xls_meta["site5"] != expected_site5 or xls_meta["yyyymm"] != zip_meta["yyyymm"]:
+            raise ValueError(
+                f"Incohérence ZIP/EXCEL PSY: ZIP site={zip_meta['site3']} periode={zip_meta['yyyymm']} "
+                f"mais EXCEL site={xls_meta['site5']} periode={xls_meta['yyyymm']} "
+                f"(attendu site5={expected_site5})."
+            )
+
+    um_excel_df = read_um_excel_xlsx_only(excel_bytes, excel_filename)
+    um_df = build_um_mapping_from_df(um_excel_df)
+    mapping = dict(zip(um_df["URM_APHP"].tolist(), um_df["URM_SITE"].tolist()))
+    report_lines.append(f"Mapping UM PSY: {len(mapping)} clés.")
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zin_tmp:
+        names_tmp = zin_tmp.namelist()
+
+    finess_found = extract_finess_from_zip_names(names_tmp, [RPA_RE, RPS_RE, ANOHOSP_PSY_RE])
+    if not finess_found:
+        raise ValueError("Impossible de déterminer le FINESS PSY depuis le ZIP.")
+    if not re.fullmatch(r"\d{9}", finess_found):
+        raise ValueError(f"FINESS PSY invalide détecté: {finess_found}")
+
+    if zip_meta:
+        site5 = site3_to_site5(zip_meta["site3"])
+        site3 = zip_meta["site3"]
+    elif xls_meta:
+        site5 = xls_meta["site5"]
+        site3 = site5[-3:]
+    else:
+        raise ValueError("Impossible de déterminer le site PSY (nom zip/excel non standard).")
+
+    ficum_bytes, ficum_lines_count = build_autorisations_psy_from_excel(um_excel_df, site5=site5, finess=finess_found)
+    ficum_name = f"ficum{site3}.txt"
+
+    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zin:
+        names = zin.namelist()
+        rpa_files = [n for n in names if RPA_RE.match(n.split("/")[-1])]
+        rps_files = [n for n in names if RPS_RE.match(n.split("/")[-1])]
+        anohosp_files = [n for n in names if ANOHOSP_PSY_RE.match(n.split("/")[-1])]
+
+        report_lines.append(f"Fichiers RPA trouvés: {len(rpa_files)}")
+        report_lines.append(f"Fichiers RPS trouvés: {len(rps_files)}")
+        report_lines.append(f"Fichiers ANOHOSP trouvés: {len(anohosp_files)}")
+
+        zout_buffer = io.BytesIO()
+        with zipfile.ZipFile(zout_buffer, "w", compression=zipfile.ZIP_DEFLATED) as zout:
+            for n in names:
+                zout.writestr(n, zin.read(n))
+
+            zout.writestr(ficum_name, ficum_bytes)
+            report_lines.append(f"FICUM généré: {ficum_name} (finess={finess_found}, lignes={ficum_lines_count})")
+
+            for rpa_name in rpa_files:
+                base = rpa_name.split("/")[-1]
+                rpa_bytes_in = zin.read(rpa_name)
+
+                corrected_bytes, stats = process_fixedwidth_um_replacement(
+                    rpa_bytes_in,
+                    mapping,
+                    start_1_based=rpa_um_start_1based,
+                    length=rpa_um_length,
+                )
+
+                report_lines.append(
+                    f"RPA {base}: matched={stats['matched']}/{stats['total_records_checked']} "
+                    f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']} "
+                    f"lines_in={stats['input_line_count']} lines_out={stats['output_line_count']}"
+                )
+                if stats["missing_top10"]:
+                    report_lines.append(f"  Top missing keys: {stats['missing_top10']}")
+
+                if stats["input_line_count"] != stats["output_line_count"]:
+                    raise ValueError(
+                        f"Le nombre de lignes du RPA corrigé diffère de l'entrée pour {base} "
+                        f"({stats['input_line_count']} -> {stats['output_line_count']})."
+                    )
+
+                if stats["total_records_checked"] > 0 and stats["match_rate"] < min_match_rate:
+                    raise ValueError(
+                        f"Taux de match UM insuffisant sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                        f"Le traitement PSY exige 100% de correspondance UM."
+                    )
+
+                prefix = rpa_name[:-len(base)]
+                corrected_name = prefix + base.replace(".rpa.txt", ".rpa-corrige.txt")
+                zout.writestr(corrected_name, corrected_bytes)
+
+            for rps_name in rps_files:
+                base = rps_name.split("/")[-1]
+                rps_bytes_in = zin.read(rps_name)
+
+                corrected_bytes, stats = process_fixedwidth_um_replacement(
+                    rps_bytes_in,
+                    mapping,
+                    start_1_based=rps_um_start_1based,
+                    length=rps_um_length,
+                )
+
+                report_lines.append(
+                    f"RPS {base}: matched={stats['matched']}/{stats['total_records_checked']} "
+                    f"rate={stats['match_rate']:.4f} missing_unique={stats['missing_unique']} "
+                    f"lines_in={stats['input_line_count']} lines_out={stats['output_line_count']}"
+                )
+                if stats["missing_top10"]:
+                    report_lines.append(f"  Top missing keys: {stats['missing_top10']}")
+
+                if stats["input_line_count"] != stats["output_line_count"]:
+                    raise ValueError(
+                        f"Le nombre de lignes du RPS corrigé diffère de l'entrée pour {base} "
+                        f"({stats['input_line_count']} -> {stats['output_line_count']})."
+                    )
+
+                if stats["total_records_checked"] > 0 and stats["match_rate"] < min_match_rate:
+                    raise ValueError(
+                        f"Taux de match UM insuffisant sur {base}: {stats['match_rate']:.4f} < {min_match_rate:.2f}. "
+                        f"Le traitement PSY exige 100% de correspondance UM."
+                    )
+
+                prefix = rps_name[:-len(base)]
+                corrected_name = prefix + base.replace(".rps.txt", ".rps-corrige.txt")
+                zout.writestr(corrected_name, corrected_bytes)
+
+            for anohosp_name in anohosp_files:
+                base = anohosp_name.split("/")[-1]
+                m = ANOHOSP_PSY_RE.match(base)
+                finess, yyyy, mm = m.group(1), m.group(2), m.group(3)
+
+                anohosp_bytes_in = zin.read(anohosp_name)
+                vid_bytes, vid_stats = anohosp_to_vidhosp_lines_psy(finess=finess, ano_bytes=anohosp_bytes_in)
+
+                report_lines.append(
+                    f"ANOHOSP {base}: vidhosp_produced={vid_stats['vidhosp_produced']} "
+                    f"(prepared={vid_stats['prepared_nonempty_lines']}, skipped={vid_stats['skipped_total']}) "
+                    f"parse_errors_cle00={vid_stats['parse_errors_cle00']}"
+                )
+                if vid_stats["formats_seen"]:
+                    report_lines.append(f"  Formats ANO vus: {vid_stats['formats_seen']}")
+                if vid_stats["skipped_format_top10"]:
+                    report_lines.append(f"  Formats ignorés: {vid_stats['skipped_format_top10']}")
+
+                if vid_stats["vidhosp_produced"] + vid_stats["skipped_total"] != vid_stats["anohosp_nonempty_seen"]:
+                    raise ValueError(
+                        f"Incohérence ANOHOSP/VIDHOSP sur {base}: "
+                        f"produced({vid_stats['vidhosp_produced']}) + skipped({vid_stats['skipped_total']}) "
+                        f"!= nonempty_seen({vid_stats['anohosp_nonempty_seen']})."
+                    )
+
+                prefix = anohosp_name[:-len(base)]
+                vid_name = prefix + f"{finess}.{yyyy}.{mm}.vidhosp.txt"
+                zout.writestr(vid_name, vid_bytes)
+
+            report_txt = "\n".join(report_lines) + "\n"
+            zout.writestr("PMSIPilot_report.txt", safe_encode_singlebyte(report_txt))
+
+        zout_buffer.seek(0)
+        return zout_buffer.getvalue(), "\n".join(report_lines)
+
+
+# ============================================================
+# UI STREAMLIT
+# ============================================================
+
+def main():
+    st.title("Formatage PMSIPilot — MCO / SMR / PSY")
+
+    st.markdown(
+        "- Dépose un ZIP d'entrée + un Excel de correspondance UM.\n"
+        "- ⚠️ Seul le format .xlsx est accepté.\n"
+        "- MCO : originaux + RSS corrigé + VIDHOSP + FICUM + fichcomp corrigés + rapport.\n"
+        "- SMR : originaux + RHS corrigé + VIDHOSP + MED corrigé + FICUM + rapport.\n"
+        "- PSY : originaux + RPA corrigé + RPS corrigé + VIDHOSP + FICUM + rapport."
+    )
+
+    mode = st.selectbox("Type", ["Auto", "MCO", "SMR", "PSY"], index=0)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        uploaded_zip = st.file_uploader("ZIP d'entrée", type=["zip"])
+    with col2:
+        uploaded_excel = st.file_uploader("Excel correspondance UM (.xlsx requis)", type=["xls", "xlsx"])
+
+    if uploaded_zip and uploaded_excel:
+        if uploaded_excel.name.lower().endswith(".xls"):
+            st.error(
+                "Fichier Excel au format .xls détecté.\n\n"
+                "Merci de l'ouvrir et de l'enregistrer au format .xlsx."
+            )
+            return
+
+        zip_bytes = uploaded_zip.read()
+        excel_bytes = uploaded_excel.read()
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as z:
+                namelist = z.namelist()
+        except Exception as e:
+            st.error(f"ZIP invalide: {e}")
+            return
+
+        detected = detect_domain(uploaded_zip.name, namelist)
+        chosen = detected if mode == "Auto" else mode
+
+        if chosen not in ("MCO", "SMR", "PSY"):
+            st.warning("Pour le moment seuls MCO, SMR et PSY sont implémentés.")
+            return
+
+        if st.button("Lancer le traitement", type="primary"):
+            try:
+                if chosen == "MCO":
+                    out_zip_bytes, report = process_zip_mco(
+                        zip_bytes=zip_bytes,
+                        zip_filename=uploaded_zip.name,
+                        excel_bytes=excel_bytes,
+                        excel_filename=uploaded_excel.name,
+                        rss_um_start_1based=87,
+                        rss_um_length=4,
+                        min_match_rate=1.0,
+                    )
+                elif chosen == "SMR":
+                    out_zip_bytes, report = process_zip_smr(
+                        zip_bytes=zip_bytes,
+                        zip_filename=uploaded_zip.name,
+                        excel_bytes=excel_bytes,
+                        excel_filename=uploaded_excel.name,
+                        rhs_um_start_1based=130,
+                        rhs_um_length=4,
+                        min_match_rate=1.0,
+                        med_target_length=104,
+                    )
+                else:
+                    out_zip_bytes, report = process_zip_psy(
+                        zip_bytes=zip_bytes,
+                        zip_filename=uploaded_zip.name,
+                        excel_bytes=excel_bytes,
+                        excel_filename=uploaded_excel.name,
+                        rpa_um_start_1based=60,
+                        rpa_um_length=4,
+                        rps_um_start_1based=100,
+                        rps_um_length=4,
+                        min_match_rate=1.0,
+                    )
+            except Exception as e:
+                st.error(str(e))
+                return
+
+            st.success("Traitement terminé.")
+            st.text_area("Rapport", report, height=360)
+
+            out_name = uploaded_zip.name.replace("_in.zip", "_out.zip")
+            st.download_button(
+                label="Télécharger le ZIP formaté",
+                data=out_zip_bytes,
+                file_name=out_name,
+                mime="application/zip",
+            )
+
+    else:
+        st.info("Téléverse un ZIP + un Excel pour démarrer.")
+
+
+if __name__ == "__main__":
+    main()
