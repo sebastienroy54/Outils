@@ -1,9 +1,2 @@
-def ano_format(ano: str) -> str:
-    raw = ss_1based(ano, 17, 19).strip().upper()
-
-    if raw in ("013", "014", "015", "016"):
-        return "V" + raw
-    if raw == "A16":
-        return "VA16"
-
-    return "V" + raw
+021 75010016602A01012005014C
+021 75010016602E01102024012C
