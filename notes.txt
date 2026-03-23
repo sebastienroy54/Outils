@@ -1,3 +1,26 @@
+    for nda, grp in df.groupby("NDA", sort=False):
+        grp = grp.copy()
+
+        # Tri conservant l'ordre du fichier
+        # groupby conserve déjà l'ordre des lignes dans pandas pour chaque groupe
+        # si sort=False est utilisé.
+        types_uniques = grp["Type PMSI"].unique()
+        dp_mask = grp["Type PMSI"].str.strip().str.upper() == "DP"
+
+        dp_list = grp.loc[grp["Type PMSI"].str.strip().str.upper() == "DP", "Code Diagnostic"].tolist()
+        dr_list = grp.loc[grp["Type PMSI"].str.strip().str.upper() == "DR", "Code Diagnostic"].tolist()
+        das_list = grp.loc[grp["Type PMSI"].str.strip().str.upper() == "DAS", "Code Diagnostic"].tolist()
+
+        if len(dp_list) > 1:
+            print("\n⚠️ PROBLEME DP DETECTE")
+            print(f"NDA : {nda}")
+            print("Valeurs uniques Type PMSI :", types_uniques)
+            print("\nLignes concernées :")
+            print(grp[["Type PMSI", "Code Diagnostic"]])
+            raise ValueError(f"Plusieurs DP trouvés pour le NDA {nda}, ce qui ne devrait pas arriver.")
+
+
+
 ⚠️ PROBLEME DP DETECTE
 NDA : 213427620
 Valeurs uniques Type PMSI : ['DAS' 'DP']
