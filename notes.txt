@@ -1,1 +1,333 @@
-NDA	IPP	Début Résumé	Fin Résumé	UM	Code Diagnostic	Type PMSI	Code APH	Rôle	Nom	Prénom
+from pathlib import Path
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
+
+# ============================================
+# PARAMETRES
+# ============================================
+INPUT_CSV = "input.csv"  # <- à remplacer par le nom de ton fichier
+OUTPUT_XLSX = "Résumé_codage_TIM.xlsx"
+
+SITE_MAPPING = {
+    "16": "BRC",
+    "21": "CCH",
+    "41": "HTD",
+}
+
+EXPECTED_COLUMNS = [
+    "NDA",
+    "IPP",
+    "Début Résumé",
+    "Fin Résumé",
+    "UM",
+    "Code Diagnostic",
+    "Type PMSI",
+    "Code APH",
+    "Rôle",
+    "Nom",
+    "Prénom",
+]
+
+
+# ============================================
+# OUTILS
+# ============================================
+def read_csv_robust(file_path: str) -> pd.DataFrame:
+    """
+    Lit un CSV ';' avec plusieurs encodages possibles.
+    """
+    encodings_to_try = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
+
+    last_error = None
+    for enc in encodings_to_try:
+        try:
+            df = pd.read_csv(
+                file_path,
+                sep=";",
+                dtype=str,
+                encoding=enc,
+                keep_default_na=False
+            )
+            return df
+        except Exception as e:
+            last_error = e
+
+    raise ValueError(f"Impossible de lire le fichier CSV. Dernière erreur : {last_error}")
+
+
+def clean_string(value):
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def format_date_column(series: pd.Series) -> pd.Series:
+    """
+    Convertit une colonne texte type 'dd/mm/yyyy hh:mm' vers 'dd/mm/yyyy'.
+    """
+    dt = pd.to_datetime(series, errors="coerce", dayfirst=True)
+    return dt.dt.strftime("%d/%m/%Y").fillna("")
+
+
+def extract_site_and_um(um_value: str):
+    """
+    Extrait le site à partir des 2 premiers caractères de UM.
+    Retire ensuite les 2 premiers caractères de UM.
+    Gère UM comme une string.
+    """
+    um_value = clean_string(um_value)
+    if len(um_value) >= 2:
+        prefix = um_value[:2]
+        site = SITE_MAPPING.get(prefix, "Inconnu")
+        um_without_prefix = um_value[2:]
+        return site, um_without_prefix
+    return "Inconnu", um_value
+
+
+def choose_unique_non_empty(values):
+    """
+    Retourne la première valeur non vide.
+    Utilisé pour les colonnes supposées stables par NDA.
+    """
+    for v in values:
+        v = clean_string(v)
+        if v != "":
+            return v
+    return ""
+
+
+def auto_adjust_columns(ws, extra_padding=2, max_width=60):
+    """
+    Ajuste automatiquement la largeur des colonnes avec padding.
+    """
+    for col_cells in ws.columns:
+        lengths = []
+        col_letter = get_column_letter(col_cells[0].column)
+        for cell in col_cells:
+            cell_value = "" if cell.value is None else str(cell.value)
+            lengths.append(len(cell_value))
+        width = min(max(lengths) + extra_padding, max_width)
+        ws.column_dimensions[col_letter].width = width
+
+
+def style_worksheet(ws):
+    """
+    Mise en forme simple : header + filtre + freeze pane.
+    """
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True)
+    center_alignment = Alignment(vertical="center")
+
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_alignment
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+
+# ============================================
+# TRAITEMENT PRINCIPAL
+# ============================================
+def build_consolidated_sheet(df: pd.DataFrame) -> pd.DataFrame:
+    # Nettoyage noms de colonnes
+    df.columns = [clean_string(c) for c in df.columns]
+
+    missing_cols = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+    if missing_cols:
+        raise ValueError(
+            "Colonnes manquantes dans le CSV : " + ", ".join(missing_cols)
+        )
+
+    # Nettoyage général
+    for col in df.columns:
+        df[col] = df[col].astype(str).map(clean_string)
+
+    # Dates
+    df["Début Résumé"] = format_date_column(df["Début Résumé"])
+    df["Fin Résumé"] = format_date_column(df["Fin Résumé"])
+
+    # Site + UM sans préfixe
+    site_um = df["UM"].apply(extract_site_and_um)
+    df["Site"] = site_um.map(lambda x: x[0])
+    df["UM_sans_prefixe"] = site_um.map(lambda x: x[1])
+
+    # On supprime les colonnes inutiles en sortie consolidée,
+    # mais on les garde dans df temporairement pour le traitement si besoin.
+    grouped_rows = []
+    max_das = 0
+
+    for nda, grp in df.groupby("NDA", sort=False):
+        grp = grp.copy()
+
+        # Tri conservant l'ordre du fichier
+        # groupby conserve déjà l'ordre des lignes dans pandas pour chaque groupe
+        # si sort=False est utilisé.
+
+        dp_list = grp.loc[grp["Type PMSI"] == "DP", "Code Diagnostic"].tolist()
+        dr_list = grp.loc[grp["Type PMSI"] == "DR", "Code Diagnostic"].tolist()
+        das_list = grp.loc[grp["Type PMSI"] == "DAS", "Code Diagnostic"].tolist()
+
+        if len(dp_list) > 1:
+            raise ValueError(f"Plusieurs DP trouvés pour le NDA {nda}, ce qui ne devrait pas arriver.")
+
+        row = {
+            "NDA": nda,
+            "IPP": choose_unique_non_empty(grp["IPP"]),
+            "Début Résumé": choose_unique_non_empty(grp["Début Résumé"]),
+            "Fin Résumé": choose_unique_non_empty(grp["Fin Résumé"]),
+            "Site": choose_unique_non_empty(grp["Site"]),
+            "UM": choose_unique_non_empty(grp["UM_sans_prefixe"]),
+            "Nom": choose_unique_non_empty(grp["Nom"]),
+            "Prénom": choose_unique_non_empty(grp["Prénom"]),
+            "DP": dp_list[0] if dp_list else "",
+            "DR": dr_list[0] if dr_list else "",
+        }
+
+        for i, das in enumerate(das_list, start=1):
+            row[f"DAS_{i}"] = das
+
+        max_das = max(max_das, len(das_list))
+        grouped_rows.append(row)
+
+    dossiers_df = pd.DataFrame(grouped_rows)
+
+    # S'assurer que toutes les colonnes DAS existent
+    for i in range(1, max_das + 1):
+        col = f"DAS_{i}"
+        if col not in dossiers_df.columns:
+            dossiers_df[col] = ""
+
+    base_cols = [
+        "NDA",
+        "IPP",
+        "Début Résumé",
+        "Fin Résumé",
+        "Site",
+        "UM",
+        "Nom",
+        "Prénom",
+        "DP",
+        "DR",
+    ]
+    das_cols = [f"DAS_{i}" for i in range(1, max_das + 1)]
+
+    dossiers_df = dossiers_df.reindex(columns=base_cols + das_cols)
+    return dossiers_df
+
+
+def build_technician_summary(dossiers_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Synthèse par technicien (Nom + Prénom) :
+    - total dossiers
+    - nb dossiers par UM
+    - % UM sur total du technicien
+    - % contribution globale sur l'UM
+    """
+    summary_base = (
+        dossiers_df.groupby(["Nom", "Prénom"], dropna=False)
+        .size()
+        .reset_index(name="Total_dossiers")
+    )
+
+    # Tableau nb dossiers par UM et technicien
+    counts_um = (
+        dossiers_df.groupby(["Nom", "Prénom", "UM"], dropna=False)
+        .size()
+        .reset_index(name="nb")
+    )
+
+    pivot_counts = counts_um.pivot_table(
+        index=["Nom", "Prénom"],
+        columns="UM",
+        values="nb",
+        fill_value=0
+    )
+
+    # Total par UM tous techniciens confondus
+    total_par_um = dossiers_df.groupby("UM").size().to_dict()
+
+    # On construit le tableau final
+    result = summary_base.set_index(["Nom", "Prénom"]).copy()
+
+    # Ajout colonnes dynamiques par UM
+    for um in pivot_counts.columns:
+        count_col = f"Nb_{um}"
+        pct_tech_col = f"%{um}_tech"
+        pct_global_col = f"%{um}_global"
+
+        result[count_col] = pivot_counts[um]
+
+        # % de cette UM sur le total du technicien
+        result[pct_tech_col] = (
+            result[count_col] / result["Total_dossiers"]
+        ).fillna(0)
+
+        # % de contribution du technicien sur le total global de cette UM
+        total_um = total_par_um.get(um, 0)
+        if total_um == 0:
+            result[pct_global_col] = 0
+        else:
+            result[pct_global_col] = result[count_col] / total_um
+
+    result = result.reset_index()
+
+    # Tri lisible
+    fixed_cols = ["Nom", "Prénom", "Total_dossiers"]
+    dynamic_cols = [c for c in result.columns if c not in fixed_cols]
+    result = result[fixed_cols + dynamic_cols]
+
+    return result
+
+
+def export_to_excel(dossiers_df: pd.DataFrame, synthese_df: pd.DataFrame, output_path: str):
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        dossiers_df.to_excel(writer, sheet_name="Dossiers", index=False)
+        synthese_df.to_excel(writer, sheet_name="Synthese_Technicien", index=False)
+
+    # Mise en forme avec openpyxl
+    wb = load_workbook(output_path)
+
+    # Feuille Dossiers
+    ws1 = wb["Dossiers"]
+    style_worksheet(ws1)
+    auto_adjust_columns(ws1, extra_padding=2)
+
+    # Feuille Synthese
+    ws2 = wb["Synthese_Technicien"]
+    style_worksheet(ws2)
+    auto_adjust_columns(ws2, extra_padding=2)
+
+    # Formater les colonnes % en pourcentage
+    for ws in [ws2]:
+        for col in range(1, ws.max_column + 1):
+            header = ws.cell(row=1, column=col).value
+            if header and str(header).startswith("%"):
+                for row in range(2, ws.max_row + 1):
+                    ws.cell(row=row, column=col).number_format = "0.0%"
+
+    wb.save(output_path)
+
+
+def main():
+    input_path = Path(INPUT_CSV)
+    if not input_path.exists():
+        raise FileNotFoundError(
+            f"Fichier introuvable : {input_path.resolve()}\n"
+            f"Modifie la variable INPUT_CSV dans le script."
+        )
+
+    df = read_csv_robust(str(input_path))
+    dossiers_df = build_consolidated_sheet(df)
+    synthese_df = build_technician_summary(dossiers_df)
+    export_to_excel(dossiers_df, synthese_df, OUTPUT_XLSX)
+
+    print(f"Fichier généré : {Path(OUTPUT_XLSX).resolve()}")
+
+
+if __name__ == "__main__":
+    main()
