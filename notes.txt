@@ -1,30 +1,374 @@
-18/03/2026 16:14	20/03/2026 11:19	21010	D648	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	Z993	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	Z955	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	I255	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	I10	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	Z8670	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	R418	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	Z741	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	J188	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	I252	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	Z998	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	E8758	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	R060	DAS
-18/03/2026 16:14	20/03/2026 11:19	21010	I5009	DP
+from pathlib import Path
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
 
 
+# ============================================================
+# PARAMETRES
+# ============================================================
+INPUT_CSV = "input.csv"   # <-- à remplacer par le nom du fichier source
+OUTPUT_XLSX = "Résumé_codage_TIM.xlsx"
 
-17/03/2026 09:46	18/03/2026 16:14	21540	I10	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	E8758	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	Z998	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	I252	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	J188	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	Z741	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	R060	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	R418	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	Z8670	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	I255	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	Z955	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	Z993	DAS
-17/03/2026 09:46	18/03/2026 16:14	21540	I5009	DP
+SITE_MAPPING = {
+    "16": "BRC",
+    "21": "CCH",
+    "41": "HTD",
+}
+
+EXPECTED_COLUMNS = [
+    "NDA",
+    "IPP",
+    "Début Résumé",
+    "Fin Résumé",
+    "UM",
+    "Code Diagnostic",
+    "Type PMSI",
+    "Code APH",
+    "Rôle",
+    "Nom",
+    "Prénom",
+]
+
+
+# ============================================================
+# OUTILS
+# ============================================================
+def read_csv_robust(file_path: str) -> pd.DataFrame:
+    """
+    Lit un CSV séparé par ';' avec plusieurs encodages possibles.
+    """
+    encodings_to_try = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
+
+    last_error = None
+    for enc in encodings_to_try:
+        try:
+            df = pd.read_csv(
+                file_path,
+                sep=";",
+                dtype=str,
+                encoding=enc,
+                keep_default_na=False
+            )
+            return df
+        except Exception as e:
+            last_error = e
+
+    raise ValueError(f"Impossible de lire le fichier CSV. Dernière erreur : {last_error}")
+
+
+def clean_string(value):
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def choose_unique_non_empty(values):
+    """
+    Retourne la première valeur non vide d'une série/list.
+    """
+    for v in values:
+        v = clean_string(v)
+        if v != "":
+            return v
+    return ""
+
+
+def extract_site_and_um(um_value: str):
+    """
+    Extrait le site à partir des 2 premiers caractères de UM,
+    puis retire ces 2 caractères de la valeur UM conservée.
+    UM est toujours traité comme une string.
+    """
+    um_value = clean_string(um_value)
+    if len(um_value) >= 2:
+        prefix = um_value[:2]
+        site = SITE_MAPPING.get(prefix, "Inconnu")
+        um_without_prefix = um_value[2:]
+        return site, um_without_prefix
+    return "Inconnu", um_value
+
+
+def auto_adjust_columns(ws, extra_padding=2, max_width=60):
+    """
+    Ajuste automatiquement la largeur des colonnes avec padding.
+    """
+    for col_cells in ws.columns:
+        lengths = []
+        col_letter = get_column_letter(col_cells[0].column)
+
+        for cell in col_cells:
+            cell_value = "" if cell.value is None else str(cell.value)
+            lengths.append(len(cell_value))
+
+        width = min(max(lengths) + extra_padding, max_width)
+        ws.column_dimensions[col_letter].width = width
+
+
+def style_worksheet(ws):
+    """
+    Mise en forme simple : en-tête, filtre, freeze pane.
+    """
+    header_fill = PatternFill("solid", fgColor="1F4E78")
+    header_font = Font(color="FFFFFF", bold=True)
+    center_alignment = Alignment(vertical="center")
+
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_alignment
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+
+# ============================================================
+# FEUILLE 1 : CONSOLIDATION PAR RUM
+# ============================================================
+def build_consolidated_sheet(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    # Nettoyage noms de colonnes
+    df.columns = [clean_string(c) for c in df.columns]
+
+    missing_cols = [c for c in EXPECTED_COLUMNS if c not in df.columns]
+    if missing_cols:
+        raise ValueError(
+            "Colonnes manquantes dans le CSV : " + ", ".join(missing_cols)
+        )
+
+    # Nettoyage général
+    for col in df.columns:
+        df[col] = df[col].astype(str).map(clean_string)
+
+    # Normalisation des colonnes utilisées
+    df["Type PMSI"] = df["Type PMSI"].astype(str).str.strip().str.upper()
+    df["Code Diagnostic"] = df["Code Diagnostic"].astype(str).str.strip().str.upper()
+    df["UM"] = df["UM"].astype(str).map(clean_string)
+
+    # Dates techniques
+    df["Début Résumé DT"] = pd.to_datetime(df["Début Résumé"], errors="coerce", dayfirst=True)
+    df["Fin Résumé DT"] = pd.to_datetime(df["Fin Résumé"], errors="coerce", dayfirst=True)
+
+    # Dates affichées
+    df["Début Résumé"] = df["Début Résumé DT"].dt.strftime("%d/%m/%Y").fillna("")
+    df["Fin Résumé"] = df["Fin Résumé DT"].dt.strftime("%d/%m/%Y").fillna("")
+
+    # Site + UM sans préfixe
+    site_um = df["UM"].apply(extract_site_and_um)
+    df["Site"] = site_um.map(lambda x: x[0])
+    df["UM_sans_prefixe"] = site_um.map(lambda x: x[1])
+
+    # Clé RUM :
+    # NDA + Début Résumé + Fin Résumé + UM
+    # On garde aussi IPP dans les colonnes de sortie, mais pas dans la clé.
+    rum_group_cols = ["NDA", "Début Résumé", "Fin Résumé", "UM"]
+
+    grouped_rows = []
+    max_das = 0
+
+    for rum_key, grp in df.groupby(rum_group_cols, sort=False, dropna=False):
+        grp = grp.copy()
+
+        # Déduplication d'éventuelles lignes strictement identiques
+        grp = grp.drop_duplicates(subset=["Type PMSI", "Code Diagnostic"], keep="first")
+
+        dp_list = grp.loc[grp["Type PMSI"] == "DP", "Code Diagnostic"].drop_duplicates().tolist()
+        dr_list = grp.loc[grp["Type PMSI"] == "DR", "Code Diagnostic"].drop_duplicates().tolist()
+        das_list = grp.loc[grp["Type PMSI"] == "DAS", "Code Diagnostic"].drop_duplicates().tolist()
+
+        nda_value, debut_value, fin_value, um_original = rum_key
+
+        if len(dp_list) > 1:
+            print("\n⚠️ PROBLEME DP DETECTE")
+            print(f"Clé RUM : {rum_key}")
+            print("DP trouvés :", dp_list)
+            print(grp[grp["Type PMSI"] == "DP"][[
+                "NDA", "Début Résumé", "Fin Résumé", "UM", "Type PMSI", "Code Diagnostic"
+            ]])
+            raise ValueError(
+                f"Plusieurs DP différents trouvés pour le RUM {rum_key}, ce qui ne devrait pas arriver."
+            )
+
+        if len(dr_list) > 1:
+            print("\n⚠️ PROBLEME DR DETECTE")
+            print(f"Clé RUM : {rum_key}")
+            print("DR trouvés :", dr_list)
+            print(grp[grp["Type PMSI"] == "DR"][[
+                "NDA", "Début Résumé", "Fin Résumé", "UM", "Type PMSI", "Code Diagnostic"
+            ]])
+            raise ValueError(
+                f"Plusieurs DR différents trouvés pour le RUM {rum_key}, ce qui ne devrait pas arriver."
+            )
+
+        row = {
+            "NDA": nda_value,
+            "IPP": choose_unique_non_empty(grp["IPP"]),
+            "Début Résumé": debut_value,
+            "Fin Résumé": fin_value,
+            "Site": choose_unique_non_empty(grp["Site"]),
+            "UM": choose_unique_non_empty(grp["UM_sans_prefixe"]),
+            "Nom": choose_unique_non_empty(grp["Nom"]),
+            "Prénom": choose_unique_non_empty(grp["Prénom"]),
+            "DP": dp_list[0] if dp_list else "",
+            "DR": dr_list[0] if dr_list else "",
+        }
+
+        for i, das in enumerate(das_list, start=1):
+            row[f"DAS_{i}"] = das
+
+        max_das = max(max_das, len(das_list))
+        grouped_rows.append(row)
+
+    rum_df = pd.DataFrame(grouped_rows)
+
+    # Créer toutes les colonnes DAS jusqu'au max observé
+    for i in range(1, max_das + 1):
+        col = f"DAS_{i}"
+        if col not in rum_df.columns:
+            rum_df[col] = ""
+
+    base_cols = [
+        "NDA",
+        "IPP",
+        "Début Résumé",
+        "Fin Résumé",
+        "Site",
+        "UM",
+        "Nom",
+        "Prénom",
+        "DP",
+        "DR",
+    ]
+    das_cols = [f"DAS_{i}" for i in range(1, max_das + 1)]
+
+    rum_df = rum_df.reindex(columns=base_cols + das_cols)
+
+    # Tri optionnel pour la lisibilité
+    rum_df = rum_df.sort_values(
+        by=["Nom", "Prénom", "NDA", "Début Résumé", "Fin Résumé", "UM"],
+        kind="stable"
+    ).reset_index(drop=True)
+
+    return rum_df
+
+
+# ============================================================
+# FEUILLE 2 : SYNTHESE PAR TECHNICIEN
+# ============================================================
+def build_technician_summary(rum_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Synthèse par technicien (Nom + Prénom) :
+    - Nb_RUM_codes
+    - Nb_<UM>
+    - %<UM>_tech : part de cette UM sur le total du technicien
+    - %<UM>_global : part de ce technicien dans le total global de cette UM
+    """
+    summary_base = (
+        rum_df.groupby(["Nom", "Prénom"], dropna=False)
+        .size()
+        .reset_index(name="Nb_RUM_codes")
+    )
+
+    counts_um = (
+        rum_df.groupby(["Nom", "Prénom", "UM"], dropna=False)
+        .size()
+        .reset_index(name="nb")
+    )
+
+    pivot_counts = counts_um.pivot_table(
+        index=["Nom", "Prénom"],
+        columns="UM",
+        values="nb",
+        fill_value=0
+    )
+
+    total_par_um = rum_df.groupby("UM").size().to_dict()
+
+    result = summary_base.set_index(["Nom", "Prénom"]).copy()
+
+    # Colonnes dynamiques par UM
+    for um in pivot_counts.columns:
+        um_str = str(um)
+        count_col = f"Nb_{um_str}"
+        pct_tech_col = f"%{um_str}_tech"
+        pct_global_col = f"%{um_str}_global"
+
+        result[count_col] = pivot_counts[um]
+        result[pct_tech_col] = (result[count_col] / result["Nb_RUM_codes"]).fillna(0)
+
+        total_um = total_par_um.get(um, 0)
+        if total_um == 0:
+            result[pct_global_col] = 0
+        else:
+            result[pct_global_col] = result[count_col] / total_um
+
+    result = result.reset_index()
+
+    fixed_cols = ["Nom", "Prénom", "Nb_RUM_codes"]
+    dynamic_cols = [c for c in result.columns if c not in fixed_cols]
+    result = result[fixed_cols + dynamic_cols]
+
+    # Tri de sortie
+    result = result.sort_values(
+        by=["Nom", "Prénom"],
+        kind="stable"
+    ).reset_index(drop=True)
+
+    return result
+
+
+# ============================================================
+# EXPORT EXCEL
+# ============================================================
+def export_to_excel(rum_df: pd.DataFrame, synthese_df: pd.DataFrame, output_path: str):
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        rum_df.to_excel(writer, sheet_name="Dossiers", index=False)
+        synthese_df.to_excel(writer, sheet_name="Synthese_Technicien", index=False)
+
+    wb = load_workbook(output_path)
+
+    # Feuille Dossiers
+    ws1 = wb["Dossiers"]
+    style_worksheet(ws1)
+    auto_adjust_columns(ws1, extra_padding=2)
+
+    # Feuille Synthese
+    ws2 = wb["Synthese_Technicien"]
+    style_worksheet(ws2)
+    auto_adjust_columns(ws2, extra_padding=2)
+
+    # Formater les colonnes % en pourcentage
+    for col in range(1, ws2.max_column + 1):
+        header = ws2.cell(row=1, column=col).value
+        if header and str(header).startswith("%"):
+            for row in range(2, ws2.max_row + 1):
+                ws2.cell(row=row, column=col).number_format = "0.0%"
+
+    wb.save(output_path)
+
+
+# ============================================================
+# MAIN
+# ============================================================
+def main():
+    input_path = Path(INPUT_CSV)
+
+    if not input_path.exists():
+        raise FileNotFoundError(
+            f"Fichier introuvable : {input_path.resolve()}\n"
+            f"Modifie la variable INPUT_CSV dans le script."
+        )
+
+    df = read_csv_robust(str(input_path))
+    rum_df = build_consolidated_sheet(df)
+    synthese_df = build_technician_summary(rum_df)
+    export_to_excel(rum_df, synthese_df, OUTPUT_XLSX)
+
+    print(f"Fichier généré : {Path(OUTPUT_XLSX).resolve()}")
+    print(f"Nombre de RUM exportés : {len(rum_df)}")
+
+
+if __name__ == "__main__":
+    main()
