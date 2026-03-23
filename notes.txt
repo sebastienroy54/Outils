@@ -1,598 +1,121 @@
-from pathlib import Path
-import re
-import pandas as pd
-from openpyxl import load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
-
-
-# ============================================================
-# PARAMETRES
-# ============================================================
-WORKDIR = Path(".")
-OUTPUT_XLSX_PREFIX = "Résumé_codage_TIM"
-OUTPUT_CONCAT_PREFIX = "Diagnostics concaténés"
-
-SITE_MAPPING = {
-    "016": "BRC",
-    "021": "CCH",
-    "041": "HTD",
-}
-
-SITE_NAMES = {"BRC", "CCH", "HTD"}
-
-EXPECTED_COLUMNS = [
-    "NDA",
-    "IPP",
-    "Début Résumé",
-    "Fin Résumé",
-    "UM",
-    "Code Diagnostic",
-    "Type PMSI",
-    "Code APH",
-    "Rôle",
-    "Nom",
-    "Prénom",
-]
-
-DEBUG_UM = True
-DEBUG_UM_MAX_LINES = 50
-
-
-# ============================================================
-# OUTILS GENERAUX
-# ============================================================
-def clean_string(value):
-    if pd.isna(value):
-        return ""
-    return str(value).strip()
-
-
-def choose_unique_non_empty(values):
-    for v in values:
-        v = clean_string(v)
-        if v != "":
-            return v
-    return ""
-
-
-def auto_adjust_columns(ws, extra_padding=2, max_width=60):
-    for col_cells in ws.columns:
-        lengths = []
-        col_letter = get_column_letter(col_cells[0].column)
-
-        for cell in col_cells:
-            cell_value = "" if cell.value is None else str(cell.value)
-            lengths.append(len(cell_value))
-
-        width = min(max(lengths) + extra_padding, max_width)
-        ws.column_dimensions[col_letter].width = width
-
-
-def style_worksheet(ws):
-    header_fill = PatternFill("solid", fgColor="1F4E78")
-    header_font = Font(color="FFFFFF", bold=True)
-    center_alignment = Alignment(vertical="center")
-
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = center_alignment
-
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-
-
-# ============================================================
-# DETECTION FICHIERS / DATES / SITE
-# ============================================================
-def extract_dates_from_filename(filename: str):
-    """
-    Cherche en priorité des dates au format dd_mm_yyyy dans le nom du fichier.
-    Retourne une liste de tuples (day, month, year).
-    """
-    pattern_full = r"(\d{2})_(\d{2})_(\d{4})"
-    matches = re.findall(pattern_full, filename)
-
-    dates = []
-    for d, m, y in matches:
-        try:
-            day = int(d)
-            month = int(m)
-            year = int(y)
-            if 1 <= day <= 31 and 1 <= month <= 12:
-                dates.append((day, month, year))
-        except Exception:
-            pass
-
-    return dates
-
-
-def extract_site_from_filename(filename: str):
-    upper_name = filename.upper()
-    for site in SITE_NAMES:
-        if site in upper_name:
-            return site
-    return None
-
-
-def detect_month_year_from_files(files_info):
-    """
-    On suppose que le dossier contient un seul mois.
-    On récupère le mois/année à partir des dates trouvées dans les noms.
-    """
-    months_years = set()
-
-    for info in files_info:
-        for _, month, year in info["dates"]:
-            months_years.add((month, year))
-
-    print(f"[DEBUG] Couples mois/année détectés dans les noms : {sorted(months_years)}")
-
-    if len(months_years) == 0:
-        raise ValueError("Aucune date dd_mm_yyyy détectée dans les noms de fichiers.")
-    if len(months_years) > 1:
-        raise ValueError(
-            f"Plusieurs mois/années détectés dans le dossier : {sorted(months_years)}. "
-            "Le script attend un seul mois à la fois."
-        )
-
-    month, year = next(iter(months_years))
-    return month, year
-
-
-def find_csv_files(workdir: Path):
-    """
-    Prend tous les CSV du dossier sauf les concaténés déjà générés.
-    """
-    csv_files = sorted(workdir.glob("*.csv"))
-
-    selected = []
-    for f in csv_files:
-        name_upper = f.name.upper()
-        if "DIAGNOSTICS CONCATÉNÉS" in name_upper or "DIAGNOSTICS CONCATENES" in name_upper:
-            print(f"[INFO] Fichier concaténé ignoré : {f.name}")
-            continue
-        selected.append(f)
-
-    if not selected:
-        raise FileNotFoundError("Aucun fichier CSV source trouvé dans le dossier.")
-
-    print(f"[INFO] {len(selected)} fichier(s) CSV source détecté(s) :")
-    for f in selected:
-        print(f"   - {f.name}")
-
-    return selected
-
-
-# ============================================================
-# LECTURE CSV
-# ============================================================
-def read_csv_robust(file_path: str) -> pd.DataFrame:
-    encodings_to_try = ["utf-8-sig", "utf-8", "cp1252", "latin1"]
-
-    last_error = None
-    for enc in encodings_to_try:
-        try:
-            df = pd.read_csv(
-                file_path,
-                sep=";",
-                dtype=str,
-                encoding=enc,
-                keep_default_na=False
-            )
-            print(f"[INFO] Lecture OK : {file_path} (encodage={enc})")
-            return df
-        except Exception as e:
-            last_error = e
-
-    raise ValueError(f"Impossible de lire le fichier CSV {file_path}. Dernière erreur : {last_error}")
-
-
-# ============================================================
-# UM / SITE
-# ============================================================
-def normalize_um_raw(um_value: str) -> str:
-    """
-    Nettoie la valeur brute de UM sans perdre les zéros à gauche.
-    Exemples :
-    - '021010 '  -> '021010'
-    - '021010S'  -> '021010S'
-    - '021540'   -> '021540'
-    """
-    um = clean_string(um_value).upper()
-    um = um.replace(" ", "")
-
-    if um.endswith(".0"):
-        um = um[:-2]
-
-    return um
-
-
-def extract_site_and_um(um_value: str):
-    """
-    Format attendu si préfixé :
-    - 021010  -> site=CCH, UM=010
-    - 021010S -> site=CCH, UM=010S
-    - 021540  -> site=CCH, UM=540
-
-    Tu as indiqué avoir corrigé avec :
-    - len < 4
-    - prefix [:3]
-    - rest [3:]
-    """
-    um_raw = normalize_um_raw(um_value)
-
-    if len(um_raw) < 4:
-        return "Inconnu", um_raw
-
-    prefix = um_raw[:3]
-    rest = um_raw[3:]
-
-    if prefix in SITE_MAPPING:
-        site = SITE_MAPPING[prefix]
-        return site, rest
-
-    return "Inconnu", um_raw
-
-
-def debug_um_transformation(df: pd.DataFrame):
-    print("\n========== DEBUG UM ==========")
-
-    unique_um = pd.Series(df["UM"].astype(str).map(clean_string).unique())
-    unique_um = unique_um[unique_um != ""]
-
-    if unique_um.empty:
-        print("Aucune valeur UM trouvée.")
-        print("================================\n")
-        return
-
-    print(f"Nombre de valeurs UM uniques : {len(unique_um)}")
-    print("Aperçu avant / après transformation :\n")
-
-    shown = 0
-    for raw in unique_um:
-        normalized = normalize_um_raw(raw)
-        site, um_out = extract_site_and_um(raw)
-        print(
-            f"UM brut='{raw}' | normalisé='{normalized}' | site='{site}' | UM final='{um_out}'"
-        )
-        shown += 1
-        if shown >= DEBUG_UM_MAX_LINES:
-            remaining = len(unique_um) - shown
-            if remaining > 0:
-                print(f"... ({remaining} autres valeurs non affichées)")
-            break
-
-    print("================================\n")
-
-
-# ============================================================
-# CONCATENATION
-# ============================================================
-def load_and_concat_csvs(workdir: Path):
-    csv_files = find_csv_files(workdir)
-
-    files_info = []
-    dfs = []
-
-    for f in csv_files:
-        dates = extract_dates_from_filename(f.name)
-        site = extract_site_from_filename(f.name)
-
-        print(f"\n[DEBUG] Analyse nom fichier : {f.name}")
-        print(f"        Dates détectées : {dates if dates else 'Aucune'}")
-        print(f"        Site détecté   : {site if site else 'Aucun'}")
-
-        if len(dates) < 2:
-            raise ValueError(
-                f"Impossible de détecter 2 dates au format dd_mm_yyyy dans le nom : {f.name}"
-            )
-
-        files_info.append({
-            "path": f,
-            "dates": dates,
-            "site": site,
-        })
-
-        df = read_csv_robust(str(f))
-        df["__source_file__"] = f.name
-        dfs.append(df)
-
-    month, year = detect_month_year_from_files(files_info)
-
-    detected_sites = sorted({info["site"] for info in files_info if info["site"]})
-    print(f"[DEBUG] Sites détectés dans les noms : {detected_sites if detected_sites else 'Aucun'}")
-
-    if len(detected_sites) > 1:
-        print("[ATTENTION] Plusieurs sites détectés dans les noms de fichiers.")
-        print("           Le script continue, mais ce n'est pas le cas attendu.")
-
-    df_concat = pd.concat(dfs, ignore_index=True)
-
-    print(f"[INFO] Nombre de lignes avant déduplication brute : {len(df_concat)}")
-
-    # Déduplication brute à la ligne diagnostic
-    dedup_subset = [
-        "NDA",
-        "IPP",
-        "Début Résumé",
-        "Fin Résumé",
-        "UM",
-        "Code Diagnostic",
-        "Type PMSI",
-        "Nom",
-        "Prénom",
-    ]
-
-    available_subset = [c for c in dedup_subset if c in df_concat.columns]
-    before = len(df_concat)
-    df_concat = df_concat.drop_duplicates(subset=available_subset, keep="first").copy()
-    after = len(df_concat)
-
-    print(f"[INFO] Nombre de lignes après déduplication brute : {after}")
-    print(f"[INFO] Nombre de doublons supprimés : {before - after}")
-
-    return df_concat, month, year
-
-
-# ============================================================
-# FEUILLE 1 : CONSOLIDATION PAR RUM
-# ============================================================
-def build_consolidated_sheet(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-
-    df.columns = [clean_string(c) for c in df.columns]
-
-    missing_cols = [c for c in EXPECTED_COLUMNS if c not in df.columns]
-    if missing_cols:
-        raise ValueError(
-            "Colonnes manquantes dans le CSV : " + ", ".join(missing_cols)
-        )
-
-    for col in df.columns:
-        df[col] = df[col].astype(str).map(clean_string)
-
-    df["Type PMSI"] = df["Type PMSI"].astype(str).str.strip().str.upper()
-    df["Code Diagnostic"] = df["Code Diagnostic"].astype(str).str.strip().str.upper()
-    df["UM"] = df["UM"].astype(str).map(clean_string)
-
-    if DEBUG_UM:
-        debug_um_transformation(df)
-
-    df["Début Résumé DT"] = pd.to_datetime(df["Début Résumé"], errors="coerce", dayfirst=True)
-    df["Fin Résumé DT"] = pd.to_datetime(df["Fin Résumé"], errors="coerce", dayfirst=True)
-
-    nb_bad_start = df["Début Résumé DT"].isna().sum()
-    nb_bad_end = df["Fin Résumé DT"].isna().sum()
-    print(f"[DEBUG] Dates Début Résumé invalides : {nb_bad_start}")
-    print(f"[DEBUG] Dates Fin Résumé invalides   : {nb_bad_end}")
-
-    df["Début Résumé"] = df["Début Résumé DT"].dt.strftime("%d/%m/%Y").fillna("")
-    df["Fin Résumé"] = df["Fin Résumé DT"].dt.strftime("%d/%m/%Y").fillna("")
-
-    site_um = df["UM"].apply(extract_site_and_um)
-    df["Site"] = site_um.map(lambda x: x[0])
-    df["UM_finale"] = site_um.map(lambda x: x[1])
-
-    print("\n[DEBUG] Répartition Site détecté dans les données :")
-    print(df["Site"].value_counts(dropna=False).to_string())
-
-    rum_group_cols = ["NDA", "Début Résumé", "Fin Résumé", "UM"]
-
-    grouped_rows = []
-    max_das = 0
-
-    print(f"\n[INFO] Début consolidation par RUM sur {len(df)} ligne(s) diagnostic...")
-    grouped = df.groupby(rum_group_cols, sort=False, dropna=False)
-    print(f"[INFO] Nombre de groupes RUM détectés : {grouped.ngroups}")
-
-    for rum_key, grp in grouped:
-        grp = grp.copy()
-        grp = grp.drop_duplicates(subset=["Type PMSI", "Code Diagnostic"], keep="first")
-
-        dp_list = grp.loc[grp["Type PMSI"] == "DP", "Code Diagnostic"].drop_duplicates().tolist()
-        dr_list = grp.loc[grp["Type PMSI"] == "DR", "Code Diagnostic"].drop_duplicates().tolist()
-        das_list = grp.loc[grp["Type PMSI"] == "DAS", "Code Diagnostic"].drop_duplicates().tolist()
-
-        nda_value, debut_value, fin_value, um_original = rum_key
-
-        if len(dp_list) > 1:
-            print("\n⚠️ PROBLEME DP DETECTE")
-            print(f"Clé RUM : {rum_key}")
-            print("DP trouvés :", dp_list)
-            print(grp[grp["Type PMSI"] == "DP"][[
-                "NDA", "Début Résumé", "Fin Résumé", "UM", "Type PMSI", "Code Diagnostic", "__source_file__"
-            ]])
-            raise ValueError(
-                f"Plusieurs DP différents trouvés pour le RUM {rum_key}, ce qui ne devrait pas arriver."
-            )
-
-        if len(dr_list) > 1:
-            print("\n⚠️ PROBLEME DR DETECTE")
-            print(f"Clé RUM : {rum_key}")
-            print("DR trouvés :", dr_list)
-            print(grp[grp["Type PMSI"] == "DR"][[
-                "NDA", "Début Résumé", "Fin Résumé", "UM", "Type PMSI", "Code Diagnostic", "__source_file__"
-            ]])
-            raise ValueError(
-                f"Plusieurs DR différents trouvés pour le RUM {rum_key}, ce qui ne devrait pas arriver."
-            )
-
-        row = {
-            "NDA": nda_value,
-            "IPP": choose_unique_non_empty(grp["IPP"]),
-            "Début Résumé": debut_value,
-            "Fin Résumé": fin_value,
-            "Site": choose_unique_non_empty(grp["Site"]),
-            "UM": choose_unique_non_empty(grp["UM_finale"]),
-            "Nom": choose_unique_non_empty(grp["Nom"]),
-            "Prénom": choose_unique_non_empty(grp["Prénom"]),
-            "DP": dp_list[0] if dp_list else "",
-            "DR": dr_list[0] if dr_list else "",
-        }
-
-        for i, das in enumerate(das_list, start=1):
-            row[f"DAS_{i}"] = das
-
-        max_das = max(max_das, len(das_list))
-        grouped_rows.append(row)
-
-    rum_df = pd.DataFrame(grouped_rows)
-
-    for i in range(1, max_das + 1):
-        col = f"DAS_{i}"
-        if col not in rum_df.columns:
-            rum_df[col] = ""
-
-    base_cols = [
-        "NDA",
-        "IPP",
-        "Début Résumé",
-        "Fin Résumé",
-        "Site",
-        "UM",
-        "Nom",
-        "Prénom",
-        "DP",
-        "DR",
-    ]
-    das_cols = [f"DAS_{i}" for i in range(1, max_das + 1)]
-
-    rum_df = rum_df.reindex(columns=base_cols + das_cols)
-
-    rum_df = rum_df.sort_values(
-        by=["Nom", "Prénom", "Site", "UM", "NDA", "Début Résumé", "Fin Résumé"],
-        kind="stable"
-    ).reset_index(drop=True)
-
-    print(f"[INFO] Nombre final de RUM consolidés : {len(rum_df)}")
-    return rum_df
-
-
-# ============================================================
-# FEUILLE 2 : SYNTHESE LONGUE
-# ============================================================
-def build_technician_summary_long(rum_df: pd.DataFrame) -> pd.DataFrame:
-    total_tech = (
-        rum_df.groupby(["Nom", "Prénom"], dropna=False)
-        .size()
-        .reset_index(name="Total_RUM_codes")
-    )
-
-    tech_um = (
-        rum_df.groupby(["Nom", "Prénom", "Site", "UM"], dropna=False)
-        .size()
-        .reset_index(name="Nb_RUM_UM")
-    )
-
-    total_par_um = (
-        rum_df.groupby(["Site", "UM"], dropna=False)
-        .size()
-        .reset_index(name="Total_UM_global")
-    )
-
-    summary = tech_um.merge(
-        total_tech,
-        on=["Nom", "Prénom"],
-        how="left"
-    ).merge(
-        total_par_um,
-        on=["Site", "UM"],
-        how="left"
-    )
-
-    summary["%UM_tech"] = (summary["Nb_RUM_UM"] / summary["Total_RUM_codes"]).fillna(0)
-    summary["%UM_global"] = (summary["Nb_RUM_UM"] / summary["Total_UM_global"]).fillna(0)
-
-    summary = summary[[
-        "Nom",
-        "Prénom",
-        "Site",
-        "UM",
-        "Nb_RUM_UM",
-        "%UM_tech",
-        "%UM_global",
-        "Total_RUM_codes",
-    ]]
-
-    summary = summary.sort_values(
-        by=["Nom", "Prénom", "Site", "UM"],
-        kind="stable"
-    ).reset_index(drop=True)
-
-    # Remplir Total_RUM_codes uniquement sur la première ligne de chaque technicien
-    first_mask = ~summary.duplicated(subset=["Nom", "Prénom"], keep="first")
-    summary.loc[~first_mask, "Total_RUM_codes"] = ""
-
-    print(f"[INFO] Nombre de lignes dans la synthèse longue : {len(summary)}")
-    return summary
-
-
-# ============================================================
-# EXPORTS
-# ============================================================
-def save_concatenated_csv(df_concat: pd.DataFrame, month: int, year: int, workdir: Path):
-    output_name = f"{OUTPUT_CONCAT_PREFIX} {month:02d}_{year}.csv"
-    output_path = workdir / output_name
-
-    df_concat.to_csv(output_path, sep=";", index=False, encoding="utf-8-sig")
-    print(f"[INFO] CSV concaténé enregistré : {output_path.resolve()}")
-    return output_path
-
-
-def export_to_excel(rum_df: pd.DataFrame, synthese_df: pd.DataFrame, month: int, year: int, workdir: Path):
-    output_name = f"{OUTPUT_XLSX_PREFIX} {month:02d}_{year}.xlsx"
-    output_path = workdir / output_name
-
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        rum_df.to_excel(writer, sheet_name="Dossiers", index=False)
-        synthese_df.to_excel(writer, sheet_name="Synthese_Technicien", index=False)
-
-    wb = load_workbook(output_path)
-
-    ws1 = wb["Dossiers"]
-    style_worksheet(ws1)
-    auto_adjust_columns(ws1, extra_padding=2)
-
-    ws2 = wb["Synthese_Technicien"]
-    style_worksheet(ws2)
-    auto_adjust_columns(ws2, extra_padding=2)
-
-    for col in range(1, ws2.max_column + 1):
-        header = ws2.cell(row=1, column=col).value
-        if header and str(header).startswith("%"):
-            for row in range(2, ws2.max_row + 1):
-                ws2.cell(row=row, column=col).number_format = "0.0%"
-
-    wb.save(output_path)
-    print(f"[INFO] Excel final enregistré : {output_path.resolve()}")
-    return output_path
-
-
-# ============================================================
-# MAIN
-# ============================================================
-def main():
-    print("====================================================")
-    print("Lancement du traitement Diagnostics codés par utilisateur")
-    print(f"Dossier de travail : {WORKDIR.resolve()}")
-    print("====================================================\n")
-
-    df_concat, month, year = load_and_concat_csvs(WORKDIR)
-    save_concatenated_csv(df_concat, month, year, WORKDIR)
-
-    rum_df = build_consolidated_sheet(df_concat)
-    synthese_df = build_technician_summary_long(rum_df)
-    export_to_excel(rum_df, synthese_df, month, year, WORKDIR)
-
-    print("\n====================================================")
-    print("Traitement terminé")
-    print(f"Mois/année détectés : {month:02d}/{year}")
-    print(f"Nombre de lignes concaténées retenues : {len(df_concat)}")
-    print(f"Nombre de RUM exportés : {len(rum_df)}")
-    print("====================================================")
-
-
-if __name__ == "__main__":
-    main()
+====================================================
+Lancement du traitement Diagnostics codés par utilisateur
+Dossier de travail : C:\Users\4251352\projets\RUM_TIM
+====================================================
+
+[INFO] 5 fichier(s) CSV source détecté(s) :
+   - Diagnostics codés par un utilisateur 01_01_2026 08_01_2026.csv
+   - Diagnostics codés par un utilisateur 08_01_2026 13_01_2026.csv
+   - Diagnostics codés par un utilisateur 13_01_2026 18_01_2026.csv
+   - Diagnostics codés par un utilisateur 18_01_2026 24_01_2026.csv
+   - Diagnostics codés par un utilisateur 24_01_2026 31_01_2026.csv
+
+[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur 01_01_2026 08_01_2026.csv
+        Dates détectées : [(1, 1, 2026), (8, 1, 2026)]
+        Site détecté   : Aucun
+[INFO] Lecture OK : Diagnostics codés par un utilisateur 01_01_2026 08_01_2026.csv (encodage=cp1252)
+
+[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur 08_01_2026 13_01_2026.csv
+        Dates détectées : [(8, 1, 2026), (13, 1, 2026)]
+        Site détecté   : Aucun
+[INFO] Lecture OK : Diagnostics codés par un utilisateur 08_01_2026 13_01_2026.csv (encodage=cp1252)
+
+[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur 13_01_2026 18_01_2026.csv
+        Dates détectées : [(13, 1, 2026), (18, 1, 2026)]
+        Site détecté   : Aucun
+[INFO] Lecture OK : Diagnostics codés par un utilisateur 13_01_2026 18_01_2026.csv (encodage=cp1252)
+
+[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur 18_01_2026 24_01_2026.csv
+        Dates détectées : [(18, 1, 2026), (24, 1, 2026)]
+        Site détecté   : Aucun
+[INFO] Lecture OK : Diagnostics codés par un utilisateur 18_01_2026 24_01_2026.csv (encodage=cp1252)
+
+[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur 24_01_2026 31_01_2026.csv
+        Dates détectées : [(24, 1, 2026), (31, 1, 2026)]
+        Site détecté   : Aucun
+[INFO] Lecture OK : Diagnostics codés par un utilisateur 24_01_2026 31_01_2026.csv (encodage=cp1252)
+[DEBUG] Couples mois/année détectés dans les noms : [(1, 2026)]
+[DEBUG] Sites détectés dans les noms : Aucun
+[INFO] Nombre de lignes avant déduplication brute : 43322
+[INFO] Nombre de lignes après déduplication brute : 39381
+[INFO] Nombre de doublons supprimés : 3941
+[INFO] CSV concaténé enregistré : C:\Users\4251352\projets\RUM_TIM\Diagnostics concaténés 01_2026.csv
+
+========== DEBUG UM ==========
+Nombre de valeurs UM uniques : 69
+Aperçu avant / après transformation :
+
+UM brut='021591C' | normalisé='021591C' | site='CCH' | UM final='591C'
+UM brut='021140' | normalisé='021140' | site='CCH' | UM final='140'
+UM brut='021115' | normalisé='021115' | site='CCH' | UM final='115'
+UM brut='021010' | normalisé='021010' | site='CCH' | UM final='010'
+UM brut='021112' | normalisé='021112' | site='CCH' | UM final='112'
+UM brut='021540' | normalisé='021540' | site='CCH' | UM final='540'
+UM brut='021140S' | normalisé='021140S' | site='CCH' | UM final='140S'
+UM brut='021160' | normalisé='021160' | site='CCH' | UM final='160'
+UM brut='021070' | normalisé='021070' | site='CCH' | UM final='070'
+UM brut='021340' | normalisé='021340' | site='CCH' | UM final='340'
+UM brut='021080S' | normalisé='021080S' | site='CCH' | UM final='080S'
+UM brut='021060' | normalisé='021060' | site='CCH' | UM final='060'
+UM brut='021591' | normalisé='021591' | site='CCH' | UM final='591'
+UM brut='021010S' | normalisé='021010S' | site='CCH' | UM final='010S'
+UM brut='021130' | normalisé='021130' | site='CCH' | UM final='130'
+UM brut='021670' | normalisé='021670' | site='CCH' | UM final='670'
+UM brut='021450' | normalisé='021450' | site='CCH' | UM final='450'
+UM brut='021041' | normalisé='021041' | site='CCH' | UM final='041'
+UM brut='021341' | normalisé='021341' | site='CCH' | UM final='341'
+UM brut='021021' | normalisé='021021' | site='CCH' | UM final='021'
+UM brut='021040S' | normalisé='021040S' | site='CCH' | UM final='040S'
+UM brut='021037' | normalisé='021037' | site='CCH' | UM final='037'
+UM brut='021300S' | normalisé='021300S' | site='CCH' | UM final='300S'
+UM brut='021393' | normalisé='021393' | site='CCH' | UM final='393'
+UM brut='021080' | normalisé='021080' | site='CCH' | UM final='080'
+UM brut='021090' | normalisé='021090' | site='CCH' | UM final='090'
+UM brut='021092' | normalisé='021092' | site='CCH' | UM final='092'
+UM brut='021112S' | normalisé='021112S' | site='CCH' | UM final='112S'
+UM brut='021270' | normalisé='021270' | site='CCH' | UM final='270'
+UM brut='021103' | normalisé='021103' | site='CCH' | UM final='103'
+UM brut='021520S' | normalisé='021520S' | site='CCH' | UM final='520S'
+UM brut='021112C' | normalisé='021112C' | site='CCH' | UM final='112C'
+UM brut='021300' | normalisé='021300' | site='CCH' | UM final='300'
+UM brut='021011' | normalisé='021011' | site='CCH' | UM final='011'
+UM brut='021543' | normalisé='021543' | site='CCH' | UM final='543'
+UM brut='021520' | normalisé='021520' | site='CCH' | UM final='520'
+UM brut='021022J' | normalisé='021022J' | site='CCH' | UM final='022J'
+UM brut='021091' | normalisé='021091' | site='CCH' | UM final='091'
+UM brut='021600' | normalisé='021600' | site='CCH' | UM final='600'
+UM brut='021022S' | normalisé='021022S' | site='CCH' | UM final='022S'
+UM brut='021270S' | normalisé='021270S' | site='CCH' | UM final='270S'
+UM brut='021450J' | normalisé='021450J' | site='CCH' | UM final='450J'
+UM brut='021040' | normalisé='021040' | site='CCH' | UM final='040'
+UM brut='021080J' | normalisé='021080J' | site='CCH' | UM final='080J'
+UM brut='021451' | normalisé='021451' | site='CCH' | UM final='451'
+UM brut='021040C' | normalisé='021040C' | site='CCH' | UM final='040C'
+UM brut='021020J' | normalisé='021020J' | site='CCH' | UM final='020J'
+UM brut='021520J' | normalisé='021520J' | site='CCH' | UM final='520J'
+UM brut='021010J' | normalisé='021010J' | site='CCH' | UM final='010J'
+UM brut='021037S' | normalisé='021037S' | site='CCH' | UM final='037S'
+... (19 autres valeurs non affichées)
+================================
+
+[DEBUG] Dates Début Résumé invalides : 0
+[DEBUG] Dates Fin Résumé invalides   : 0
+
+[DEBUG] Répartition Site détecté dans les données :
+Site
+CCH    39381
+
+[INFO] Début consolidation par RUM sur 39381 ligne(s) diagnostic...
+[INFO] Nombre de groupes RUM détectés : 5927
+[INFO] Nombre final de RUM consolidés : 5927
+c:\Users\4251352\projets\RUM_TIM\resume_codes.py:526: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '' has dtype incompatible with int64, please explicitly cast to a compatible dtype first.
+  summary.loc[~first_mask, "Total_RUM_codes"] = ""
+[INFO] Nombre de lignes dans la synthèse longue : 111
+[INFO] Excel final enregistré : C:\Users\4251352\projets\RUM_TIM\Résumé_codage_TIM 01_2026.xlsx
+
+====================================================
+Traitement terminé
+Mois/année détectés : 01/2026
+Nombre de lignes concaténées retenues : 39381
+Nombre de RUM exportés : 5927
+====================================================
