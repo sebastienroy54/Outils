@@ -1,13 +1,42 @@
-# Debug : affichage brut des valeurs de Type PMSI
-types_uniques = grp["Type PMSI"].unique()
+⚠️ PROBLEME DP DETECTE
+NDA : 213427620
+Valeurs uniques Type PMSI : ['DAS' 'DP']
 
-dp_mask = grp["Type PMSI"].str.strip().str.upper() == "DP"
-dp_list = grp.loc[dp_mask, "Code Diagnostic"].tolist()
-
-# DEBUG SI PROBLEME
-if len(dp_list) > 1:
-    print("\n⚠️ PROBLEME DP DETECTE")
-    print(f"NDA : {nda}")
-    print("Valeurs uniques Type PMSI :", types_uniques)
-    print("\nLignes concernées :")
-    print(grp[["Type PMSI", "Code Diagnostic"]])
+Lignes concernées :
+     Type PMSI Code Diagnostic
+141        DAS            D648
+142        DAS            Z993
+143        DAS            Z955
+144        DAS            I255
+145        DAS             I10
+146        DAS           Z8670
+147        DAS            R418
+148        DAS            Z741
+149        DAS            J188
+150        DAS            I252
+151        DAS            Z998
+152        DAS           E8758
+153        DAS            R060
+154         DP           I5009
+2129       DAS             I10
+2130       DAS           E8758
+2131       DAS            Z998
+2132       DAS            I252
+2133       DAS            J188
+2134       DAS            Z741
+2135       DAS            R060
+2136       DAS            R418
+2137       DAS           Z8670
+2138       DAS            I255
+2139       DAS            Z955
+2140       DAS            Z993
+2141        DP           I5009
+Traceback (most recent call last):
+  File "c:\Users\4251352\projets\resume_codes.py", line 319, in <module>
+    main()
+  File "c:\Users\4251352\projets\resume_codes.py", line 311, in main
+    dossiers_df = build_consolidated_sheet(df)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\4251352\projets\resume_codes.py", line 162, in build_consolidated_sheet
+    raise ValueError(f"Plusieurs DP trouvés pour le NDA {nda}, ce qui ne devrait pas arriver.")
+ValueError: Plusieurs DP trouvés pour le NDA 213427620, ce qui ne devrait pas arriver.
