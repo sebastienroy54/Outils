@@ -1,174 +1,56 @@
-====================================================
-Lancement du traitement Diagnostics codés par utilisateur
-Dossier de travail : C:\Users\4251352\projets\RUM_TIM
-====================================================
+# Changelog
 
-[INFO] Fichier concaténé ignoré : Diagnostics concaténés 01_2026.csv
-[INFO] 13 fichier(s) CSV source détecté(s) :
-   - Diagnostics codés par un utilisateur BRC 01_01_2026 08_01_2026.csv
-   - Diagnostics codés par un utilisateur BRC 08_01_2026 13_01_2026.csv
-   - Diagnostics codés par un utilisateur BRC 13_01_2026 18_01_2026.csv
-   - Diagnostics codés par un utilisateur BRC 18_01_2026 24_01_2026.csv
-   - Diagnostics codés par un utilisateur BRC 24_01_2026 31_01_2026.csv
-   - Diagnostics codés par un utilisateur CCH 01_01_2026 08_01_2026.csv
-   - Diagnostics codés par un utilisateur CCH 08_01_2026 13_01_2026.csv
-   - Diagnostics codés par un utilisateur CCH 13_01_2026 18_01_2026.csv
-   - Diagnostics codés par un utilisateur CCH 18_01_2026 24_01_2026.csv
-   - Diagnostics codés par un utilisateur CCH 24_01_2026 31_01_2026.csv
-   - Diagnostics codés par un utilisateur HTD 01_01_2026 08_01_2026.csv
-   - Diagnostics codés par un utilisateur HTD 08_01_2026 20_01_2026.csv
-   - Diagnostics codés par un utilisateur HTD 20_01_2026 31_01_2026.csv
+All notable changes to this project will be documented in this file.
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur BRC 01_01_2026 08_01_2026.csv
-        Dates détectées : [(1, 1, 2026), (8, 1, 2026)]
-        Site détecté   : BRC
-[INFO] Lecture OK : Diagnostics codés par un utilisateur BRC 01_01_2026 08_01_2026.csv (encodage=cp1252)
+---
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur BRC 08_01_2026 13_01_2026.csv
-        Dates détectées : [(8, 1, 2026), (13, 1, 2026)]
-        Site détecté   : BRC
-[INFO] Lecture OK : Diagnostics codés par un utilisateur BRC 08_01_2026 13_01_2026.csv (encodage=cp1252)
+## [1.4.0]
+### Added
+- Outil de formatage des données DIM siège (MCO, PSY, SMR) pour intégration dans PMSIpilot
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur BRC 13_01_2026 18_01_2026.csv
-        Dates détectées : [(13, 1, 2026), (18, 1, 2026)]
-        Site détecté   : BRC
-[INFO] Lecture OK : Diagnostics codés par un utilisateur BRC 13_01_2026 18_01_2026.csv (encodage=cp1252)
+### Fixed
+- Mise à jour du format PMSIpilot avec support Vidhosp / Anohosp VA16
+- Génération automatique des fichiers d'autorisations par champ
+- Correction et génération des fichcomp MCO
+- Amélioration de l’outil RAA : export supplémentaire par praticien + téléchargement en ZIP
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur BRC 18_01_2026 24_01_2026.csv
-        Dates détectées : [(18, 1, 2026), (24, 1, 2026)]
-        Site détecté   : BRC
-[INFO] Lecture OK : Diagnostics codés par un utilisateur BRC 18_01_2026 24_01_2026.csv (encodage=cp1252)
+---
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur BRC 24_01_2026 31_01_2026.csv
-        Dates détectées : [(24, 1, 2026), (31, 1, 2026)]
-        Site détecté   : BRC
-[INFO] Lecture OK : Diagnostics codés par un utilisateur BRC 24_01_2026 31_01_2026.csv (encodage=cp1252)
+## [1.3.1]
+### Fixed
+- Optimisation de l’outil de détection des doublons :
+  - Passage de l’analyse année en cours → M-1 et M-2
+  - Amélioration significative des performances
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur CCH 01_01_2026 08_01_2026.csv
-        Dates détectées : [(1, 1, 2026), (8, 1, 2026)]
-        Site détecté   : CCH
-[INFO] Lecture OK : Diagnostics codés par un utilisateur CCH 01_01_2026 08_01_2026.csv (encodage=cp1252)
+---
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur CCH 08_01_2026 13_01_2026.csv
-        Dates détectées : [(8, 1, 2026), (13, 1, 2026)]
-        Site détecté   : CCH
-[INFO] Lecture OK : Diagnostics codés par un utilisateur CCH 08_01_2026 13_01_2026.csv (encodage=cp1252)
+## [1.3.0]
+### Added
+- Outil de répartition des RUMs codés par TIM via interrogation BDD Oracle
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur CCH 13_01_2026 18_01_2026.csv
-        Dates détectées : [(13, 1, 2026), (18, 1, 2026)]
-        Site détecté   : CCH
-[INFO] Lecture OK : Diagnostics codés par un utilisateur CCH 13_01_2026 18_01_2026.csv (encodage=cp1252)
+### Changed
+- Migration de l’application vers un serveur (disponibilité 24/7)
+- Adaptation complète du code pour compatibilité Python 3.7 (downgrade depuis 3.10)
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur CCH 18_01_2026 24_01_2026.csv
-        Dates détectées : [(18, 1, 2026), (24, 1, 2026)]
-        Site détecté   : CCH
-[INFO] Lecture OK : Diagnostics codés par un utilisateur CCH 18_01_2026 24_01_2026.csv (encodage=cp1252)
+---
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur CCH 24_01_2026 31_01_2026.csv
-        Dates détectées : [(24, 1, 2026), (31, 1, 2026)]
-        Site détecté   : CCH
-[INFO] Lecture OK : Diagnostics codés par un utilisateur CCH 24_01_2026 31_01_2026.csv (encodage=cp1252)
+## [1.2.0]
+### Added
+- Outil de croisement de fichiers Excel pour le BHRe
+- Outil de détection des doublons, séjours contigus et chevauchements (BDD Oracle)
+- Outil de comparaison de tableaux de valorisation
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur HTD 01_01_2026 08_01_2026.csv
-        Dates détectées : [(1, 1, 2026), (8, 1, 2026)]
-        Site détecté   : HTD
-[INFO] Lecture OK : Diagnostics codés par un utilisateur HTD 01_01_2026 08_01_2026.csv (encodage=cp1252)
+---
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur HTD 08_01_2026 20_01_2026.csv
-        Dates détectées : [(8, 1, 2026), (20, 1, 2026)]
-        Site détecté   : HTD
-[INFO] Lecture OK : Diagnostics codés par un utilisateur HTD 08_01_2026 20_01_2026.csv (encodage=cp1252)
+## [1.1.0]
+### Added
+- Interface Streamlit avec menu de sélection d’outils
+- Outil de découpage de fichiers Excel par chirurgien avec export ZIP
+- Outil de visualisation des suppléments RUM via BDD Oracle
+- Outil de croisement des RAA manquants (unité 60R)
 
-[DEBUG] Analyse nom fichier : Diagnostics codés par un utilisateur HTD 20_01_2026 31_01_2026.csv
-        Dates détectées : [(20, 1, 2026), (31, 1, 2026)]
-        Site détecté   : HTD
-[INFO] Lecture OK : Diagnostics codés par un utilisateur HTD 20_01_2026 31_01_2026.csv (encodage=cp1252)
-[DEBUG] Couples mois/année détectés dans les noms : [(1, 2026)]
-[DEBUG] Sites détectés dans les noms : ['BRC', 'CCH', 'HTD']
-[ATTENTION] Plusieurs sites détectés dans les noms de fichiers.
-           Le script continue, mais ce n'est pas le cas attendu.
-[INFO] Nombre de lignes avant déduplication brute : 46419
-[INFO] Nombre de lignes après déduplication brute : 42150
-[INFO] Nombre de doublons supprimés : 4269
-[INFO] CSV concaténé enregistré : C:\Users\4251352\projets\RUM_TIM\Diagnostics concaténés 01_2026.csv
+---
 
-========== DEBUG UM ==========
-Nombre de valeurs UM uniques : 78
-Aperçu avant / après transformation :
-
-UM brut='016018' | normalisé='016018' | site='BRC' | UM final='018'
-UM brut='016029' | normalisé='016029' | site='BRC' | UM final='029'
-UM brut='021591C' | normalisé='021591C' | site='CCH' | UM final='591C'
-UM brut='021140' | normalisé='021140' | site='CCH' | UM final='140'
-UM brut='021115' | normalisé='021115' | site='CCH' | UM final='115'
-UM brut='021010' | normalisé='021010' | site='CCH' | UM final='010'
-UM brut='021112' | normalisé='021112' | site='CCH' | UM final='112'
-UM brut='021540' | normalisé='021540' | site='CCH' | UM final='540'
-UM brut='021140S' | normalisé='021140S' | site='CCH' | UM final='140S'
-UM brut='021160' | normalisé='021160' | site='CCH' | UM final='160'
-UM brut='021070' | normalisé='021070' | site='CCH' | UM final='070'
-UM brut='021340' | normalisé='021340' | site='CCH' | UM final='340'
-UM brut='021080S' | normalisé='021080S' | site='CCH' | UM final='080S'
-UM brut='021060' | normalisé='021060' | site='CCH' | UM final='060'
-UM brut='021591' | normalisé='021591' | site='CCH' | UM final='591'
-UM brut='021010S' | normalisé='021010S' | site='CCH' | UM final='010S'
-UM brut='021130' | normalisé='021130' | site='CCH' | UM final='130'
-UM brut='021670' | normalisé='021670' | site='CCH' | UM final='670'
-UM brut='021450' | normalisé='021450' | site='CCH' | UM final='450'
-UM brut='021041' | normalisé='021041' | site='CCH' | UM final='041'
-UM brut='021341' | normalisé='021341' | site='CCH' | UM final='341'
-UM brut='021021' | normalisé='021021' | site='CCH' | UM final='021'
-UM brut='021040S' | normalisé='021040S' | site='CCH' | UM final='040S'
-UM brut='021037' | normalisé='021037' | site='CCH' | UM final='037'
-UM brut='021300S' | normalisé='021300S' | site='CCH' | UM final='300S'
-UM brut='021393' | normalisé='021393' | site='CCH' | UM final='393'
-UM brut='021080' | normalisé='021080' | site='CCH' | UM final='080'
-UM brut='021090' | normalisé='021090' | site='CCH' | UM final='090'
-UM brut='021092' | normalisé='021092' | site='CCH' | UM final='092'
-UM brut='021112S' | normalisé='021112S' | site='CCH' | UM final='112S'
-UM brut='021270' | normalisé='021270' | site='CCH' | UM final='270'
-UM brut='021103' | normalisé='021103' | site='CCH' | UM final='103'
-UM brut='021520S' | normalisé='021520S' | site='CCH' | UM final='520S'
-UM brut='021112C' | normalisé='021112C' | site='CCH' | UM final='112C'
-UM brut='021300' | normalisé='021300' | site='CCH' | UM final='300'
-UM brut='021011' | normalisé='021011' | site='CCH' | UM final='011'
-UM brut='021543' | normalisé='021543' | site='CCH' | UM final='543'
-UM brut='021520' | normalisé='021520' | site='CCH' | UM final='520'
-UM brut='021022J' | normalisé='021022J' | site='CCH' | UM final='022J'
-UM brut='021091' | normalisé='021091' | site='CCH' | UM final='091'
-UM brut='021600' | normalisé='021600' | site='CCH' | UM final='600'
-UM brut='021022S' | normalisé='021022S' | site='CCH' | UM final='022S'
-UM brut='021270S' | normalisé='021270S' | site='CCH' | UM final='270S'
-UM brut='021450J' | normalisé='021450J' | site='CCH' | UM final='450J'
-UM brut='021040' | normalisé='021040' | site='CCH' | UM final='040'
-UM brut='021080J' | normalisé='021080J' | site='CCH' | UM final='080J'
-UM brut='021451' | normalisé='021451' | site='CCH' | UM final='451'
-UM brut='021040C' | normalisé='021040C' | site='CCH' | UM final='040C'
-UM brut='021020J' | normalisé='021020J' | site='CCH' | UM final='020J'
-UM brut='021520J' | normalisé='021520J' | site='CCH' | UM final='520J'
-... (28 autres valeurs non affichées)
-================================
-
-[DEBUG] Dates Début Résumé invalides : 0
-[DEBUG] Dates Fin Résumé invalides   : 0
-
-[DEBUG] Répartition Site détecté dans les données :
-Site
-CCH    39381
-BRC     1844
-HTD      925
-
-[INFO] Début consolidation par RUM sur 42150 ligne(s) diagnostic...
-[INFO] Nombre de groupes RUM détectés : 6193
-[INFO] Nombre final de RUM consolidés : 6193
-c:\Users\4251352\projets\RUM_TIM\resume_codes.py:526: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '' has dtype incompatible with int64, please explicitly cast to a compatible dtype first.
-  summary.loc[~first_mask, "Total_RUM_codes"] = ""
-[INFO] Nombre de lignes dans la synthèse longue : 131
-[INFO] Excel final enregistré : C:\Users\4251352\projets\RUM_TIM\Résumé_codage_TIM 01_2026.xlsx
-
-====================================================
-Traitement terminé
-Mois/année détectés : 01/2026
-Nombre de lignes concaténées retenues : 42150
-Nombre de RUM exportés : 6193
-====================================================
+## [1.0.0]
+### Added
+- Initialisation du projet Streamlit
