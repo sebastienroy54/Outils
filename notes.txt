@@ -507,3 +507,11 @@ bilan_supp_SC <- function(annee,mois,
 
 # ex : 663543620
 # testex <- test2 %>% filter(NDA=="663543620")
+
+
+
+
+
+
+
+sur les pneumothorax spontanés primaires traités par surveillance simple, sans drainage ni chirurgie durant leur hospitalisation
