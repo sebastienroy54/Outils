@@ -1,517 +1,245 @@
-################################################### #
-############ Suppléments soins critiques ############ 
-################# MAJ 2026 - Naomi ################ # 
-####### Création script R pour automatisation ##### #
-#################### FONCTIONS #################### #
-################################################### #
+import streamlit as st
+import subprocess
+import pandas as pd
+import plotly.graph_objects as go
+from datetime import datetime
+from pathlib import Path
 
-library(dplyr)
-library(tidyverse)
-library(DBI)
-library(RMySQL)
-library(lubridate)
-library(openxlsx)
-library(readxl)
+BASE_DIR = Path(__file__).resolve().parents[1]
+SQL_DIR = BASE_DIR / "SQL"
+DATA_DIR = BASE_DIR / "data"
+OUTILS_DIR = BASE_DIR / "outils"
 
-# fichiers utiles ####
+SQL_FILE = SQL_DIR / "Requete_RUM.sql"
+CSV_FILE = DATA_DIR / "dashboard.csv"
+CSS_FILE = OUTILS_DIR / "styles_dashboard_rum.css"
 
-## Correspondances variables - classes des variables
-classes <- read.table("//Wprod.ds.aphp.fr/dfz/ESPRIT/DIM/Requetes/TDB_GHU_SU_2025/sources/variables_simpa_correspondance.txt", 
-                      header=T, sep="\t", colClasses = "character") 
+def load_css(file_path):
+    if not file_path.exists():
+        st.warning(f"CSS introuvable : {file_path}")
+        return
+    with open(file_path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
-# Fichiers structures avec changements et exceptions
-# gh_structure <- read.xlsx(paste0("C:/Users/4241402/Documents/TDB_GHU_SU_2025/sources/gh_structure.xlsx")) %>% mutate(date_statut=as.Date(date_statut, origin = "1899-12-30")) %>% 
-gh_structure <- read.xlsx(paste0("//Wprod.ds.aphp.fr/dfz/ESPRIT/DIM/Requetes/TDB_GHU_SU_2025/sources/gh_structure.xlsx")) %>% mutate(date_statut=as.Date(date_statut, origin = "1899-12-30")) %>% 
-  dplyr::filter(!statut%in% c("avant_cht","old"))#is.na(statut))
-uh_dmu <- gh_structure %>%
-  filter(!hop_UH %in% c('PSL 184','PSL 173','PSL 233'))
-
-# import des données simpa pas SITE ####
-
-# Récupération et traitement des exports simpa en fonction du site
-# Ne garde que les variables nécéssaires
-# Assigne les bonnes classes aux variables (numeric, texte, date)
-
-import_simpa<- function(chemin_simpa_mco,site){
-  ## Import de l'export simpa tel quel
-  if (site %in% c("PSL","CFX")){
-    simpa <-  read.csv(chemin_simpa_mco,header=T, sep="\t", na.strings="", colClasses = "character", encoding="latin1")
-    # simpa <- simpa %>%  mutate(Date.entree.resume=str_replace_all(Date.entree.resume,"/2025","/2026"),Date.sortie.resume=str_replace_all(Date.sortie.resume,"/2025","/2026"),Date.entree.dossier=str_replace_all(Date.entree.dossier,"/2025","/2026"),Date.sortie.dossier=str_replace_all(Date.sortie.dossier,"/2025","/2026"),Date.entree.resume=str_replace_all(Date.entree.resume,"/2024","/2025"),Date.sortie.resume=str_replace_all(Date.sortie.resume,"/2024","/2025"),Date.entree.dossier=str_replace_all(Date.entree.dossier,"/2024","/2025"),Date.sortie.dossier=str_replace_all(Date.sortie.dossier,"/2024","/2025"))
-  }
-  else  {
-    simpa <- read.csv(chemin_simpa_mco,header=T, sep=";", na.strings="", colClasses = "character", encoding="latin1")
-    # simpa <- simpa %>%  mutate(Date.entree.resume=str_replace_all(Date.entree.resume,"/2025","/2026"),Date.sortie.resume=str_replace_all(Date.sortie.resume,"/2025","/2026"),Date.entree.dossier=str_replace_all(Date.entree.dossier,"/2025","/2026"),Date.sortie.dossier=str_replace_all(Date.sortie.dossier,"/2025","/2026"),Date.entree.resume=str_replace_all(Date.entree.resume,"/2024","/2025"),Date.sortie.resume=str_replace_all(Date.sortie.resume,"/2024","/2025"),Date.entree.dossier=str_replace_all(Date.entree.dossier,"/2024","/2025"),Date.sortie.dossier=str_replace_all(Date.sortie.dossier,"/2024","/2025"))
-  }
-  ## on récup?re dans le fichier 'classes' les classes souhaitées selon le nom des variables
-  num <- classes$rsimpa[classes$class %in% "numeric"]
-  date <- classes$rsimpa[classes$class %in% "date"]
-  dateh <- classes$rsimpa[classes$class %in% "dateh"]
-  
-  ## affectation des classes correctes pour toutes les variables (numérique, dates, dates avec heure)
-  simpa[ , num] <- lapply(num, function(x) as.numeric(as.character(simpa[ , x])))
-  simpa[ , date] <- lapply(date, function(x) as.Date(simpa[ ,x], format="%d/%m/%Y"))
-  simpa[ , dateh] <- lapply(dateh, function(x) as.POSIXct(simpa[ ,x], format="%d/%m/%Y %H:%M"))
-  
-  ## table finale, sélection des variables d'intérêts
-  simpa <-tibble::as_tibble(simpa)
-  simpa <- select(simpa, NIP, NDA ,NAS ,URMC , UH, URMP,
-                  nbjnnc_r=NBJNNC_R, nbjnnb_r=NBJNNB_R, nbjnna_r=NBJNNA_R, nbjsitr=NBJSTF_TOT_R,nbjsirr=NBJSTF_ISSUDEREA_R ,
-                  nbjsrc_r=NBJSRC_R, nbjrea_r=NBJREA_R, nbrep_r=NBREP_R, nbjrum=NBJRUM,
-                  Date.entree.resume, Date.sortie.resume, Date.entree.dossier,Date.sortie.dossier,GHM,NBJRUM)
-  return(simpa)
-  print(paste("Import Table Simpa",site))
-}
-
-# Création table des suppléments pour une année N ####
-# nombre, ratios et présence de supléments
-table_annee_seule <- function(nom,data){
-  # Modification des UMA si changement
-  calculSupp1 <- data %>%
-    mutate(
-      mois = as.integer(substr(Date.sortie.dossier, 6, 7)),
-      UMA2 = paste0(substr(NDA, 1, 2), URMP),
-      UMA2 = case_when(
-        substr(UMA2, 1, 6) == '66221' ~ '66741R',
-        substr(UMA2, 1, 6) == '66222' ~ '66742',
-        TRUE ~ UMA2),
-      UMA2 = case_when(
-        UMA2 == '87013' ~ '87740',
-        UMA2 == '87031' ~ '87344',
-        UMA2 == '87032' ~ '87345',
-        UMA2 == '87030' ~ '87343',
-        UMA2 == '66533' ~ '66912',
-        UMA2 == '66281' ~ '66941',
-        UMA2 == '66282' & UH == '173' ~ '66285',
-        UMA2 == '66282' ~ '66942',
-        UMA2 == '66284' ~ '66943',
-        UMA2 == '66101' ~ '661A1',
-        TRUE ~ UMA2
-      )
-    ) %>% 
-    # Ajout des changement "spécial" d'USC et USI
-    filter(UMA2 != '73053') %>% # delete rows with UMA2 '073053'
-    mutate(
-      special = case_when(
-        UMA2 %in% c('66202','66204','66212','66672','66742','66771','66942','73261','73263','73292','87014','87740','88063','88311') ~ 'USC->USIP',
-        UMA2 %in% c('88022','88031','88071','88095','66912','87345') ~ 'USC->USI spé',
-        UMA2 == '66207' ~ 'USI->USIP',
-        TRUE ~ NA
-      )
-    ) %>% 
-    mutate(diff=0)
-  # Remove rows based on special and date conditions
-  # calculSupp <- calculSupp1 %>%
-  #   filter(!(
-  #     (special == 'USC->USIP' & !is.na(special) & (substr(Date.entree.resume, 1, 7) %in% c('2024-10','2024-11','2024-12','2025-01','2025-02') |
-  #                                  substr(Date.sortie.resume, 1, 7) %in% c('2024-10','2024-11','2024-12','2025-01','2025-02'))) |
-  #       (special == 'USC->USI spé' & !is.na(special) & (substr(Date.entree.resume, 1, 7) %in% c('2024-10','2024-11','2024-12') |
-  #                                       substr(Date.sortie.resume, 1, 7) %in% c('2024-10','2024-11','2024-12'))) |
-  #       (special == 'USI->USIP' & !is.na(special) & (substr(Date.entree.resume, 1, 7) %in% c('2025-01','2025-02') |
-  #                                    substr(Date.sortie.resume, 1, 7) %in% c('2025-01','2025-02')))
-  #   ))
-  
-  # calculSupptest <- calculSupp1 %>% 
-  #   filter(!(str_detect(special,"USI->USIP") & !is.na(special) & between(Date.sortie.resume,as.Date("2024-12-31"),as.Date("2025-03-01")))) %>% 
-  #   filter(!(str_detect(special,"USC") & !is.na(special) & Date.entree.resume>=as.Date("2024-10-01")))
-  
-  if(nom==2024){
-    # On laisse les USI USI et non USIP (même si USI -> USIP) ??
-    # USI spé -> USI!! et pas USIP (?)
-    # naonao####
-
-    # calculSupp2 <- calculSupp1 %>% filter(!(!is.na(special) & Date.entree.resume>=as.Date("2024-10-01")))
-    calculSupp1 <- calculSupp1 %>% filter(!(str_detect(special,"USC") & !is.na(special) & Date.entree.resume>=as.Date("2024-10-01"))) %>% 
-      mutate(diff=ifelse(str_detect(special,"USC") & !is.na(special),nbjsitr,diff))
-    # On garde seulement les SC lorsque sejours à cheval sur transition USC -> USI ...
-  }
-  if(nom==2025){
-    # pas touche les usc en usi spé? pb de 2024 plus en 2025 ??
-    # naonao ####
-
-    # calculSupp2 <- calculSupp1 %>% filter(!(!is.na(special) & Date.sortie.resume<as.Date("2025-03-01")))
-    # attention : enlever les a cheval en choisissant date entrée après mars
-    calculSupp1 <- calculSupp1 %>% filter(!(str_detect(special,"USIP") & !is.na(special) & Date.sortie.resume<as.Date("2025-03-01"))) %>% 
-      mutate(diff=as.numeric(as.Date("2025-03-01")-as.Date(Date.entree.resume)),diff=ifelse(diff>0,diff,0))
-  }
-  
-  calculSupp <- calculSupp1 %>%
-    mutate(
-      nbjrum = ifelse(str_detect(special,"->")&!is.na(special),
-                      nbjrum-diff,nbjrum),
-      nbjUSIP= ifelse(str_detect(special,"USIP")&!is.na(special),
-                      nbjsitr+nbjsrc_r-diff,0),
-      nbjsitr=ifelse(str_detect(special,"spé")&!is.na(special), #&Date.sortie.resume>=as.Date("2024-10-01"),
-                     nbjsrc_r+nbjsitr,nbjsitr),
-      nbjsitr=ifelse(str_detect(special,"USIP")&!is.na(special),
-                     0,nbjsitr),
-      nbjsrc_r=ifelse(str_detect(special,"->")&!is.na(special),
-                      0,nbjsrc_r),
-      nbjsirr=ifelse(str_detect(special,"->")&!is.na(special),
-                     0,nbjsirr)
+def run_sqlplus(user, password, tns_alias, sql_file):
+    cmd = [
+        "sqlplus",
+        "-S",
+        f"{user}/{password}@{tns_alias}",
+        f"@{sql_file}"
+    ]
+    result = subprocess.run(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
     )
-  
-  calculSupp <- calculSupp %>%
-    mutate(
-      nbjSupp = nbjrea_r + nbrep_r + nbjsrc_r + nbjsitr + nbjnna_r + nbjnnb_r + nbjnnc_r + nbjUSIP,
-      suprea = as.integer(nbjrea_r > 0),
-      suprep = as.integer(nbrep_r > 0),
-      supsirea = as.integer(nbjsirr > 0),
-      supusip = as.integer(nbjUSIP > 0),
-      supsrc = as.integer(nbjsrc_r > 0),
-      supsi = as.integer(nbjsitr > 0),
-      supnna = as.integer(nbjnna_r > 0),
-      supnnb = as.integer(nbjnnb_r > 0),
-      supnnc = as.integer(nbjnnc_r > 0)
-    ) %>%
-    filter(!is.na(GHM))
-  
-  # calculSupp <- calculSupp %>%
-  #   mutate(
-  #     nbjSupp = nbjrea_r + nbrep_r + nbjsrc_r + nbjsitr + nbjnna_r + nbjnnb_r + nbjnnc_r,
-  #     suprea = as.integer(nbjrea_r > 0),
-  #     suprep = as.integer(nbrep_r > 0),
-  #     supsirea = as.integer(nbjsirr > 0),
-  #     supusip = if_else(special %in% c('USC->USIP', 'USI->USIP'), 1, 0),
-  #     nbjUSIP = if_else(special %in% c('USC->USIP', 'USI->USIP'), nbjsitr + nbjsrc_r, 0),
-  #     nbjsrc_r = if_else(special %in% c('USC->USIP', 'USI->USIP'), 0, nbjsrc_r),
-  #     nbjsitr = if_else(special %in% c('USC->USIP', 'USI->USIP'), 0, nbjsitr),
-  #     supsrc = as.integer(nbjsrc_r > 0),
-  #     supsi = as.integer(nbjsitr > 0),
-  #     supnna = as.integer(nbjnna_r > 0),
-  #     supnnb = as.integer(nbjnnb_r > 0),
-  #     supnnc = as.integer(nbjnnc_r > 0)
-  #   ) %>%
-  #   filter(!is.na(GHM))
-  
-# Assignation des noms des variables
-  supplement <- calculSupp %>%
-    group_by(UMA2, special) %>%
-    summarise(
-      !!paste0("nbRea", nom) := sum(nbjrea_r, na.rm = TRUE),
-      !!paste0("nbReaPed", nom) := sum(nbrep_r, na.rm = TRUE),
-      !!paste0("nbSC", nom) := sum(nbjsrc_r, na.rm = TRUE),
-      !!paste0("nbSIRea", nom) := sum(nbjsirr, na.rm = TRUE),
-      !!paste0("nbUSIP", nom) := sum(nbjUSIP, na.rm = TRUE),
-      !!paste0("nbSI", nom) := sum(nbjsitr, na.rm = TRUE),
-      !!paste0("nbNNA", nom) := sum(nbjnna_r, na.rm = TRUE),
-      !!paste0("nbNNB", nom) := sum(nbjnnb_r, na.rm = TRUE),
-      !!paste0("nbNNC", nom) := sum(nbjnnc_r, na.rm = TRUE),
-      !!paste0("nbJour", nom) := sum(nbjrum, na.rm = TRUE),
-      !!paste0("nbjSupp", nom) := sum(nbjSupp, na.rm = TRUE),
-      !!paste0("nbrum", nom) := n(),
-      !!paste0("sup_rea", nom) := sum(suprea, na.rm = TRUE),
-      !!paste0("sup_rep", nom) := sum(suprep, na.rm = TRUE),
-      !!paste0("sup_src", nom) := sum(supsrc, na.rm = TRUE),
-      !!paste0("sup_USIP", nom) := sum(supusip, na.rm = TRUE),
-      !!paste0("sup_SI", nom) := sum(supsi, na.rm = TRUE),
-      !!paste0("sup_SIRea", nom) := sum(supsirea, na.rm = TRUE),
-      !!paste0("sup_nna", nom) := sum(supnna, na.rm = TRUE),
-      !!paste0("sup_nnb", nom) := sum(supnnb, na.rm = TRUE),
-      !!paste0("sup_nnc", nom) := sum(supnnc, na.rm = TRUE),
-    .groups = "keep") %>%
-    filter(!!sym(paste0("nbjSupp", nom)) > 0) %>%
-    ungroup()
-  
-  # Ajout des libellés actuels d'UMA
-  supplement2 <- supplement %>%
-    left_join(uh_dmu %>% distinct(DMU=libdmu,Site=hopital,libelle_UMA,UMA2), by = "UMA2") %>%
-    distinct() %>% arrange(libelle_UMA)
-  
-  # Vérifie les répétitions d'UMA
-  test <- supplement2 %>%
-    group_by(UMA2) %>%
-    filter(n() > 1) %>%
-    ungroup()
-  
-  nb=nrow(test %>% select(UMA2, libelle_UMA, Site))
-  print(ifelse(nb==0,"Il n'y a pas de duplicata d'UMA",paste("Il y a",nb,"répétition(s) d'UMA")))
-  
-  # Calcul des ratios 
-  df <- supplement2 %>%
-    mutate(
-      !!paste0("ratioRea", nom) := ifelse(get(paste0("nbRea", nom)) > 0,
-                                          get(paste0("nbRea", nom)) / get(paste0("nbjSupp", nom)),
-                                          NA_real_),
-      !!paste0("ratioReaPed", nom) := ifelse(get(paste0("nbReaPed", nom)) > 0,
-                                             get(paste0("nbReaPed", nom)) / get(paste0("nbjSupp", nom)),
-                                             NA_real_),
-      !!paste0("ratioNeonat", nom) := ifelse(get(paste0("nbNNA", nom)) > 0,
-                                             get(paste0("nbNNA", nom)) / get(paste0("nbJour", nom)),
-                                             NA_real_),
-      !!paste0("ratioSINeonat", nom) := ifelse(get(paste0("nbNNB", nom)) > 0,
-                                               get(paste0("nbNNB", nom)) / get(paste0("nbjSupp", nom)),
-                                               NA_real_),
-      !!paste0("ratioReaNeonat", nom) := ifelse(get(paste0("nbNNC", nom)) > 0,
-                                                get(paste0("nbNNC", nom)) / get(paste0("nbjSupp", nom)),
-                                                NA_real_),
-      !!paste0("ratioSI", nom) := ifelse(get(paste0("nbSI", nom)) > 0,
-                                         get(paste0("nbSI", nom)) / get(paste0("nbjSupp", nom)),
-                                         NA_real_),
-      !!paste0("ratioUSIP", nom) := ifelse(get(paste0("nbUSIP", nom)) > 0,
-                                           get(paste0("nbUSIP", nom)) / get(paste0("nbJour", nom)),
-                                           NA_real_),
-      !!paste0("ratioSC", nom) := ifelse(get(paste0("nbSC", nom)) > 0,
-                                         get(paste0("nbSC", nom)) / get(paste0("nbJour", nom)),
-                                         NA_real_),
-      !!paste0("nbSIHorsRea", nom) := get(paste0("nbSI", nom)) - get(paste0("nbSIRea", nom)),
-      !!paste0("sup_SIHorsRea", nom) := get(paste0("sup_SI", nom)) - get(paste0("sup_SIRea", nom))
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr or result.stdout or "Erreur SQL*Plus")
+
+def load_data(csv_file):
+    cols = [
+        "UNIT", "ANNEE", "NB_RUM", "NB_RUM_SUPPL",
+        "NB_JOURNEES", "NB_JOURNEES_SUPPL",
+        "%_RUM_SUPPL", "%_JOURNEES_SUPPL"
+    ]
+
+    df = pd.read_csv(
+        csv_file,
+        sep=";",
+        engine="python",
+        names=cols,
+        header=None,
+        encoding="cp1252"
     )
-  return(df)
-}
- # Tables années révolue ####
-table_avant <- function(annee,
-                        chemin_simpa_psl_mco_annee_derniere, 
-                        chemin_simpa_sat_mco_annee_derniere,
-                        chemin_simpa_tnn_mco_annee_derniere,
-                        chemin_simpa_trs_mco_annee_derniere){
-  # Import des tables simpa de chaque site
-  simpa_PSL <- import_simpa(chemin_simpa_mco=chemin_simpa_psl_mco_annee_derniere, "PSL" )
-  simpa_SAT <- import_simpa(chemin_simpa_mco=chemin_simpa_sat_mco_annee_derniere, "SAT" )
-  simpa_TNN <- import_simpa(chemin_simpa_mco=chemin_simpa_tnn_mco_annee_derniere, "TNN" )
-  simpa_TRS <- import_simpa(chemin_simpa_mco=chemin_simpa_trs_mco_annee_derniere, "TRS" )
-  
-  # Création d'une table simpa unique
-  simpa_annee <- bind_rows(simpa_PSL,simpa_SAT,simpa_TNN,simpa_TRS)
-  rm(simpa_PSL,simpa_SAT,simpa_TNN,simpa_TRS)
-  print("Table SIMPA créée")
-  # Calcul des suppléments : nombre, supp, ratios de l'année
-  table <- table_annee_seule(annee,simpa_annee)
-  # Enregistrement dans "fichiers IN"
-  write.xlsx(table,paste0("fichiers IN/Table_complete_ratios_soins_critiques_",annee,".xlsx"))
-  return(table)
-}
 
+    df = df.dropna(subset=["UNIT"])
+    df["ANNEE"] = df["ANNEE"].astype(int)
+    df["UNIT"] = df["UNIT"].astype(str).str.strip()
 
-# Mise en forme ####
-mise_en_forme <- function(data,nom,annee){
-  
-  # data <- read.xlsx(paste0("fichiers IN/Table_pres_esth",annee,".xlsx"))
-  # data <- data %>% mutate(#fond=ifelse(str_detect(DMU,"601|603|605|607|609|611|613")==T,1,0),fond=substr(DMU,3,3))
-  
-  # Gestion des USC et USI de 2024 (non USI ou USIP)
-  lusc <- data %>% mutate(usc=ifelse(obs==1,row.names(.),NA)) %>% filter(!is.na(usc)) %>% select(usc) %>% mutate(usc=as.numeric(usc)+2)
-  lusc <- lusc[,1]
-  lusi <- data %>% mutate(usi=ifelse(obs==2,row.names(.),NA)) %>%  filter(!is.na(usi)) %>% select(usi) %>% mutate(usi=as.numeric(usi)+2)
-  lusi <- lusi[,1]
-  
-  # Création d'un fichier xlsx
-  # utilisation du workbook contenant la méthodo
-  wb <- loadWorkbook("Méthode.xlsx")
-  addWorksheet(wb, "journées avec supplémts par UMA", gridLines = TRUE,paperSize=8, orientation="landscape")
-  cloneWorksheet(wb, "Méthode", 1)
-  removeWorksheet(wb, 1)
-  writeData(wb, 1, data, startCol = 1, startRow = 2,withFilter=T)
-  
-  row <- nrow(data)
-  col <- ncol(data)
-  
-  # FIXER LA HAUTEUR ET LONGUEURS DES LIGNES/COLONNES
-  setColWidths(wb,1 ,cols = c(1), widths = c(19.64))
-  setColWidths(wb,1 ,cols = c(4:col), widths = c(8)) 
-  setColWidths(wb,1 ,cols = c(2:3), widths = "auto") #c(7.5))
-  
-  
-  ### SUPRRESSION COLONNE INDICATEUR POUR FORMATING
-  setColWidths(wb, 1, cols = col, widths = 10, hidden=TRUE)
-  setRowHeights(wb,1 ,rows = 2, heights = 58.5)
-  
-  # Fonctions esthétiques ##
+    numeric_cols = ["NB_RUM", "NB_RUM_SUPPL", "NB_JOURNEES", "NB_JOURNEES_SUPPL"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
 
-  ## Libelle centré
-  centre <- createStyle(halign="center",valign="center")
-  addStyle(wb, 1, style = centre, rows = 1:(row+2), cols = c(1,2),stack = T,gridExpand = TRUE)
-  addStyle(wb, 1, style = centre, rows = 1, cols = c(1:col),stack = T,gridExpand = TRUE)
-  gras <- createStyle(textDecoration="bold")
-  addStyle(wb, 1, style = gras, rows = 1:(row+2), cols = c(1),stack = T,gridExpand = TRUE)
-  addStyle(wb, 1, style = gras, rows = 1, cols = c(1:col),stack = T,gridExpand = TRUE)
-  
-  # Libéllés colonnes
-  centre_gras <- createStyle(fontSize=11, valign = "center", halign="center",textDecoration = "bold",fgFill = "#BFBFBF")
-  addStyle(wb, 1, style = centre_gras, rows = 2, cols = 1:col, gridExpand = TRUE,stack = T)
-  
-  # lib <- createStyle(bgFill = "#BFBFBF",fontSize=11, valign = "center", halign="center",textDecoration = "bold")
-  # conditionalFormatting(wb, 1, cols = (1:col), rows = (1:2), type = "contains", style = lib, stack=T, gridExpand = TRUE)
-  # ? 
-  libjaune <- createStyle(fgFill = "yellow",fontSize=11, valign = "center", halign="center",textDecoration = "bold")
-  addStyle(wb, 1, style = libjaune, rows = 2, cols = 13:15, gridExpand = TRUE)
-  
-  # ligne verticale noire
-  lignegrid <- createStyle(border="right",borderColour = "black",borderStyle = "medium")
-  addStyle(wb, 1, style = lignegrid, rows= 1:(row+2), cols = list(3,6,9,12,15,18,21,24,27),stack = T,gridExpand = TRUE)
-  
-  # ligne horizontale noire
-  lignehori <- createStyle(border="bottom",borderColour = "black",borderStyle = "medium")
-  conditionalFormatting(wb, 1, cols = 1:col, rows = 1:(row+2), rule="$A1 != $A2",type="expression", style=lignehori, stack=T, gridExpand = TRUE)
-  addStyle(wb, 1, cols = 1:col, rows = row+2, style=lignehori, stack=T, gridExpand = TRUE)
-  
-  
- #  # esthétique générale
- #  couleur selon site 2:col + font 10
-  libpsl <- createStyle(bgFill = "#C6E0B4",fontSize=10)
-  conditionalFormatting(wb, 1, cols = c(2:col), rows = c(3:(row+4)), rule='$B3=="PSL"', style=libpsl,gridExpand = TRUE, stack=T)
-  libtnn <- createStyle(bgFill = "#B4C6E7",fontSize=10)
-  conditionalFormatting(wb, 1, cols = c(2:col), rows = c(3:(row+4)), rule='$B3=="TNN"', style=libtnn,gridExpand = TRUE, stack=T)
-  libtrs <- createStyle(bgFill = "#FFCCFF",fontSize=10)
-  conditionalFormatting(wb, 1, cols = c(2:col), rows = c(3:(row+4)), rule='$B3=="TRS"', style=libtrs,gridExpand = TRUE, stack=T)
-  libsat <- createStyle(bgFill = "#F8CBAD",fontSize=10)
-  conditionalFormatting(wb, 1, cols = c(2:col), rows = c(3:(row+4)), rule='$B3=="SAT"', style=libsat,gridExpand = TRUE, stack=T)
+    df["%_RUM_SUPPL"] = round(df["NB_RUM_SUPPL"] / df["NB_RUM"] * 100, 1).fillna(0)
+    df["%_JOURNEES_SUPPL"] = round(df["NB_JOURNEES_SUPPL"] / df["NB_JOURNEES"] * 100, 1).fillna(0)
 
-   #  baisse de + 3% -> rouge
-  rouge <- createStyle(fontColour = "red")
-  conditionalFormatting(wb, 1, cols = list(6), rows = c(3:(row+4)), rule='E3-F3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(9), rows = c(3:(row+4)), rule='H3-I3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(12), rows = c(3:(row+4)), rule='K3-L3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(15), rows = c(3:(row+4)), rule='N3-O3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(18), rows = c(3:(row+4)), rule='Q3-R3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(21), rows = c(3:(row+4)), rule='T3-U3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(24), rows = c(3:(row+4)), rule='W3-X3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, cols = list(27), rows = c(3:(row+4)), rule='Z3-AA3>=0.03', style=rouge, stack=T)#,gridExpand = TRUE)
-  
-  # libéllés lignes 
-  textebleu<- createStyle(fontColour = "#000080", textDecoration = "italic",fontSize=10) #,border="TopBottomLeftRight",borderColour="black") #4F81BD
-  conditionalFormatting(wb, 1, style = textebleu, rows = 1:(row+2), cols = 3,  type = "contains",rule = "USI",stack=T,gridExpand = TRUE)
+    return df.sort_values("UNIT").reset_index(drop=True)
 
-  # pourcentage
-  percent_style <- createStyle(numFmt = "# ### ##0.0%")
-  addStyle(wb, 1, style = percent_style, rows= 3:(row+2), cols = c(4:col),stack = T,gridExpand = TRUE)
-  
-  # texte en tête wrap
-  wrap <- createStyle(wrapText = T) 
-  addStyle(wb, 1, style = wrap, rows = c(1,2), cols = c(1:col),stack = T,gridExpand = TRUE)
-  
-  # Merge cells
-  mergeCells(wb, 1, rows= 1, cols= c(4:6))
-  mergeCells(wb, 1, rows= 1, cols= c(7:9))
-  mergeCells(wb, 1, rows= 1, cols= c(10:12))
-  mergeCells(wb, 1, rows= 1, cols= c(13:15))
-  mergeCells(wb, 1, rows= 1, cols= c(16:18))
-  mergeCells(wb, 1, rows= 1, cols= c(19:21))
-  mergeCells(wb, 1, rows= 1, cols= c(22:24))
-  mergeCells(wb, 1, rows= 1, cols= c(25:27))
-  
-  my_list <- data %>% arrange(DMU) %>% distinct(DMU)
-  b <- 2
-  for(i in 1:nrow(my_list)) {
-    # print(my_list[i,])
-    a <- nrow(data %>% filter(DMU==my_list[i,])) + b
-    # print(a)
-    ifelse(a!=b, mergeCells(wb, 1, cols = 1, rows = c((b+1):a)),NA)
-    b <- a
-    # print(b)
-    addStyle(wb, 1, cols = 1, rows = a, style=lignehori, stack=T, gridExpand = TRUE)
-  }
-  
-  textebleu2 <- createStyle(fontColour = "#000080", textDecoration = "italic",halign="center") 
-  conditionalFormatting(wb, 1, style = textebleu2, rows = 3:(row+2), cols = 13, rule = '$AB3==2',stack=T,gridExpand = TRUE)
-  conditionalFormatting(wb, 1, style = textebleu2, rows = 3:(row+2), cols = 16, rule = '$AB3==1',stack=T,gridExpand = TRUE)
-  
-  # Ajout texte en tête
-  writeData(wb, 1, list("REA","","","REA PED","","","USC","","","USIP","","","USI spé","","","NEONAT","","","USI NEONAT","","","REA NEONAT"), startCol = 4, startRow = 1)
-  writeData(wb, 1, list(annee-2,annee-1,nom,annee-2,annee-1,nom,annee-2,annee-1,nom,paste0(annee-2,"(**)"),paste0(annee-1,"(*)"),nom,annee-2,annee-1,nom,annee-2,annee-1,nom,annee-2,annee-1,nom,annee-2,annee-1,nom), startCol = 4, startRow = 2)
-  for (i in lusc){
-      writeData(wb, 1, "USC", startCol = 16, startRow = i, headerStyle =createStyle(halign = "CENTER"))
-  }
-  writeData(wb, 1,"USI" , startCol = 13, startRow = lusi)
+def afficher_tableau(df, annee1, annee2):
 
-  return(wb)
-  }
+    mois_actuel = datetime.now().month
+    mois_precedent = 12 if mois_actuel == 1 else mois_actuel - 1
+    suffixe_mois = f"M{mois_precedent:02d}"
 
-# Creation table finale ####
-# Création du document pour l'année en cours
-bilan_supp_SC <- function(annee,mois,
-                          chemin_simpa_psl_mco_annee_courante, 
-                          chemin_simpa_sat_mco_annee_courante,
-                          chemin_simpa_tnn_mco_annee_courante,
-                          chemin_simpa_trs_mco_annee_courante
-                          ){
-  
-  # Import des données de supp SC des annnées N-1 et N-2
-  dataN1 <- read.xlsx(paste0("fichiers IN/Table_complete_ratios_soins_critiques_",annee-1,".xlsx"))
-  dataN2 <- read.xlsx(paste0("fichiers IN/Table_complete_ratios_soins_critiques_",annee-2,".xlsx"))
-  
-  # Import des données simpa
-  simpa_PSL <- import_simpa(chemin_simpa_mco=chemin_simpa_psl_mco_annee_courante, "PSL" )
-  simpa_SAT <- import_simpa(chemin_simpa_mco=chemin_simpa_sat_mco_annee_courante, "SAT" )
-  simpa_TNN <- import_simpa(chemin_simpa_mco=chemin_simpa_tnn_mco_annee_courante, "TNN" )
-  simpa_TRS <- import_simpa(chemin_simpa_mco=chemin_simpa_trs_mco_annee_courante, "TRS" )
+    um_names = {
+        "103": "Réa CHIR",
+        "104": "USC",
+        "21": "SI Cardiologie",
+        "340": "Med Intensive Rea",
+        "341": "USIP MIR",
+        "451": "SI Hématologie",
+        "91": "Réa Néonat",
+        "92": "SI Néonat"
+    }
 
-  simpa_annee_courante <- bind_rows(simpa_PSL,simpa_SAT,simpa_TNN,simpa_TRS)
-  rm(simpa_PSL,simpa_SAT,simpa_TNN,simpa_TRS)
-  print("Table SIMPA créée")
-  
-  # Creation de la table des nb, supp et ratios de SC pour l'année N
-  nom=paste0(annee,"M",ifelse(substr(mois,2,2)=="","0",""),mois)
-  dataN <- table_annee_seule(nom,simpa_annee_courante)
-  rm(simpa_annee_courante)
-  
-  # Création du bilan SC comparant les 3 années
-  # Jointure des tables N-2, N-1 et N
-  tableTot <- full_join(dataN2,dataN1,by=c("UMA2","DMU","Site")) %>% full_join(dataN,by=c("UMA2","DMU","Site")) %>% select(-special.x,-special.y,-special,obs=special.x) %>% 
-    mutate(libelle_UMA=ifelse(is.na(libelle_UMA),ifelse(is.na(libelle_UMA.y),libelle_UMA.x,libelle_UMA.y),libelle_UMA)) %>% 
-    select(-libelle_UMA.x,-libelle_UMA.y) %>% 
-    arrange(libelle_UMA) %>% filter(!str_detect(libelle_UMA, "612 - SAT - 262")) %>% 
-    mutate(obs =ifelse((!is.na(obs)&str_detect(obs,"USI spé")),1,
-                       ifelse((!is.na(obs)&str_detect(obs,"SI->USIP")),2,NA)))
-  
-  # Suppression des UMA sans rum pour l'année N
-  umaold <- tableTot %>% filter(is.na(get(paste0("nbrum",nom)))) %>% select(UMA2,libelle_UMA)
-  
-  print(ifelse(nrow(umaold)==0,"Toutes les UMA de l'année précédentes sont encore utilisées",paste("Il y a",nrow(umaold),"UMA sans RUM cette année",list(umaold$libelle_UMA))))
-  tableTot <- tableTot %>% anti_join(umaold,by=c("UMA2", "libelle_UMA"))
-  
-  # Repérage des nouvelles UMA 
-  umanew <- tableTot %>% filter(is.na(get(paste0("nbrum",annee-1)))&is.na(get(paste0("nbrum",annee-2)))) %>% select(UMA2,libelle_UMA)
-  print(ifelse(nrow(umanew)==0,"Pas de nouvelle UMA cette année",paste("Il y a",nrow(umanew),"nouvelle UMA cette année",list(umanew$libelle_UMA))))
-  
-  # Selection des variables d'intérets : ratio 
-  tableSC <- tableTot %>% mutate(hp=substr(UMA2,2,2)) %>% 
-    select(DMU,Site, "Libellé UMA"=libelle_UMA, contains("ratioRea2"), contains("ratioReaPed2"),
-           contains("ratioSC"), contains("ratioUSIP"), contains("ratioSI2"),
-           contains("ratioNeonat2"), contains("ratioSINeonat"), contains("ratioReaNeonat"),
-           obs)#%>% 
-  colnames(tableSC) <- str_replace_all(colnames(tableSC),"20", " 20")
-  colnames(tableSC) <- str_replace_all(colnames(tableSC),"Neonat", " Neonat")
-  colnames(tableSC) <- str_replace_all(colnames(tableSC),"Ped", " Ped")
-  
-  # write.xlsx(tableSC,paste0("fichiers IN/Table_pres_esth",annee,".xlsx"))
-  
-  # mise en forme -  esthétique
-  wb <- mise_en_forme(tableSC,nom,annee)
-  
-  # ENregistrement du fichier final
-  saveWorkbook(wb, paste0("Suppléments SU/Suppléments SU ", nom,"_CA DMU_modif USIP.xlsx"),
-               overwrite = TRUE)
-  
-  print(paste0("Table enregistrée : Suppléments SU/Suppléments SU ", nom,"_CA DMU_modif USIP.xlsx"))
-  return(tableSC)
-}
+    st.markdown("""
+    <style>
+    .block-container { max-width: 95% !important; }
+    .table-grouped { width: 100% !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# 2025
-  
-# REP=1158.31
-# REA=1021.95
-# SI=499.93
-# SRC=399.94
-# NN1=386.11
-# NN2=579.14
-# NN3=1158.31
+    df["UNIT_NOM"] = df["UNIT"].map(um_names).fillna(df["UNIT"])
 
-# TEST journée suppléments ####
-# import année 2024 ou 2025
-# création table simpa complète
-# sélection periode possiblement à cheval avec statut spécial
+    rows = []
 
-# test <- calculSupp1 %>% filter(!is.na(special)) %>% filter(Date.sortie.dossier>as.Date("2024-10-01"))
-# sélection uma avec cht en octobre 
-# test2 <- test %>% filter(URMC %in% c("66742","66942","66212","66207","66672","66771","66204","66202","73292","73261","73263","87014","87740","88311","88063"))
+    for unit in sorted(df["UNIT"].unique()):
+        d1 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee1)]
+        d2 = df[(df["UNIT"] == unit) & (df["ANNEE"] == annee2)]
 
-# ex : 663543620
-# testex <- test2 %>% filter(NDA=="663543620")
+        d1 = d1.iloc[0] if not d1.empty else None
+        d2 = d2.iloc[0] if not d2.empty else None
+
+        nb_rum1 = d1["NB_RUM"] if d1 is not None else 0
+        nb_rum_sup1 = d1["NB_RUM_SUPPL"] if d1 is not None else 0
+        pct_rum1 = d1["%_RUM_SUPPL"] if d1 is not None else 0
+        nb_journees1 = d1["NB_JOURNEES"] if d1 is not None else 0
+        nb_journees_sup1 = d1["NB_JOURNEES_SUPPL"] if d1 is not None else 0
+        pct_journees1 = d1["%_JOURNEES_SUPPL"] if d1 is not None else 0
+
+        nb_rum2 = d2["NB_RUM"] if d2 is not None else 0
+        nb_rum_sup2 = d2["NB_RUM_SUPPL"] if d2 is not None else 0
+        pct_rum2 = d2["%_RUM_SUPPL"] if d2 is not None else 0
+        nb_journees2 = d2["NB_JOURNEES"] if d2 is not None else 0
+        nb_journees_sup2 = d2["NB_JOURNEES_SUPPL"] if d2 is not None else 0
+        pct_journees2 = d2["%_JOURNEES_SUPPL"] if d2 is not None else 0
+
+        evol_rum = round(nb_rum_sup1 / nb_rum_sup2, 1) if nb_rum_sup2 else 0
+        evol_journees = round(nb_journees_sup1 / nb_journees_sup2, 1) if nb_journees_sup2 else 0
+
+        unit_nom = f"UM {unit} - {d1['UNIT_NOM'] if d1 is not None else (d2['UNIT_NOM'] if d2 is not None else unit)}"
+
+        sign_rum = "+" if evol_rum > 0 else ""
+        sign_journees = "+" if evol_journees >0 else ""
+
+        rows.append(
+            f"<tr>"
+            f"<td>{unit_nom}</td>"
+            f"<td>{nb_rum2}</td><td>{nb_rum_sup2}</td><td>{pct_rum2}%</td>"
+            f"<td>{nb_journees2}</td><td>{nb_journees_sup2}</td><td>{pct_journees2}%</td>"
+            f"<td>{nb_rum1}</td><td>{nb_rum_sup1}</td><td>{pct_rum1}%</td>"
+            f"<td>{nb_journees1}</td><td>{nb_journees_sup1}</td><td>{pct_journees1}%</td>"
+            f"<td>{sign_rum}{evol_rum}%</td>"
+            f"<td>{sign_journees}{evol_journees}%</td>"
+            f"</tr>"
+        )
+
+    tableau_html = f"""
+    <h2>Évolution {annee1} vs {annee2} - {suffixe_mois}</h2>
+    <table class="table-grouped">
+        <thead>
+        <tr>
+          <th rowspan="2" class="group-border-right th-unit">Unité médicale</th>
+          <th colspan="3" class="group-border-right th-rum">{annee2} RUM</th>
+          <th colspan="3" class="group-border-right th-jours">{annee2} Journées</th>
+          <th colspan="3" class="group-border-right th-rum">{annee1} RUM</th>
+          <th colspan="3" class="group-border-right th-jours">{annee1} Journées</th>
+          <th colspan="2" class="th-evol">Évolution</th>
+        </tr>
+        <tr>
+          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
+          <th class="th-rum">Nb RUM</th><th class="th-rum">Nb RUM sup</th><th class="th-rum group-border-right">% RUM</th>
+          <th class="th-jours">Nb journées</th><th class="th-jours">Nb journées sup</th><th class="th-jours group-border-right">% journées</th>
+          <th class="th-evol">% RUM</th><th class="th-evol">% Journées</th>
+        </tr>
+      </thead>
+      <tbody>
+        {''.join(rows)}
+      </tbody>
+    </table>
+    """
+    st.markdown(tableau_html, unsafe_allow_html=True)
+
+def main():
+    st.title("Dashboard d'évolution des RUMs")
+
+    annee1 = datetime.now().year -1
+    annee2 = datetime.now().year
+
+    load_css(CSS_FILE)
+
+    user = "xxxxxx"
+    password = "xxxxxx"
+    tns_alias = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
+
+    if st.button("Actualiser le tableau"):
+        if CSV_FILE.exists():
+            CSV_FILE.unlink()
+        try:
+            run_sqlplus(user, password, tns_alias, SQL_FILE)
+            if not CSV_FILE.exists():
+                st.error("SQL exécuté mais dashboard.csv introuvable.")
+                st.stop()
+            df = load_data(CSV_FILE)
+            afficher_tableau(df, annee1, annee2)
+        except Exception as e:
+            st.error(f"Erreur lors de l'exécution : {e}")
+
+if __name__ == "__main__":
+    main()
 
 
 
 
-
-
-
-sur les pneumothorax spontanés primaires traités par surveillance simple, sans drainage ni chirurgie durant leur hospitalisation
+SET LINESIZE 32767
+SET HEADING ON
+SET COLSEP ";"
+SET PAGESIZE 0
+SET FEEDBACK OFF
+SET TRIMSPOOL ON
+SET WRAP OFF
+SPOOL data/dashboard.csv
+SET TERMOUT OFF
+SELECT DISTINCT
+    RSM.CDURM_P AS UNITE_MEDICALE,
+    TO_CHAR(RSM.D8EEUE,'YYYY') AS ANNEE,
+    COUNT(RSM.KYRES) AS NB_RUM,
+    SUM(
+        CASE 
+            WHEN NVL(RUM.NBJREA_R,0)
+               + NVL(RUM.NBJSRC_R,0)
+               + NVL(RUM.NBJSTF_ISSUDEREA_R,0)
+               + NVL(RUM.NBJSTF_TOT_R,0)
+               + NVL(RUM.NBJNNA_R,0)
+               + NVL(RUM.NBJNNB_R,0)
+               + NVL(RUM.NBJNNC_R,0)
+               + NVL(RUM.NBJ_USIPR,0) > 0
+            THEN 1 ELSE 0 
+        END
+    ) AS NB_RUM_SUPPL,
+    SUM(NVL(RUM.NBJRUM,0)) AS NB_JOURNEES,
+    SUM(
+        CASE 
+            WHEN NVL(RUM.NBJREA_R,0)
+               + NVL(RUM.NBJSRC_R,0)
+               + NVL(RUM.NBJSTF_ISSUDEREA_R,0)
+               + NVL(RUM.NBJSTF_TOT_R,0)
+               + NVL(RUM.NBJNNA_R,0)
+               + NVL(RUM.NBJNNB_R,0)
+               + NVL(RUM.NBJNNC_R,0)
+               + NVL(RUM.NBJ_USIPR,0) > 0
+            THEN NVL(RUM.NBJRUM,0) ELSE 0 
+        END
+    ) AS NB_JOURNEES_SUPPL
+FROM RSM, RUM
+WHERE RSM.KYRES = RUM.NORES
+  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
+  AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  --AND RSM.D8EEUE <= TO_DATE('30/09/2025','DD/MM/YYYY')
+  AND RSM.D8EEUE <= ADD_MONTHS(TRUNC(SYSDATE, 'MM'), -1) + INTERVAL '1' MONTH - INTERVAL '1' DAY
+GROUP BY RSM.CDURM_P, TO_CHAR(RSM.D8EEUE,'YYYY')
+ORDER BY RSM.CDURM_P, ANNEE;
+SPOOL OFF
+EXIT;
