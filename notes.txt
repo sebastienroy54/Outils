@@ -1,457 +1,291 @@
-import io
-import subprocess
-from datetime import datetime
+from __future__ import annotations
+
+import csv
+import re
+import sys
+import unicodedata
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import streamlit as st
-
-BASE_DIR = Path(__file__).resolve().parents[1]
-SQL_DIR = BASE_DIR / "SQL"
-DATA_DIR = BASE_DIR / "data"
-OUTILS_DIR = BASE_DIR / "outils"
-
-SQL_FILE = SQL_DIR / "Requete_RUM_detail.sql"
-CSV_FILE = DATA_DIR / "dashboard_rum_detail.csv"
-CSS_FILE = OUTILS_DIR / "styles_dashboard_rum.css"
-
-# -----------------------------
-# Paramètres métier
-# -----------------------------
-UNIT_LABELS = {
-    "103": "Réa CHIR",
-    "104": "USC",
-    "21": "SI Cardiologie",
-    "340": "Med Intensive Rea",
-    "341": "USIP MIR",
-    "451": "SI Hématologie",
-    "91": "Réa Néonat",
-    "92": "SI Néonat",
-}
-
-UNITS_TO_KEEP = ["340", "103", "91", "341", "104", "92", "21", "451"]
-
-SUPP_COLS = [
-    "NBJREA_R",
-    "NBREP_R",
-    "NBJSRC_R",
-    "NBJSTF_ISSUDEREA_R",
-    "NBJSTF_TOT_R",
-    "NBJNNA_R",
-    "NBJNNB_R",
-    "NBJNNC_R",
-    "NBJ_USIPR",
-]
-
-# -----------------------------
-# Utilitaires
-# -----------------------------
-def load_css(file_path):
-    if not file_path.exists():
-        st.warning("CSS introuvable : {}".format(file_path))
-        return
-    with open(file_path, encoding="utf-8") as f:
-        st.markdown("<style>{}</style>".format(f.read()), unsafe_allow_html=True)
-
-
-def run_sqlplus(user, password, tns_alias, sql_file):
-    cmd = [
-        "sqlplus",
-        "-S",
-        "{}/{}@{}".format(user, password, tns_alias),
-        "@{}".format(sql_file)
-    ]
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr or result.stdout or "Erreur SQL*Plus")
-
-
-def normalize_unit(value):
-    """
-    Normalise les codes UM :
-    '021' -> '21'
-    '091' -> '91'
-    '340' -> '340'
-    """
-    if pd.isna(value):
-        return None
-    value = str(value).strip()
-    if not value:
-        return None
-    try:
-        return str(int(value))
-    except ValueError:
-        return value
-
-
-def safe_pct(num, den):
-    num = pd.Series(num)
-    den = pd.Series(den)
-    res = np.where(den > 0, np.round((num / den) * 100, 1), 0.0)
-    return pd.Series(res)
-
-
-def evol_percent(current_value, previous_value):
-    """
-    Règle métier voulue :
-    - si N-1 = 0 et N > 0 => +100%
-    - si N-1 = 0 et N = 0 => 0%
-    - sinon ((N - (N-1)) / (N-1)) * 100
-    """
-    if previous_value == 0:
-        return 100.0 if current_value > 0 else 0.0
-    return round(((current_value - previous_value) / float(previous_value)) * 100, 1)
-
-
-def current_year_info():
-    now = datetime.now()
-    year_n = now.year
-    year_n1 = now.year - 1
-    year_n2 = now.year - 2
-    previous_month = 12 if now.month == 1 else now.month - 1
-    month_suffix = "M{:02d}".format(previous_month)
-    return year_n, year_n1, year_n2, month_suffix
-
-
-# -----------------------------
-# Chargement et préparation
-# -----------------------------
-def load_detail_data(csv_file):
-    cols = [
-        "KYRES",
-        "UNIT",
-        "DATE_SORTIE",
-        "ANNEE",
-        "NBJRUM",
-        "NBJREA_R",
-        "NBREP_R",
-        "NBJSRC_R",
-        "NBJSTF_ISSUDEREA_R",
-        "NBJSTF_TOT_R",
-        "NBJNNA_R",
-        "NBJNNB_R",
-        "NBJNNC_R",
-        "NBJ_USIPR",
-    ]
-
-    df = pd.read_csv(
-        csv_file,
-        sep=";",
-        engine="python",
-        names=cols,
-        header=None,
-        encoding="cp1252"
-    )
-
-    df = df.dropna(subset=["KYRES", "UNIT"])
-    df["UNIT"] = df["UNIT"].apply(normalize_unit)
-    df = df[df["UNIT"].isin(UNITS_TO_KEEP)].copy()
-
-    df["ANNEE"] = pd.to_numeric(df["ANNEE"], errors="coerce").fillna(0).astype(int)
-    df["DATE_SORTIE"] = pd.to_datetime(df["DATE_SORTIE"], errors="coerce", format="%Y-%m-%d")
-
-    numeric_cols = ["NBJRUM"] + SUPP_COLS
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    # Indicateurs métier
-    df["NBJ_SUPPL_REELLES"] = df[SUPP_COLS].sum(axis=1)
-    df["RUM_AVEC_SUPPL"] = (df["NBJ_SUPPL_REELLES"] > 0).astype(int)
-
-    # Journées des RUM qui déclenchent un supplément
-    df["NBJRUM_AVEC_SUPPL"] = np.where(df["RUM_AVEC_SUPPL"] == 1, df["NBJRUM"], 0)
-
-    df["UNIT_NOM"] = df["UNIT"].map(UNIT_LABELS).fillna(df["UNIT"])
-
-    return df.reset_index(drop=True)
-
-
-def build_aggregated_by_unit_year(df):
-    agg = (
-        df.groupby(["UNIT", "UNIT_NOM", "ANNEE"], as_index=False)
-        .agg({
-            "KYRES": "count",
-            "RUM_AVEC_SUPPL": "sum",
-            "NBJRUM": "sum",
-            "NBJRUM_AVEC_SUPPL": "sum",
-            "NBJ_SUPPL_REELLES": "sum",
-            "NBJREA_R": "sum",
-            "NBREP_R": "sum",
-            "NBJSRC_R": "sum",
-            "NBJSTF_ISSUDEREA_R": "sum",
-            "NBJSTF_TOT_R": "sum",
-            "NBJNNA_R": "sum",
-            "NBJNNB_R": "sum",
-            "NBJNNC_R": "sum",
-            "NBJ_USIPR": "sum",
-        })
-        .rename(columns={
-            "KYRES": "NB_RUM",
-            "RUM_AVEC_SUPPL": "NB_RUM_SUPPL",
-            "NBJRUM": "NB_JOURNEES",
-            "NBJRUM_AVEC_SUPPL": "NB_JOURNEES_AVEC_SUPPL",
-        })
-    )
-
-    agg["PCT_RUM_SUPPL"] = safe_pct(agg["NB_RUM_SUPPL"], agg["NB_RUM"])
-    agg["PCT_JOURNEES_SUPPL"] = safe_pct(agg["NB_JOURNEES_AVEC_SUPPL"], agg["NB_JOURNEES"])
-
-    return agg.sort_values(["UNIT", "ANNEE"]).reset_index(drop=True)
-
-
-def build_dashboard_table(agg, year_n, year_n1):
-    rows = []
-
-    for unit in sorted(UNITS_TO_KEEP, key=lambda x: int(x)):
-        d_n = agg[(agg["UNIT"] == unit) & (agg["ANNEE"] == year_n)]
-        d_n1 = agg[(agg["UNIT"] == unit) & (agg["ANNEE"] == year_n1)]
-
-        d_n = d_n.iloc[0] if not d_n.empty else None
-        d_n1 = d_n1.iloc[0] if not d_n1.empty else None
-
-        unit_name = UNIT_LABELS.get(unit, unit)
-
-        nb_rum_n = int(d_n["NB_RUM"]) if d_n is not None else 0
-        nb_rum_sup_n = int(d_n["NB_RUM_SUPPL"]) if d_n is not None else 0
-        pct_rum_n = float(d_n["PCT_RUM_SUPPL"]) if d_n is not None else 0.0
-        nb_j_n = int(d_n["NB_JOURNEES"]) if d_n is not None else 0
-        nb_j_sup_n = int(d_n["NB_JOURNEES_AVEC_SUPPL"]) if d_n is not None else 0
-        pct_j_n = float(d_n["PCT_JOURNEES_SUPPL"]) if d_n is not None else 0.0
-
-        nb_rum_n1 = int(d_n1["NB_RUM"]) if d_n1 is not None else 0
-        nb_rum_sup_n1 = int(d_n1["NB_RUM_SUPPL"]) if d_n1 is not None else 0
-        pct_rum_n1 = float(d_n1["PCT_RUM_SUPPL"]) if d_n1 is not None else 0.0
-        nb_j_n1 = int(d_n1["NB_JOURNEES"]) if d_n1 is not None else 0
-        nb_j_sup_n1 = int(d_n1["NB_JOURNEES_AVEC_SUPPL"]) if d_n1 is not None else 0
-        pct_j_n1 = float(d_n1["PCT_JOURNEES_SUPPL"]) if d_n1 is not None else 0.0
-
-        evol_rum = evol_percent(nb_rum_sup_n, nb_rum_sup_n1)
-        evol_j = evol_percent(nb_j_sup_n, nb_j_sup_n1)
-
-        rows.append({
-            "Unité médicale": "UM {} - {}".format(unit, unit_name),
-
-            "{} - Nb RUM".format(year_n): nb_rum_n,
-            "{} - Nb RUM sup".format(year_n): nb_rum_sup_n,
-            "{} - % RUM".format(year_n): pct_rum_n,
-            "{} - Nb journées".format(year_n): nb_j_n,
-            "{} - Nb journées sup".format(year_n): nb_j_sup_n,
-            "{} - % journées".format(year_n): pct_j_n,
-
-            "{} - Nb RUM".format(year_n1): nb_rum_n1,
-            "{} - Nb RUM sup".format(year_n1): nb_rum_sup_n1,
-            "{} - % RUM".format(year_n1): pct_rum_n1,
-            "{} - Nb journées".format(year_n1): nb_j_n1,
-            "{} - Nb journées sup".format(year_n1): nb_j_sup_n1,
-            "{} - % journées".format(year_n1): pct_j_n1,
-
-            "Évolution RUM sup %": evol_rum,
-            "Évolution journées sup %": evol_j,
-        })
-
-    return pd.DataFrame(rows)
-
-
-def format_dashboard_display(df):
-    display_df = df.copy()
-
-    pct_cols = [c for c in display_df.columns if "% RUM" in c or "% journées" in c or "Évolution" in c]
-    int_cols = [c for c in display_df.columns if c not in pct_cols and c != "Unité médicale"]
-
-    for col in int_cols:
-        display_df[col] = display_df[col].astype(int)
-
-    for col in pct_cols:
-        display_df[col] = display_df[col].map(lambda x: "{:+.1f}%".format(x) if "Évolution" in col else "{:.1f}%".format(x))
-
-    return display_df
-
-
-# -----------------------------
-# Export Excel
-# -----------------------------
-def build_excel_file(agg, detail_df, year_n, year_n1, year_n2):
-    output = io.BytesIO()
-
-    synthese_site = build_dashboard_table(agg, year_n, year_n1)
-    synthese_site_display = format_dashboard_display(synthese_site)
-
-    synthese_3_ans = agg[agg["ANNEE"].isin([year_n2, year_n1, year_n])].copy()
-    synthese_3_ans = synthese_3_ans.sort_values(["UNIT", "ANNEE"])
-
-    detail_uma = synthese_3_ans[[
-        "UNIT", "UNIT_NOM", "ANNEE",
-        "NB_RUM", "NB_RUM_SUPPL", "PCT_RUM_SUPPL",
-        "NB_JOURNEES", "NB_JOURNEES_AVEC_SUPPL", "PCT_JOURNEES_SUPPL",
-        "NBJ_SUPPL_REELLES",
-        "NBJREA_R", "NBREP_R", "NBJSRC_R", "NBJSTF_ISSUDEREA_R",
-        "NBJSTF_TOT_R", "NBJNNA_R", "NBJNNB_R", "NBJNNC_R", "NBJ_USIPR"
-    ]].copy()
-
-    rum_detail = detail_df[detail_df["ANNEE"].isin([year_n2, year_n1, year_n])].copy()
-    rum_detail = rum_detail[[
-        "KYRES", "UNIT", "UNIT_NOM", "ANNEE", "DATE_SORTIE",
-        "NBJRUM", "RUM_AVEC_SUPPL", "NBJRUM_AVEC_SUPPL", "NBJ_SUPPL_REELLES",
-        "NBJREA_R", "NBREP_R", "NBJSRC_R", "NBJSTF_ISSUDEREA_R",
-        "NBJSTF_TOT_R", "NBJNNA_R", "NBJNNB_R", "NBJNNC_R", "NBJ_USIPR"
-    ]].copy()
-
-    # Harmonisation des noms lisibles
-    detail_uma = detail_uma.rename(columns={
-        "UNIT": "UMA",
-        "UNIT_NOM": "LIBELLE_UMA",
-        "ANNEE": "ANNEE",
-        "NB_RUM": "NB_RUM",
-        "NB_RUM_SUPPL": "NB_RUM_DECLENCHANT_SUPPL",
-        "PCT_RUM_SUPPL": "PCT_RUM_AVEC_SUPPL",
-        "NB_JOURNEES": "NB_JOURNEES",
-        "NB_JOURNEES_AVEC_SUPPL": "NB_JOURNEES_RUM_AVEC_SUPPL",
-        "PCT_JOURNEES_SUPPL": "PCT_JOURNEES_AVEC_SUPPL",
-        "NBJ_SUPPL_REELLES": "NB_JOURNEES_SUPPL_REELLES",
-    })
-
-    rum_detail = rum_detail.rename(columns={
-        "UNIT": "UMA",
-        "UNIT_NOM": "LIBELLE_UMA",
-        "DATE_SORTIE": "DATE_SORTIE_RUM",
-        "NBJRUM": "NB_JOURNEES_RUM",
-        "RUM_AVEC_SUPPL": "RUM_DECLENCHE_SUPPL",
-        "NBJRUM_AVEC_SUPPL": "NB_JOURNEES_RUM_AVEC_SUPPL",
-        "NBJ_SUPPL_REELLES": "NB_JOURNEES_SUPPL_REELLES",
-    })
-
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        synthese_site_display.to_excel(writer, index=False, sheet_name="Synthese_site")
-        synthese_3_ans.to_excel(writer, index=False, sheet_name="Synthese_3_ans")
-        detail_uma.to_excel(writer, index=False, sheet_name="Detail_UMA_annee")
-        rum_detail.to_excel(writer, index=False, sheet_name="Detail_RUM")
-
-        # Ajustement simple largeur colonnes
-        for sheet_name, df_sheet in {
-            "Synthese_site": synthese_site_display,
-            "Synthese_3_ans": synthese_3_ans,
-            "Detail_UMA_annee": detail_uma,
-            "Detail_RUM": rum_detail,
-        }.items():
-            ws = writer.book[sheet_name]
-            for idx, col in enumerate(df_sheet.columns, 1):
-                max_len = max(len(str(col)), 12)
-                if not df_sheet.empty:
-                    sample_max = df_sheet[col].astype(str).map(len).max()
-                    if pd.notna(sample_max):
-                        max_len = max(max_len, min(int(sample_max) + 2, 35))
-                ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = max_len
-
-    output.seek(0)
-    return output
-
-
-# -----------------------------
-# Affichage Streamlit
-# -----------------------------
-def main():
-    st.set_page_config(page_title="Dashboard d'évolution des RUMs", layout="wide")
-    st.title("Dashboard d'évolution des RUMs")
-    load_css(CSS_FILE)
-
-    year_n, year_n1, year_n2, month_suffix = current_year_info()
-
-    st.caption(
-        "Période analysée : {} / {} / {} arrêtée à fin de {}.".format(
-            year_n2, year_n1, year_n, month_suffix
+from typing import Dict, Iterable, List, Optional, Tuple
+
+try:
+    from openpyxl import load_workbook
+except ImportError as exc:
+    raise SystemExit("Le module openpyxl est requis pour lire le fichier .xlsm.") from exc
+
+
+XLSM_FILENAME = "CCAM_V82_-02.01.2026._VF(1).xlsm"
+CSV_FILENAME = "sejours_actes_j0_uma_2024_2025.csv"
+OUTPUT_DETAIL = "sejours_actes_j0_uma_2024_2025_adc_detail.csv"
+OUTPUT_SUMMARY = "sejours_actes_j0_uma_2024_2025_adc_resume.csv"
+TARGET_REGROUPEMENT = "ADC"
+
+
+def normalize_text(value: object) -> str:
+    """Normalise un texte pour comparer des en-têtes de façon robuste."""
+    if value is None:
+        return ""
+    text = str(value)
+    text = text.replace("\ufeff", " ").replace("\xa0", " ")
+    text = "".join(ch for ch in text if ch.isprintable())
+    text = unicodedata.normalize("NFKD", text)
+    text = "".join(ch for ch in text if not unicodedata.combining(ch))
+    text = text.strip().lower()
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def canonical_code(value: object) -> str:
+    """Normalise un code CCAM pour comparaison."""
+    if value is None:
+        return ""
+    text = str(value).strip().upper()
+    text = text.replace("\ufeff", "").replace("\xa0", "")
+    text = re.sub(r"\s+", "", text)
+    return text
+
+
+def detect_header_indexes(header_values: List[object]) -> Tuple[int, int]:
+    normalized = [normalize_text(v) for v in header_values]
+
+    code_candidates = []
+    regroupement_candidates = []
+
+    for idx, name in enumerate(normalized):
+        compact = name.replace(" ", "")
+        if compact == "code" or compact.startswith("code"):
+            code_candidates.append(idx)
+        if compact == "regroupement" or compact.startswith("regroupement"):
+            regroupement_candidates.append(idx)
+
+    if not code_candidates:
+        for idx, name in enumerate(normalized):
+            if "code" in name:
+                code_candidates.append(idx)
+    if not regroupement_candidates:
+        for idx, name in enumerate(normalized):
+            if "regroupement" in name:
+                regroupement_candidates.append(idx)
+
+    if not code_candidates or not regroupement_candidates:
+        raise ValueError(
+            "Impossible de détecter les colonnes 'Code' et/ou 'Regroupement' dans le .xlsm."
         )
+
+    return code_candidates[0], regroupement_candidates[0]
+
+
+def find_code_regroupement_sheet(xlsm_path: Path) -> Tuple[str, int, int]:
+    wb = load_workbook(xlsm_path, read_only=True, data_only=True, keep_vba=True)
+    try:
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            max_scan_rows = min(ws.max_row or 0, 30)
+            for row_idx, row in enumerate(
+                ws.iter_rows(min_row=1, max_row=max_scan_rows, values_only=True), start=1
+            ):
+                row_values = list(row)
+                try:
+                    code_idx, reg_idx = detect_header_indexes(row_values)
+                    return sheet_name, row_idx, code_idx
+                except ValueError:
+                    continue
+    finally:
+        wb.close()
+
+    raise ValueError(
+        "Aucune feuille ne contient un en-tête détectable avec 'Code' et 'Regroupement'."
     )
 
-    user = "xxxxxx"
-    password = "xxxxxx"
-    tns_alias = "//o-simpa-b1.cch.aphp.fr:10805/SIP1CCH"
 
-    if st.button("Actualiser le tableau"):
-        if CSV_FILE.exists():
-            CSV_FILE.unlink()
+def load_adc_codes(xlsm_path: Path) -> Dict[str, str]:
+    sheet_name, header_row, code_idx = find_code_regroupement_sheet(xlsm_path)
+    wb = load_workbook(xlsm_path, read_only=True, data_only=True, keep_vba=True)
+    try:
+        ws = wb[sheet_name]
+        header = [cell for cell in next(ws.iter_rows(min_row=header_row, max_row=header_row, values_only=True))]
+        code_idx, reg_idx = detect_header_indexes(header)
 
-        try:
-            run_sqlplus(user, password, tns_alias, SQL_FILE)
+        adc_codes: Dict[str, str] = {}
+        for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
+            if row is None:
+                continue
+            code = canonical_code(row[code_idx] if code_idx < len(row) else None)
+            regroupement = normalize_text(row[reg_idx] if reg_idx < len(row) else None)
+            if not code:
+                continue
+            if regroupement == TARGET_REGROUPEMENT.lower():
+                adc_codes[code] = TARGET_REGROUPEMENT
+        return adc_codes
+    finally:
+        wb.close()
 
-            if not CSV_FILE.exists():
-                st.error("SQL exécuté mais fichier CSV introuvable.")
-                st.stop()
 
-            detail_df = load_detail_data(CSV_FILE)
-            agg = build_aggregated_by_unit_year(detail_df)
-
-            dashboard_df = build_dashboard_table(agg, year_n, year_n1)
-            dashboard_display = format_dashboard_display(dashboard_df)
-
-            st.subheader("Évolution {} vs {} - {}".format(year_n1, year_n, month_suffix))
-            st.dataframe(dashboard_display, use_container_width=True, hide_index=True)
-
-            excel_buffer = build_excel_file(agg, detail_df, year_n, year_n1, year_n2)
-
-            st.download_button(
-                label="Télécharger l'Excel détaillé",
-                data=excel_buffer,
-                file_name="supplements_{}_{}_{}_{}.xlsx".format(year_n2, year_n1, year_n, month_suffix),
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+def read_sql_csv(csv_path: Path) -> List[dict]:
+    rows: List[dict] = []
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f, delimiter=";")
+        expected = {"ANNEE", "KYRES", "KYRSS", "UMA", "DATE_ENTREE_RSS", "CODE_CCAM", "DATE_REAL_ACTE"}
+        missing = expected.difference(reader.fieldnames or [])
+        if missing:
+            raise ValueError(
+                "Colonnes attendues absentes du CSV SQL : " + ", ".join(sorted(missing))
             )
+        for row in reader:
+            row = {k: (v.strip() if isinstance(v, str) else v) for k, v in row.items()}
+            row["CODE_CCAM_NORM"] = canonical_code(row.get("CODE_CCAM", ""))
+            rows.append(row)
+    return rows
 
-            with st.expander("Aide à la lecture"):
-                st.markdown(
-                    """
-                    - **Nb RUM sup** : nombre de RUM déclenchant au moins un supplément.
-                    - **Nb journées sup** : nombre de journées des RUM déclenchant au moins un supplément.
-                    - L'Excel contient aussi les **journées de supplément réelles** et le **détail par type**.
-                    """
-                )
 
-        except Exception as e:
-            st.error("Erreur lors de l'exécution : {}".format(e))
+def write_csv(path: Path, rows: Iterable[dict], fieldnames: List[str]) -> None:
+    with path.open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter=";")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def main() -> int:
+    base_dir = Path(__file__).resolve().parent
+    xlsm_path = base_dir / XLSM_FILENAME
+    csv_path = base_dir / CSV_FILENAME
+    detail_path = base_dir / OUTPUT_DETAIL
+    summary_path = base_dir / OUTPUT_SUMMARY
+
+    if not xlsm_path.exists():
+        raise FileNotFoundError(f"Fichier .xlsm introuvable : {xlsm_path}")
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Fichier CSV introuvable : {csv_path}")
+
+    adc_codes = load_adc_codes(xlsm_path)
+    if not adc_codes:
+        raise ValueError("Aucun code trouvé avec le regroupement ADC dans le fichier .xlsm.")
+
+    sql_rows = read_sql_csv(csv_path)
+
+    matched_rows: List[dict] = []
+    unmatched_codes = set()
+    all_sql_codes = set()
+
+    for row in sql_rows:
+        code_norm = row["CODE_CCAM_NORM"]
+        if code_norm:
+            all_sql_codes.add(code_norm)
+        if code_norm in adc_codes:
+            new_row = dict(row)
+            new_row["REGROUPEMENT"] = adc_codes[code_norm]
+            matched_rows.append(new_row)
+        else:
+            if code_norm:
+                unmatched_codes.add(code_norm)
+
+    detail_fieldnames = [
+        "ANNEE",
+        "KYRES",
+        "KYRSS",
+        "UMA",
+        "DATE_ENTREE_RSS",
+        "CODE_CCAM",
+        "DATE_REAL_ACTE",
+        "REGROUPEMENT",
+    ]
+    write_csv(detail_path, matched_rows, detail_fieldnames)
+
+    summary_rows: List[dict] = []
+    for year in sorted({row["ANNEE"] for row in sql_rows}):
+        year_rows = [row for row in matched_rows if row["ANNEE"] == year]
+        distinct_sejours = {row["KYRES"] for row in year_rows if row.get("KYRES")}
+        distinct_rss = {row["KYRSS"] for row in year_rows if row.get("KYRSS")}
+        distinct_codes = {row["CODE_CCAM_NORM"] for row in year_rows if row.get("CODE_CCAM_NORM")}
+        summary_rows.append(
+            {
+                "ANNEE": year,
+                "NB_LIGNES_ACTES_ADC_J0": len(year_rows),
+                "NB_SEJOURS_DISTINCTS_ADC_J0": len(distinct_sejours),
+                "NB_RSS_DISTINCTS_ADC_J0": len(distinct_rss),
+                "NB_CODES_CCAM_ADC_DIFFERENTS": len(distinct_codes),
+            }
+        )
+
+    write_csv(
+        summary_path,
+        summary_rows,
+        [
+            "ANNEE",
+            "NB_LIGNES_ACTES_ADC_J0",
+            "NB_SEJOURS_DISTINCTS_ADC_J0",
+            "NB_RSS_DISTINCTS_ADC_J0",
+            "NB_CODES_CCAM_ADC_DIFFERENTS",
+        ],
+    )
+
+    total_distinct_sejours = {row["KYRES"] for row in matched_rows if row.get("KYRES")}
+
+    print("Traitement terminé.")
+    print(f"Fichier xlsm lu : {xlsm_path.name}")
+    print(f"Fichier CSV lu : {csv_path.name}")
+    print(f"Codes ADC trouvés dans le référentiel : {len(adc_codes)}")
+    print(f"Lignes SQL lues : {len(sql_rows)}")
+    print(f"Lignes ADC retenues : {len(matched_rows)}")
+    print(f"Séjours distincts ADC J0 (toutes années) : {len(total_distinct_sejours)}")
+    print(f"Codes SQL non retrouvés en ADC : {len(unmatched_codes)}")
+    print(f"Détail exporté : {detail_path.name}")
+    print(f"Résumé exporté : {summary_path.name}")
+
+    if unmatched_codes:
+        unmatched_path = base_dir / "codes_ccam_non_retrouves_adc.txt"
+        with unmatched_path.open("w", encoding="utf-8") as f:
+            for code in sorted(unmatched_codes):
+                f.write(code + "\n")
+        print(f"Liste des codes non retrouvés exportée : {unmatched_path.name}")
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except Exception as exc:  # noqa: BLE001
+        print(f"ERREUR : {exc}", file=sys.stderr)
+        raise
 
 
 
-SET LINESIZE 32767
-SET HEADING OFF
-SET COLSEP ";"
-SET PAGESIZE 0
+
+
+SET HEADING ON
 SET FEEDBACK OFF
+SET PAGESIZE 6000
+SET LINESIZE 400
+SET COLSEP ';'
 SET TRIMSPOOL ON
 SET WRAP OFF
 SET TERMOUT OFF
 
-SPOOL data/dashboard_rum_detail.csv
+SPOOL C:\Users\4251352\projets\sejours_actes_j0_uma_2024_2025.csv
 
-SELECT
-    RSM.KYRES,
-    RSM.CDURM_P,
-    TO_CHAR(RSM.D8EEUE, 'YYYY-MM-DD'),
-    TO_CHAR(RSM.D8EEUE, 'YYYY'),
-    NVL(RUM.NBJRUM, 0),
-    NVL(RUM.NBJREA_R, 0),
-    NVL(RUM.NBREP_R, 0),
-    NVL(RUM.NBJSRC_R, 0),
-    NVL(RUM.NBJSTF_ISSUDEREA_R, 0),
-    NVL(RUM.NBJSTF_TOT_R, 0),
-    NVL(RUM.NBJNNA_R, 0),
-    NVL(RUM.NBJNNB_R, 0),
-    NVL(RUM.NBJNNC_R, 0),
-    NVL(RUM.NBJ_USIPR, 0)
-FROM RSM, RUM
-WHERE RSM.KYRES = RUM.NORES
-  AND RSM.CDURM_P IN ('340','103','091','341','104','092','021','451')
-  AND RSM.D8EEUE >= TRUNC(ADD_MONTHS(SYSDATE, -12 * 2), 'YYYY')
-  AND RSM.D8EEUE <= LAST_DAY(ADD_MONTHS(TRUNC(SYSDATE), -1))
-ORDER BY RSM.CDURM_P, RSM.D8EEUE, RSM.KYRES
-;
+SELECT DISTINCT
+       TO_CHAR(RSS.D8DEB,'YYYY') AS ANNEE,
+       RSM.KYRES AS KYRES,
+       RSS.KYRSS AS KYRSS,
+       RSM.CDURM_P AS UMA,
+       TO_CHAR(RSS.D8DEB,'DD/MM/YYYY HH24:MI:SS') AS DATE_ENTREE_RSS,
+       RAC.KYCDAC AS CODE_CCAM,
+       TO_CHAR(RAC.D8REAL,'DD/MM/YYYY HH24:MI:SS') AS DATE_REAL_ACTE
+FROM   RSM,
+       RUM,
+       RSS,
+       RAC
+WHERE  RUM.NORES = RSM.KYRES
+AND    RSS.KYRSS = RUM.KYRSS
+AND    RAC.KYRES = RSM.KYRES
+AND    RSM.CDURM_P IN ('112','112S','115','310')
+AND    RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+AND    RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
+AND    RAC.D8REAL IS NOT NULL
+AND    TRUNC(RSS.D8DEB) = TRUNC(RAC.D8REAL)
+ORDER BY 1, 4, 2, 6, 7;
 
 SPOOL OFF
-EXIT;
+
+EXIT
