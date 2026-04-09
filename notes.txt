@@ -1,22 +1,11 @@
-dmi_files = [n for n in names if DMI_RE.search(n.split("/")[-1])]
-med_files = [n for n in names if MED_FICHCOMP_RE.search(n.split("/")[-1])]
-pie_files = [n for n in names if PIE_RE.search(n.split("/")[-1])]
-porg_files = [n for n in names if PORG_RE.search(n.split("/")[-1])]
-
-report_lines.append(f"Fichiers RSS trouvés: {len(rss_files)}")
-report_lines.append(f"Fichiers ANO trouvés: {len(ano_files)}")
-report_lines.append(f"Fichiers FICHCOMP DMI trouvés: {len(dmi_files)}")
-report_lines.append(f"Fichiers FICHCOMP MED trouvés: {len(med_files)}")
-report_lines.append(f"Fichiers FICHCOMP PIE trouvés: {len(pie_files)}")
-report_lines.append(f"Fichiers FICHCOMP PORG trouvés: {len(porg_files)}")
-
-
-
-
-
-fichcomp_groups = [
-    ("DMI", dmi_files, ".dmi", ".dmi_corrige.txt"),
-    ("MED", med_files, ".med", ".med_corrige.txt"),
-    ("PIE", pie_files, ".pie", ".pie_corrige.txt"),
-    ("PORG", porg_files, ".porg", ".porg_corrige.txt"),
-]
+ZIP détecté: domaine=SMR site=016 periode=202602
+EXCEL détecté: domaine=SMR site=00016 periode=202602 ext=xlsx
+Mapping UM SMR: 4 clés.
+Fichiers RHS trouvés: 1
+Fichiers ANO trouvés: 1
+Fichiers MED trouvés: 1
+FICUM généré: ficum016.txt (finess=750801441, lignes=4)
+RHS 750801441.2026.02.rhs.ini.txt: matched=1403/1403 rate=1.0000 missing_unique=0 lines_in=1403 lines_out=1403
+ANO 750801441.2026.02.ano: vidhosp_produced=0 (prepared=0, skipped=0) parse_errors_cle00=0
+  Pré-filtrage SMR: raw=268 filtered_empty=0 filtered_too_short=0 filtered_first_char=268
+MED 750801441.2026.02.med: lines_in=26 lines_out=26 target_length=104
