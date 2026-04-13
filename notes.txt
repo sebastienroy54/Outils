@@ -1,31 +1,26 @@
-Les questions sur les 3 programmes/3 populations sont :
-1.	Nombre de patients (file active)
-2.	Tranches d’âge : 15-24 ans / 25-64 ans / > 65 ans
-3.	Statut grossesse
-4.	Lieu de résidence 
-5.	Population fragile (PUMA, CMU, AME)
- 
-Programme Yalow DT1 : conditions
-1.	Unité 071S
-2.	Patients DT1 Yalow : code  E10-
-3.	4 ou 5 jours d’hospitalisation (sans les < 3 jours)
-Programme Yalow DT2
-4.	Unité 071S
-5.	Patients DT2 Yalow : code  E11-
-6.	Quelle que soit la durée d’hospitalisation  
-Programme pompe ou BF
-7.	Unité 071S
-8.	Nombre de patients avec z448 (début pompe)
-9.	Nombre de patients avec z469 (début boucle fermée)
-10.	Nombre de patients avec z964 (porteurs de pompe) sans z448 ni Z469  
- 
-11.	Selon la durée de séjour 
-1.	4 ou 5 jours d’hospitalisation (unité de semaine)
-2.	3 jours et moins (unité de demi semaine)
-et
-•	HDJ pompe et Boucle Fermée
-secteur HDJ diabéto : UF 979, nombres de patients 
--	HDJ pompe  complet Z451
--	patients sous pompe Z964 en bilan Z092
--	initiation de boucle fermée Z469
--	porteurs de boucle fermée Z468
+Pour le Programme Yalow DT1, les indicateurs demandés pour 2024 sont les suivants :
+-              Nombre de patients (file active) : 189 
+-              Tranches d’âge : 15-24 ans / 25-64 ans / > 65 ans :  15_24 ans : 29; 25_64 ans : 143; >=65 ans : 17 
+-              Statut grossesse : 6 patientes
+-              Lieu de résidence : dept 75 : 59 pats ; 92 : 29 ; 94 : 23 ; 93 : 20 ; 91 : 15 ; 78 : 12 ; 95 : 10 ; 77 : 9 ; 60 : 3 ; province et dom-tom : 9 ; étranger : 0
+-              Population fragile (PUMA, CMU, AME) : 13 patients en AME
+
+
+
+Pour le Programme Yalow DT2, les indicateurs demandés pour 2024 sont les suivants :
+-              Nombre de patients (file active) : 215 
+-              Tranches d’âge :  15_24 ans : 1 ; 25_64 ans : 127 ; >=65 ans : 87
+-              Statut grossesse : 5 patientes
+-              Lieu de résidence : dept : 
+75           88
+93           28
+94           24
+92           22
+77           14
+95           13
+91           10
+78           6
+60           4
+Province Dom_Tom :     5
+(étranger, 99) : 1 
+-              Population fragile (PUMA, CMU, AME) : 25 patients en AME
