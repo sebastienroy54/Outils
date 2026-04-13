@@ -1,26 +1,80 @@
-Pour le Programme Yalow DT1, les indicateurs demandés pour 2024 sont les suivants :
--              Nombre de patients (file active) : 189 
--              Tranches d’âge : 15-24 ans / 25-64 ans / > 65 ans :  15_24 ans : 29; 25_64 ans : 143; >=65 ans : 17 
--              Statut grossesse : 6 patientes
--              Lieu de résidence : dept 75 : 59 pats ; 92 : 29 ; 94 : 23 ; 93 : 20 ; 91 : 15 ; 78 : 12 ; 95 : 10 ; 77 : 9 ; 60 : 3 ; province et dom-tom : 9 ; étranger : 0
--              Population fragile (PUMA, CMU, AME) : 13 patients en AME
+SELECT DISTINCT
+       RSM.NOIP                   AS IPP,
+       RSM.NODA                   AS NDA,
+       SDO.AGEE                   AS AGE,
+       SDO.SXPMSI                 AS SEXE,
+       SDO.CDRESI                 AS CP_RESIDENCE,
+       RSS.DUSEJ                  AS DUREE_SEJOUR,
+       CASE
+         WHEN RSM.CDDNC9 LIKE 'Z35%'
+           OR RSM.CDRELIE LIKE 'Z35%'
+           OR EXISTS (
+                SELECT 1
+                FROM DGN DGN2
+                WHERE DGN2.KYRES = RSM.KYRES
+                  AND DGN2.KYCDDG LIKE 'Z35%'
+           )
+         THEN 1
+         ELSE 0
+       END AS GROSSESSE
+FROM RSM, RSS, RUM, SDO
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND SDO.KYNODA = RSM.NODA
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.DUSEJ IN (4,5)
+  AND (
+       RSM.CDDNC9 LIKE 'E10%'
+       OR RSM.CDRELIE LIKE 'E10%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN DGN1
+            WHERE DGN1.KYRES = RSM.KYRES
+              AND DGN1.KYCDDG LIKE 'E10%'
+       )
+  )
+ORDER BY RSM.NOIP, RSM.NODA;
 
 
 
-Pour le Programme Yalow DT2, les indicateurs demandés pour 2024 sont les suivants :
--              Nombre de patients (file active) : 215 
--              Tranches d’âge :  15_24 ans : 1 ; 25_64 ans : 127 ; >=65 ans : 87
--              Statut grossesse : 5 patientes
--              Lieu de résidence : dept : 
-75           88
-93           28
-94           24
-92           22
-77           14
-95           13
-91           10
-78           6
-60           4
-Province Dom_Tom :     5
-(étranger, 99) : 1 
--              Population fragile (PUMA, CMU, AME) : 25 patients en AME
+
+
+SELECT DISTINCT
+       RSM.NOIP                   AS IPP,
+       RSM.NODA                   AS NDA,
+       SDO.AGEE                   AS AGE,
+       SDO.SXPMSI                 AS SEXE,
+       SDO.CDRESI                 AS CP_RESIDENCE,
+       RSS.DUSEJ                  AS DUREE_SEJOUR,
+       CASE
+         WHEN RSM.CDDNC9 LIKE 'Z35%'
+           OR RSM.CDRELIE LIKE 'Z35%'
+           OR EXISTS (
+                SELECT 1
+                FROM DGN DGN2
+                WHERE DGN2.KYRES = RSM.KYRES
+                  AND DGN2.KYCDDG LIKE 'Z35%'
+           )
+         THEN 1
+         ELSE 0
+       END AS GROSSESSE
+FROM RSM, RSS, RUM, SDO
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND SDO.KYNODA = RSM.NODA
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'E11%'
+       OR RSM.CDRELIE LIKE 'E11%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN DGN1
+            WHERE DGN1.KYRES = RSM.KYRES
+              AND DGN1.KYCDDG LIKE 'E11%'
+       )
+  )
+ORDER BY RSM.NOIP, RSM.NODA;
