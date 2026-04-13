@@ -1,35 +1,31 @@
-domain_lower = chosen.lower()
-
-zip_meta_old = None
-zip_meta_new = None
-if chosen == "MCO":
-    zip_meta_old = parse_zip_name_mco(working_zip_name)
-elif chosen == "SMR":
-    zip_meta_old = parse_zip_name_smr(working_zip_name)
-else:
-    zip_meta_old = parse_zip_name_psy(working_zip_name)
-
-zip_meta_new = parse_zip_name_newstyle(working_zip_name)
-
-site3_for_name = None
-yyyymm_for_name = None
-
-if zip_meta_old:
-    site3_for_name = zip_meta_old["site3"]
-    yyyymm_for_name = zip_meta_old["yyyymm"]
-elif zip_meta_new and zip_meta_new["domain"] == chosen:
-    yyyymm_for_name = zip_meta_new["yyyymm"]
-    site5_from_finess = FINESS_TO_SITE5.get(zip_meta_new["finess"])
-    if site5_from_finess:
-        site3_for_name = site5_to_site3(site5_from_finess)
-
-if site3_for_name and yyyymm_for_name:
-    out_name = f"{domain_lower}_{site3_for_name}_{yyyymm_for_name}_out.zip"
-else:
-    out_name = working_zip_name.replace("_in.zip", "_out.zip")
-    if out_name == working_zip_name:
-        out_name = (
-            working_zip_name[:-4] + "_out.zip"
-            if working_zip_name.lower().endswith(".zip")
-            else working_zip_name + "_out.zip"
-        )
+Les questions sur les 3 programmes/3 populations sont :
+1.	Nombre de patients (file active)
+2.	Tranches d’âge : 15-24 ans / 25-64 ans / > 65 ans
+3.	Statut grossesse
+4.	Lieu de résidence 
+5.	Population fragile (PUMA, CMU, AME)
+ 
+Programme Yalow DT1 : conditions
+1.	Unité 071S
+2.	Patients DT1 Yalow : code  E10-
+3.	4 ou 5 jours d’hospitalisation (sans les < 3 jours)
+Programme Yalow DT2
+4.	Unité 071S
+5.	Patients DT2 Yalow : code  E11-
+6.	Quelle que soit la durée d’hospitalisation  
+Programme pompe ou BF
+7.	Unité 071S
+8.	Nombre de patients avec z448 (début pompe)
+9.	Nombre de patients avec z469 (début boucle fermée)
+10.	Nombre de patients avec z964 (porteurs de pompe) sans z448 ni Z469  
+ 
+11.	Selon la durée de séjour 
+1.	4 ou 5 jours d’hospitalisation (unité de semaine)
+2.	3 jours et moins (unité de demi semaine)
+et
+•	HDJ pompe et Boucle Fermée
+secteur HDJ diabéto : UF 979, nombres de patients 
+-	HDJ pompe  complet Z451
+-	patients sous pompe Z964 en bilan Z092
+-	initiation de boucle fermée Z469
+-	porteurs de boucle fermée Z468
