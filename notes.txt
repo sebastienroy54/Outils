@@ -1,203 +1,118 @@
-SELECT INDICATEUR,
-       MODALITE,
-       NB_PATIENTS
-FROM
-(
-    SELECT 1 AS ORDRE,
-           'FILE_ACTIVE' AS INDICATEUR,
-           'TOTAL' AS MODALITE,
-           COUNT(*) AS NB_PATIENTS
-    FROM
-    (
-        SELECT DISTINCT
-               RSM.NOIP,
-               SDO.AGEE,
-               SDO.CDRESI,
-               CASE
-                 WHEN RSM.CDDNC9 LIKE 'Z35%'
-                   OR RSM.CDRELIE LIKE 'Z35%'
-                   OR EXISTS (
-                        SELECT 1
-                        FROM DGN
-                        WHERE DGN.KYRES = RSM.KYRES
-                          AND DGN.KYCDDG LIKE 'Z35%'
-                   )
-                 THEN 1
-                 ELSE 0
-               END AS GROSSESSE
-        FROM RSM, RUM, RSS, SDO
-        WHERE RUM.NORES = RSM.KYRES
-          AND RSS.KYRSS = RUM.KYRSS
-          AND SDO.KYNODA = RSM.NODA
-          AND RSM.CDURM_P = '071S'
-          AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-          AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-          AND RSS.DUSEJ IN (4,5)
-          AND (
-               RSM.CDDNC9 LIKE 'E10%'
-               OR RSM.CDRELIE LIKE 'E10%'
-               OR EXISTS (
-                    SELECT 1
-                    FROM DGN
-                    WHERE DGN.KYRES = RSM.KYRES
-                      AND DGN.KYCDDG LIKE 'E10%'
-               )
-          )
-    )
+SELECT COUNT(DISTINCT RSM.NOIP) AS FILE_ACTIVE_DT1
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.DUSEJ IN (4,5)
+  AND (
+       RSM.CDDNC9 LIKE 'E10%'
+       OR RSM.CDRELIE LIKE 'E10%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'E10%'
+       )
+  );
 
-    UNION ALL
 
-    SELECT 2 AS ORDRE,
-           'TRANCHE_AGE' AS INDICATEUR,
-           CASE
-             WHEN BASE.AGEE BETWEEN 15 AND 24 THEN '15_24'
-             WHEN BASE.AGEE BETWEEN 25 AND 64 THEN '25_64'
-             WHEN BASE.AGEE >= 65 THEN '65_ET_PLUS'
-             ELSE 'HORS_TRANCHE'
-           END AS MODALITE,
-           COUNT(*) AS NB_PATIENTS
-    FROM
-    (
-        SELECT DISTINCT
-               RSM.NOIP,
-               SDO.AGEE,
-               SDO.CDRESI,
-               CASE
-                 WHEN RSM.CDDNC9 LIKE 'Z35%'
-                   OR RSM.CDRELIE LIKE 'Z35%'
-                   OR EXISTS (
-                        SELECT 1
-                        FROM DGN
-                        WHERE DGN.KYRES = RSM.KYRES
-                          AND DGN.KYCDDG LIKE 'Z35%'
-                   )
-                 THEN 1
-                 ELSE 0
-               END AS GROSSESSE
-        FROM RSM, RUM, RSS, SDO
-        WHERE RUM.NORES = RSM.KYRES
-          AND RSS.KYRSS = RUM.KYRSS
-          AND SDO.KYNODA = RSM.NODA
-          AND RSM.CDURM_P = '071S'
-          AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-          AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-          AND RSS.DUSEJ IN (4,5)
-          AND (
-               RSM.CDDNC9 LIKE 'E10%'
-               OR RSM.CDRELIE LIKE 'E10%'
-               OR EXISTS (
-                    SELECT 1
-                    FROM DGN
-                    WHERE DGN.KYRES = RSM.KYRES
-                      AND DGN.KYCDDG LIKE 'E10%'
-               )
-          )
-    ) BASE
-    GROUP BY CASE
-               WHEN BASE.AGEE BETWEEN 15 AND 24 THEN '15_24'
-               WHEN BASE.AGEE BETWEEN 25 AND 64 THEN '25_64'
-               WHEN BASE.AGEE >= 65 THEN '65_ET_PLUS'
-               ELSE 'HORS_TRANCHE'
-             END
+SELECT CASE
+         WHEN SDO.AGEE BETWEEN 15 AND 24 THEN '15_24'
+         WHEN SDO.AGEE BETWEEN 25 AND 64 THEN '25_64'
+         WHEN SDO.AGEE >= 65 THEN '65_ET_PLUS'
+         ELSE 'HORS_TRANCHE'
+       END AS TRANCHE_AGE,
+       COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS
+FROM RSM, RUM, RSS, SDO
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND SDO.KYNODA = RSM.NODA
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.DUSEJ IN (4,5)
+  AND (
+       RSM.CDDNC9 LIKE 'E10%'
+       OR RSM.CDRELIE LIKE 'E10%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'E10%'
+       )
+  )
+GROUP BY CASE
+           WHEN SDO.AGEE BETWEEN 15 AND 24 THEN '15_24'
+           WHEN SDO.AGEE BETWEEN 25 AND 64 THEN '25_64'
+           WHEN SDO.AGEE >= 65 THEN '65_ET_PLUS'
+           ELSE 'HORS_TRANCHE'
+         END
+ORDER BY 1;
 
-    UNION ALL
 
-    SELECT 3 AS ORDRE,
-           'GROSSESSE' AS INDICATEUR,
-           'Z35' AS MODALITE,
-           COUNT(*) AS NB_PATIENTS
-    FROM
-    (
-        SELECT DISTINCT
-               RSM.NOIP,
-               SDO.AGEE,
-               SDO.CDRESI,
-               CASE
-                 WHEN RSM.CDDNC9 LIKE 'Z35%'
-                   OR RSM.CDRELIE LIKE 'Z35%'
-                   OR EXISTS (
-                        SELECT 1
-                        FROM DGN
-                        WHERE DGN.KYRES = RSM.KYRES
-                          AND DGN.KYCDDG LIKE 'Z35%'
-                   )
-                 THEN 1
-                 ELSE 0
-               END AS GROSSESSE
-        FROM RSM, RUM, RSS, SDO
-        WHERE RUM.NORES = RSM.KYRES
-          AND RSS.KYRSS = RUM.KYRSS
-          AND SDO.KYNODA = RSM.NODA
-          AND RSM.CDURM_P = '071S'
-          AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-          AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-          AND RSS.DUSEJ IN (4,5)
-          AND (
-               RSM.CDDNC9 LIKE 'E10%'
-               OR RSM.CDRELIE LIKE 'E10%'
-               OR EXISTS (
-                    SELECT 1
-                    FROM DGN
-                    WHERE DGN.KYRES = RSM.KYRES
-                      AND DGN.KYCDDG LIKE 'E10%'
-               )
-          )
-    ) BASE
-    WHERE BASE.GROSSESSE = 1
 
-    UNION ALL
+SELECT COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTES_ENCEINTES
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.DUSEJ IN (4,5)
+  AND (
+       RSM.CDDNC9 LIKE 'E10%'
+       OR RSM.CDRELIE LIKE 'E10%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'E10%'
+       )
+  )
+  AND (
+       RSM.CDDNC9 LIKE 'Z35%'
+       OR RSM.CDRELIE LIKE 'Z35%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z35%'
+       )
+  );
 
-    SELECT 4 AS ORDRE,
-           'LIEU_RESIDENCE' AS INDICATEUR,
-           CASE
-             WHEN SUBSTR(BASE.CDRESI,1,2) = '99' THEN 'ETRANGER'
-             WHEN SUBSTR(BASE.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
-               THEN SUBSTR(BASE.CDRESI,1,2)
-             ELSE 'PROVINCE_DOM_TOM'
-           END AS MODALITE,
-           COUNT(*) AS NB_PATIENTS
-    FROM
-    (
-        SELECT DISTINCT
-               RSM.NOIP,
-               SDO.AGEE,
-               SDO.CDRESI,
-               CASE
-                 WHEN RSM.CDDNC9 LIKE 'Z35%'
-                   OR RSM.CDRELIE LIKE 'Z35%'
-                   OR EXISTS (
-                        SELECT 1
-                        FROM DGN
-                        WHERE DGN.KYRES = RSM.KYRES
-                          AND DGN.KYCDDG LIKE 'Z35%'
-                   )
-                 THEN 1
-                 ELSE 0
-               END AS GROSSESSE
-        FROM RSM, RUM, RSS, SDO
-        WHERE RUM.NORES = RSM.KYRES
-          AND RSS.KYRSS = RUM.KYRSS
-          AND SDO.KYNODA = RSM.NODA
-          AND RSM.CDURM_P = '071S'
-          AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-          AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-          AND RSS.DUSEJ IN (4,5)
-          AND (
-               RSM.CDDNC9 LIKE 'E10%'
-               OR RSM.CDRELIE LIKE 'E10%'
-               OR EXISTS (
-                    SELECT 1
-                    FROM DGN
-                    WHERE DGN.KYRES = RSM.KYRES
-                      AND DGN.KYCDDG LIKE 'E10%'
-               )
-          )
-    ) BASE
-    GROUP BY CASE
-               WHEN SUBSTR(BASE.CDRESI,1,2) = '99' THEN 'ETRANGER'
-               WHEN SUBSTR(BASE.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
-                 THEN SUBSTR(BASE.CDRESI,1,2)
-               ELSE 'PROVINCE_DOM_TOM'
-             END
-)
-ORDER BY ORDRE, MODALITE;
+
+
+SELECT CASE
+         WHEN SUBSTR(SDO.CDRESI,1,2) = '99' THEN 'ETRANGER'
+         WHEN SUBSTR(SDO.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
+           THEN SUBSTR(SDO.CDRESI,1,2)
+         ELSE 'PROVINCE_DOM_TOM'
+       END AS LIEU_RESIDENCE,
+       COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS
+FROM RSM, RUM, RSS, SDO
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND SDO.KYNODA = RSM.NODA
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.DUSEJ IN (4,5)
+  AND (
+       RSM.CDDNC9 LIKE 'E10%'
+       OR RSM.CDRELIE LIKE 'E10%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'E10%'
+       )
+  )
+GROUP BY CASE
+           WHEN SUBSTR(SDO.CDRESI,1,2) = '99' THEN 'ETRANGER'
+           WHEN SUBSTR(SDO.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
+             THEN SUBSTR(SDO.CDRESI,1,2)
+           ELSE 'PROVINCE_DOM_TOM'
+         END
+ORDER BY NB_PATIENTS DESC, LIEU_RESIDENCE;
