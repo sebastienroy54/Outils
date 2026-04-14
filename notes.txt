@@ -1,25 +1,84 @@
-SELECT COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS
-FROM RSM
-WHERE RSM.UE = '979'
-  AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSM.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z964%'
-       OR RSM.CDRELIE LIKE 'Z964%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z964%'
-       )
-  )
-  AND (
-       RSM.CDDNC9 LIKE 'Z092%'
-       OR RSM.CDRELIE LIKE 'Z092%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z092%'
-       )
-  );
+demande de base :
+Les questions sur les 3 programmes/3 populations sont :
+1.	Nombre de patients (file active)
+2.	Tranches d’âge : 15-24 ans / 25-64 ans / > 65 ans
+3.	Statut grossesse
+4.	Lieu de résidence 
+5.	Population fragile (PUMA, CMU, AME)
+ 
+Programme Yalow DT1 : conditions
+1.	Unité 071S
+2.	Patients DT1 Yalow : code  E10-
+3.	4 ou 5 jours d’hospitalisation (sans les < 3 jours)
+Programme Yalow DT2
+4.	Unité 071S
+5.	Patients DT2 Yalow : code  E11-
+6.	Quelle que soit la durée d’hospitalisation  
+Programme pompe ou BF
+7.	Unité 071S
+8.	Nombre de patients avec z448 (début pompe)
+9.	Nombre de patients avec z469 (début boucle fermée)
+10.	Nombre de patients avec z964 (porteurs de pompe) sans z448 ni Z469  
+ 
+11.	Selon la durée de séjour 
+1.	4 ou 5 jours d’hospitalisation (unité de semaine)
+2.	3 jours et moins (unité de demi semaine)
+
+les chiffres de 2024 pour DT1 et 2 avaient transmis, puis réponse :
+Encore Merci ! Votre travail m’a permis de faire un retour à l’ARS pour les programmes Yalow DT1 et Yalow DT2.
+.
+Ne manque plus que le programme HDJ pompe et Boucle Fermée
+Après avoir discuté avec Caroline Dumange, voici ce qui permettrait de repérer les patients concernés.
+secteur HDJ diabéto : UF 979, nombres de patients 
+-	HDJ pompe  complet Z451
+-	patients sous pompe Z964 en bilan Z092
+-	initiation de boucle fermée Z469
+-	porteurs de boucle fermée Z468
+
+Mêmes questions : 
+-	nombre de patients 
+-	3 tranches d’âge (5_24 ans, 25_64 ans,  >=65 ans 
+-	Lieu de résidence
+-	Population fragile (PUMA, CMU, AME) 
+
+pas plus de réponse et derrière la demande de 2025 :
+Comme chaque année, nous devons donner des chiffres au PMSI pour les 3 programmes :
+-	DT1
+-	DT2
+-	pompe et boucle feréme qui commence en HDS (2.5j majoritairement et se termine en 1 HDJ 3-6 mois après.
+STP pourrais avoir les chiffres 2025 ?
+Programme Yalow DT1 : conditions
+1.	Unité 071S
+2.	Patients DT1 Yalow : code  E10-
+3.	4 ou 5 jours d’hospitalisation (sans les < 3 jours)
+Programme Yalow DT2
+4.	Unité 071S
+5.	Patients DT2 Yalow : code  E11-
+6.	Quelle que soit la durée d’hospitalisation  
+Programme pompe ou BF
+7.	Unité 071S
+8.	Nombre de patients avec z448 (début pompe)
+9.	Nombre de patients avec z469 (début boucle fermée)
+10.	Nombre de patients avec z964 (porteurs de pompe) sans z448 ni Z469  
+ 
+11.	Selon la durée de séjour 
+1.	4 ou 5 jours d’hospitalisation (unité de semaine)
+2.	3 jours et moins (unité de demi semaine)
+et
+•	HDJ pompe et Boucle Fermée
+secteur HDJ diabéto : UF 979, nombres de patients 
+-	HDJ pompe  complet Z451
+-	patients sous pompe Z964 en bilan Z092
+-	initiation de boucle fermée Z469
+-	porteurs de boucle fermée Z468
+
+
+
+
+questions : 
+-	nombre de patients 
+-	3 tranches d’âge (5_24 ans, 25_64 ans,  >=65 ans 
+-	Lieu de résidence
+-	Population fragile (PUMA, CMU, AME) 
+
+donc en fait j'ai l'impression que les deux dernieres categories c'est la meme catégorie et du coup il faut bien les mêmes types de données pour les pompes que pour DT1 et 2
