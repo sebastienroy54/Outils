@@ -11,7 +11,25 @@ WHERE RUM.NORES = RSM.KYRES
   AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
   AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
   AND (
-       RSM.CDDNC9 LIKE 'Z469%'
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND NOT (
+       RSM.CDDNC9 LIKE 'Z448%'
+       OR RSM.CDRELIE LIKE 'Z448%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z448%'
+       )
+       OR RSM.CDDNC9 LIKE 'Z469%'
        OR RSM.CDRELIE LIKE 'Z469%'
        OR EXISTS (
             SELECT 1
