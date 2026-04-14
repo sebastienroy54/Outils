@@ -1,121 +1,158 @@
-SELECT COUNT(DISTINCT RSM.NOIP) AS FILE_ACTIVE_DT2
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'E11%'
-       OR RSM.CDRELIE LIKE 'E11%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E11%'
-       )
-  );
+SELECT CATEGORIE,
+       DUREE,
+       COUNT(DISTINCT NOIP) AS NB_PATIENTS
+FROM
+(
+    SELECT DISTINCT
+           RSM.NOIP,
+           CASE
+             WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
+             WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
+             ELSE 'AUTRE_DUREE'
+           END AS DUREE,
+           CASE
+             WHEN (
+                  RSM.CDDNC9 LIKE 'Z448%'
+                  OR RSM.CDRELIE LIKE 'Z448%'
+                  OR EXISTS (
+                       SELECT 1
+                       FROM DGN
+                       WHERE DGN.KYRES = RSM.KYRES
+                         AND DGN.KYCDDG LIKE 'Z448%'
+                  )
+             ) THEN 'DEBUT_POMPE_Z448'
+
+             WHEN (
+                  RSM.CDDNC9 LIKE 'Z469%'
+                  OR RSM.CDRELIE LIKE 'Z469%'
+                  OR EXISTS (
+                       SELECT 1
+                       FROM DGN
+                       WHERE DGN.KYRES = RSM.KYRES
+                         AND DGN.KYCDDG LIKE 'Z469%'
+                  )
+             ) THEN 'DEBUT_BOUCLE_FERMEE_Z469'
+
+             WHEN (
+                  (
+                    RSM.CDDNC9 LIKE 'Z964%'
+                    OR RSM.CDRELIE LIKE 'Z964%'
+                    OR EXISTS (
+                         SELECT 1
+                         FROM DGN
+                         WHERE DGN.KYRES = RSM.KYRES
+                           AND DGN.KYCDDG LIKE 'Z964%'
+                    )
+                  )
+                  AND NOT (
+                    RSM.CDDNC9 LIKE 'Z448%'
+                    OR RSM.CDRELIE LIKE 'Z448%'
+                    OR EXISTS (
+                         SELECT 1
+                         FROM DGN
+                         WHERE DGN.KYRES = RSM.KYRES
+                           AND DGN.KYCDDG LIKE 'Z448%'
+                    )
+                    OR RSM.CDDNC9 LIKE 'Z469%'
+                    OR RSM.CDRELIE LIKE 'Z469%'
+                    OR EXISTS (
+                         SELECT 1
+                         FROM DGN
+                         WHERE DGN.KYRES = RSM.KYRES
+                           AND DGN.KYCDDG LIKE 'Z469%'
+                    )
+                  )
+             ) THEN 'PORTEUR_POMPE_Z964_SANS_Z448_Z469'
+
+             ELSE NULL
+           END AS CATEGORIE
+    FROM RSM, RUM, RSS
+    WHERE RUM.NORES = RSM.KYRES
+      AND RSS.KYRSS = RUM.KYRSS
+      AND RSM.CDURM_P = '071S'
+      AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+      AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+)
+WHERE CATEGORIE IS NOT NULL
+GROUP BY CATEGORIE, DUREE
+ORDER BY CATEGORIE, DUREE;
 
 
 
 
 
-SELECT CASE
-         WHEN TRUNC(MONTHS_BETWEEN(RSS.D8DEB, SDO.DANAIS) / 12) BETWEEN 15 AND 24 THEN '15_24'
-         WHEN TRUNC(MONTHS_BETWEEN(RSS.D8DEB, SDO.DANAIS) / 12) BETWEEN 25 AND 64 THEN '25_64'
-         WHEN TRUNC(MONTHS_BETWEEN(RSS.D8DEB, SDO.DANAIS) / 12) >= 65 THEN '65_ET_PLUS'
-         ELSE 'HORS_TRANCHE'
-       END AS TRANCHE_AGE,
-       COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS
-FROM RSM, RUM, RSS, SDO
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND SDO.KYNODA = RSM.NODA
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'E11%'
-       OR RSM.CDRELIE LIKE 'E11%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E11%'
-       )
-  )
-GROUP BY CASE
-           WHEN TRUNC(MONTHS_BETWEEN(RSS.D8DEB, SDO.DANAIS) / 12) BETWEEN 15 AND 24 THEN '15_24'
-           WHEN TRUNC(MONTHS_BETWEEN(RSS.D8DEB, SDO.DANAIS) / 12) BETWEEN 25 AND 64 THEN '25_64'
-           WHEN TRUNC(MONTHS_BETWEEN(RSS.D8DEB, SDO.DANAIS) / 12) >= 65 THEN '65_ET_PLUS'
-           ELSE 'HORS_TRANCHE'
-         END
-ORDER BY 1;
 
+SELECT CATEGORIE,
+       COUNT(DISTINCT NOIP) AS NB_PATIENTS
+FROM
+(
+    SELECT DISTINCT
+           RSM.NOIP,
+           CASE
+             WHEN (
+                  RSM.CDDNC9 LIKE 'Z451%'
+                  OR RSM.CDRELIE LIKE 'Z451%'
+                  OR EXISTS (
+                       SELECT 1
+                       FROM DGN
+                       WHERE DGN.KYRES = RSM.KYRES
+                         AND DGN.KYCDDG LIKE 'Z451%'
+                  )
+             ) THEN 'HDJ_POMPE_COMPLET_Z451'
 
+             WHEN (
+                  (
+                    RSM.CDDNC9 LIKE 'Z964%'
+                    OR RSM.CDRELIE LIKE 'Z964%'
+                    OR EXISTS (
+                         SELECT 1
+                         FROM DGN
+                         WHERE DGN.KYRES = RSM.KYRES
+                           AND DGN.KYCDDG LIKE 'Z964%'
+                    )
+                  )
+                  AND
+                  (
+                    RSM.CDDNC9 LIKE 'Z092%'
+                    OR RSM.CDRELIE LIKE 'Z092%'
+                    OR EXISTS (
+                         SELECT 1
+                         FROM DGN
+                         WHERE DGN.KYRES = RSM.KYRES
+                           AND DGN.KYCDDG LIKE 'Z092%'
+                    )
+                  )
+             ) THEN 'SOUS_POMPE_BILAN_Z964_Z092'
 
+             WHEN (
+                  RSM.CDDNC9 LIKE 'Z469%'
+                  OR RSM.CDRELIE LIKE 'Z469%'
+                  OR EXISTS (
+                       SELECT 1
+                       FROM DGN
+                       WHERE DGN.KYRES = RSM.KYRES
+                         AND DGN.KYCDDG LIKE 'Z469%'
+                  )
+             ) THEN 'INITIATION_BOUCLE_FERMEE_Z469'
 
+             WHEN (
+                  RSM.CDDNC9 LIKE 'Z468%'
+                  OR RSM.CDRELIE LIKE 'Z468%'
+                  OR EXISTS (
+                       SELECT 1
+                       FROM DGN
+                       WHERE DGN.KYRES = RSM.KYRES
+                         AND DGN.KYCDDG LIKE 'Z468%'
+                  )
+             ) THEN 'PORTEURS_BOUCLE_FERMEE_Z468'
 
-SELECT COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTES_ENCEINTES
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'E11%'
-       OR RSM.CDRELIE LIKE 'E11%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E11%'
-       )
-  )
-  AND (
-       RSM.CDDNC9 LIKE 'Z35%'
-       OR RSM.CDRELIE LIKE 'Z35%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z35%'
-       )
-  );
-
-
-
-
-
-SELECT CASE
-         WHEN SUBSTR(SDO.CDRESI,1,2) = '99' THEN 'ETRANGER'
-         WHEN SUBSTR(SDO.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
-           THEN SUBSTR(SDO.CDRESI,1,2)
-         ELSE 'PROVINCE_DOM_TOM'
-       END AS LIEU_RESIDENCE,
-       COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS
-FROM RSM, RUM, RSS, SDO
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND SDO.KYNODA = RSM.NODA
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'E11%'
-       OR RSM.CDRELIE LIKE 'E11%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E11%'
-       )
-  )
-GROUP BY CASE
-           WHEN SUBSTR(SDO.CDRESI,1,2) = '99' THEN 'ETRANGER'
-           WHEN SUBSTR(SDO.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
-             THEN SUBSTR(SDO.CDRESI,1,2)
-           ELSE 'PROVINCE_DOM_TOM'
-         END
-ORDER BY NB_PATIENTS DESC, LIEU_RESIDENCE;
+             ELSE NULL
+           END AS CATEGORIE
+    FROM RSM
+    WHERE RSM.UE = '979'
+      AND RSM.D8EEUE >= TO_DATE('01/01/2024','DD/MM/YYYY')
+      AND RSM.D8EEUE <  TO_DATE('01/01/2025','DD/MM/YYYY')
+)
+WHERE CATEGORIE IS NOT NULL
+GROUP BY CATEGORIE
+ORDER BY CATEGORIE;
