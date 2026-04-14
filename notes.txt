@@ -1,100 +1,28 @@
-SQL> SELECT CATEGORIE,
-  2         DUREE,
-  3         COUNT(DISTINCT NOIP) AS NB_PATIENTS
-  4  FROM
-  5  (
-  6      SELECT DISTINCT
-  7             RSM.NOIP,
-  8             CASE
-  9               WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
- 10               WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
- 11               ELSE 'AUTRE_DUREE'
- 12             END AS DUREE,
- 13             CASE
- 14               WHEN (
- 15                    RSM.CDDNC9 LIKE 'Z448%'
- 16                    OR RSM.CDRELIE LIKE 'Z448%'
- 17                    OR EXISTS (
- 18                         SELECT 1
- 19                         FROM DGN
- 20                         WHERE DGN.KYRES = RSM.KYRES
- 21                           AND DGN.KYCDDG LIKE 'Z448%'
- 22                    )
- 23               ) THEN 'DEBUT_POMPE_Z448'
- 24  
-SQL>              WHEN (
-SP2-0042: commande inconnue "WHEN (" - reste de la ligne ignoré.
-SQL>                   RSM.CDDNC9 LIKE 'Z469%'
-SP2-0734: commande inconnue au début de "RSM.CDDNC9..." - le reste de la ligne est ignoré.
-SQL>                   OR RSM.CDRELIE LIKE 'Z469%'
-SP2-0734: commande inconnue au début de "OR RSM.CDR..." - le reste de la ligne est ignoré.
-SQL>                   OR EXISTS (
-SP2-0734: commande inconnue au début de "OR EXISTS ..." - le reste de la ligne est ignoré.
-SP2-0044: Pour la liste des commandes connues entrez HELP
-and et pour sortir EXIT.
-SQL>                        SELECT 1
-  2                         FROM DGN
-  3                         WHERE DGN.KYRES = RSM.KYRES
-  4                           AND DGN.KYCDDG LIKE 'Z469%'
-  5                    )
-  6               ) THEN 'DEBUT_BOUCLE_FERMEE_Z469'
-  7  
-SQL>              WHEN (
-SP2-0042: commande inconnue "WHEN (" - reste de la ligne ignoré.
-SQL>                   (
-  2                      RSM.CDDNC9 LIKE 'Z964%'
-  3                      OR RSM.CDRELIE LIKE 'Z964%'
-  4                      OR EXISTS (
-  5                           SELECT 1
-  6                           FROM DGN
-  7                           WHERE DGN.KYRES = RSM.KYRES
-  8                             AND DGN.KYCDDG LIKE 'Z964%'
-  9                      )
- 10                    )
- 11                    AND NOT (
- 12                      RSM.CDDNC9 LIKE 'Z448%'
- 13                      OR RSM.CDRELIE LIKE 'Z448%'
- 14                      OR EXISTS (
- 15                           SELECT 1
- 16                           FROM DGN
- 17                           WHERE DGN.KYRES = RSM.KYRES
- 18                             AND DGN.KYCDDG LIKE 'Z448%'
- 19                      )
- 20                      OR RSM.CDDNC9 LIKE 'Z469%'
- 21                      OR RSM.CDRELIE LIKE 'Z469%'
- 22                      OR EXISTS (
- 23                           SELECT 1
- 24                           FROM DGN
- 25                           WHERE DGN.KYRES = RSM.KYRES
- 26                             AND DGN.KYCDDG LIKE 'Z469%'
- 27                      )
- 28                    )
- 29               ) THEN 'PORTEUR_POMPE_Z964_SANS_Z448_Z469'
- 30  
-SQL>              ELSE NULL
-SP2-0042: commande inconnue "ELSE NULL" - reste de la ligne ignoré.
-SQL>            END AS CATEGORIE
-SP2-0734: commande inconnue au début de "END AS CAT..." - le reste de la ligne est ignoré.
-SQL>     FROM RSM, RUM, RSS
-SP2-0734: commande inconnue au début de "FROM RSM, ..." - le reste de la ligne est ignoré.
-SQL>     WHERE RUM.NORES = RSM.KYRES
-SP2-0734: commande inconnue au début de "WHERE RUM...." - le reste de la ligne est ignoré.
-SP2-0044: Pour la liste des commandes connues entrez HELP
-and et pour sortir EXIT.
-SQL>       AND RSS.KYRSS = RUM.KYRSS
-SP2-0734: commande inconnue au début de "AND RSS.KY..." - le reste de la ligne est ignoré.
-SQL>       AND RSM.CDURM_P = '071S'
-SP2-0734: commande inconnue au début de "AND RSM.CD..." - le reste de la ligne est ignoré.
-SQL>       AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-SP2-0734: commande inconnue au début de "AND RSS.D8..." - le reste de la ligne est ignoré.
-SQL>       AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-SP2-0734: commande inconnue au début de "AND RSS.D8..." - le reste de la ligne est ignoré.
-SP2-0044: Pour la liste des commandes connues entrez HELP
-and et pour sortir EXIT.
-SQL> )
-SP2-0042: commande inconnue ")" - reste de la ligne ignoré.
-SQL> WHERE CATEGORIE IS NOT NULL
-SP2-0734: commande inconnue au début de "WHERE CATE..." - le reste de la ligne est ignoré.
-SQL> GROUP BY CATEGORIE, DUREE
-SP2-0734: commande inconnue au début de "GROUP BY C..." - le reste de la ligne est ignoré.
-SQL> ORDER BY CATEGORIE, DUREE;
+SELECT CASE
+         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
+         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
+         ELSE 'AUTRE_DUREE'
+       END AS DUREE,
+       COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z448%'
+       OR RSM.CDRELIE LIKE 'Z448%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z448%'
+       )
+  )
+GROUP BY CASE
+           WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
+           WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
+           ELSE 'AUTRE_DUREE'
+         END
+ORDER BY 1;
