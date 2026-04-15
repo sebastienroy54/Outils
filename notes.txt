@@ -114,18 +114,3 @@ GROUP BY CASE
            ELSE 'PROVINCE_DOM_TOM'
          END
 ORDER BY NB_PATIENTS DESC, LIEU_RESIDENCE;
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z964%'
-       )
-  )
-  AND (
-       RSM.CDDNC9 LIKE 'Z092%'
-       OR RSM.CDRELIE LIKE 'Z092%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z092%'
-       )
-  );
