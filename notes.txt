@@ -1,28 +1,14 @@
-SELECT COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTS_AME_DT1
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2024','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.DUSEJ IN (4,5)
-  AND (
-       RSM.CDDNC9 LIKE 'E10%'
-       OR RSM.CDRELIE LIKE 'E10%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E10%'
-       )
-  )
-  AND (
-       RSM.CDDNC9 LIKE 'Z596%'
-       OR RSM.CDRELIE LIKE 'Z596%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z596%'
-       )
-  );
+input_file = "MCO21_Vidhosp.txt"
+output_file = "AME_lignes.txt"
+
+with open(input_file, "r", encoding="utf-8") as f_in, \
+     open(output_file, "w", encoding="utf-8") as f_out:
+
+    for line in f_in:
+        line_clean = line.rstrip("\n")
+
+        if len(line_clean) >= 84:
+            if line_clean[83] == '1':
+                f_out.write(line)
+
+print("Extraction terminée.")
