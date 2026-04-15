@@ -1,48 +1,375 @@
-import csv
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
 
-input_file = "MCO21_Vidhosp.txt"
-output_file = "vidhosp_ame_cmu.csv"
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\DT1_2025.csv
 
-# Index Python
-AME_INDEX = 83
-CMU_INDEX = 138
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND RSS.DUSEJ IN (4,5)
+  AND (
+       RSM.CDDNC9 LIKE 'E10%'
+       OR RSM.CDRELIE LIKE 'E10%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'E10%'
+       )
+  );
 
-# NDA (colonne 40, longueur 9)
-NDA_START = 39
-NDA_END = 48  # 39 + 9
+SPOOL OFF
 
-rows_written = 0
-ame_count = 0
-cmu_count = 0
-both_count = 0
 
-with open(input_file, "r", encoding="utf-8") as f_in, \
-     open(output_file, "w", encoding="utf-8", newline="") as f_out:
 
-    writer = csv.writer(f_out, delimiter=";")
-    writer.writerow(["NDA", "AME", "CMU"])
 
-    for line in f_in:
-        line_clean = line.rstrip("\n\r")
 
-        if len(line_clean) >= NDA_END:
-            nda = line_clean[NDA_START:NDA_END]
 
-            ame = int(len(line_clean) > AME_INDEX and line_clean[AME_INDEX] == "1")
-            cmu = int(len(line_clean) > CMU_INDEX and line_clean[CMU_INDEX] == "1")
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
 
-            if ame or cmu:
-                writer.writerow([nda, ame, cmu])
-                rows_written += 1
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\DT2_2025.csv
 
-                if ame:
-                    ame_count += 1
-                if cmu:
-                    cmu_count += 1
-                if ame and cmu:
-                    both_count += 1
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'E11%'
+       OR RSM.CDRELIE LIKE 'E11%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'E11%'
+       )
+  );
 
-print(f"Extraction terminée : {rows_written} lignes écrites")
-print(f"AME : {ame_count}")
-print(f"CMU : {cmu_count}")
-print(f"AME + CMU : {both_count}")
+SPOOL OFF
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\071S_Z448_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA,
+       CASE
+         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
+         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
+         ELSE 'AUTRE_DUREE'
+       END
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z448%'
+       OR RSM.CDRELIE LIKE 'Z448%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z448%'
+       )
+  );
+
+SPOOL OFF
+
+
+
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\071S_Z469_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA,
+       CASE
+         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
+         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
+         ELSE 'AUTRE_DUREE'
+       END
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z469%'
+       OR RSM.CDRELIE LIKE 'Z469%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z469%'
+       )
+  );
+
+SPOOL OFF
+
+
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\071S_Z964_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA,
+       CASE
+         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
+         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
+         ELSE 'AUTRE_DUREE'
+       END
+FROM RSM, RUM, RSS
+WHERE RUM.NORES = RSM.KYRES
+  AND RSS.KYRSS = RUM.KYRSS
+  AND RSM.CDURM_P = '071S'
+  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND NOT (
+       RSM.CDDNC9 LIKE 'Z448%'
+       OR RSM.CDRELIE LIKE 'Z448%'
+       OR RSM.CDDNC9 LIKE 'Z469%'
+       OR RSM.CDRELIE LIKE 'Z469%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND (DGN.KYCDDG LIKE 'Z448%' OR DGN.KYCDDG LIKE 'Z469%')
+       )
+  );
+
+SPOOL OFF
+
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z451_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA
+FROM RSM
+WHERE RSM.UE = '979'
+  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z451%'
+       OR RSM.CDRELIE LIKE 'Z451%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z451%'
+       )
+  );
+
+SPOOL OFF
+
+
+
+
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z964_Z092_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA
+FROM RSM
+WHERE RSM.UE = '979'
+  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND (
+       RSM.CDDNC9 LIKE 'Z092%'
+       OR RSM.CDRELIE LIKE 'Z092%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z092%'
+       )
+  );
+
+SPOOL OFF
+
+
+
+
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z469_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA
+FROM RSM
+WHERE RSM.UE = '979'
+  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z469%'
+       OR RSM.CDRELIE LIKE 'Z469%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z469%'
+       )
+  );
+
+SPOOL OFF
+
+
+
+
+
+
+
+SET HEADING OFF
+SET FEEDBACK OFF
+SET PAGESIZE 0
+SET LINESIZE 300
+SET COLSEP ';'
+SET TRIMSPOOL ON
+SET WRAP OFF
+SET TERMOUT OFF
+
+SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z468_2025.csv
+
+SELECT DISTINCT
+       RSM.NOIP,
+       RSM.NODA
+FROM RSM
+WHERE RSM.UE = '979'
+  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
+  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
+  AND (
+       RSM.CDDNC9 LIKE 'Z468%'
+       OR RSM.CDRELIE LIKE 'Z468%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z468%'
+       )
+  );
+
+SPOOL OFF
