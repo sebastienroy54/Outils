@@ -1,10 +1,54 @@
-def duration_bucket(value):
-    """
-    La 3e colonne des fichiers 071S contient déjà :
-    - '3_JOURS_ET_MOINS'
-    - '4_OU_5_JOURS'
-    """
-    value = value.strip()
-    if value in ("3_JOURS_ET_MOINS", "4_OU_5_JOURS"):
-        return value
-    return None
+Fichier : DT1_2025.csv
+Lignes lues    : 192
+Lignes matchées: 31
+DT1_2025.csv              | GLOBAL             | TOTAL=31    | AME=5     | CMU=26    | AME_OU_CMU=31    | AME_ET_CMU=0
+
+Fichier : DT2_2025.csv
+Lignes lues    : 265
+Lignes matchées: 58
+DT2_2025.csv              | GLOBAL             | TOTAL=58    | AME=11    | CMU=47    | AME_OU_CMU=58    | AME_ET_CMU=0
+
+Fichier : 071S_Z448_2025.csv
+Lignes lues    : 418
+Lignes matchées: 44
+071S_Z448_2025.csv        | GLOBAL             | TOTAL=42    | AME=1     | CMU=41    | AME_OU_CMU=42    | AME_ET_CMU=0
+071S_Z448_2025.csv        | 3_JOURS_ET_MOINS   | TOTAL=29    | AME=1     | CMU=28    | AME_OU_CMU=29    | AME_ET_CMU=0
+071S_Z448_2025.csv        | 4_OU_5_JOURS       | TOTAL=13    | AME=0     | CMU=13    | AME_OU_CMU=13    | AME_ET_CMU=0
+
+Fichier : 071S_Z469_2025.csv
+Lignes lues    : 246
+Lignes matchées: 19
+071S_Z469_2025.csv        | GLOBAL             | TOTAL=19    | AME=0     | CMU=19    | AME_OU_CMU=19    | AME_ET_CMU=0
+071S_Z469_2025.csv        | 3_JOURS_ET_MOINS   | TOTAL=17    | AME=0     | CMU=17    | AME_OU_CMU=17    | AME_ET_CMU=0
+071S_Z469_2025.csv        | 4_OU_5_JOURS       | TOTAL=2     | AME=0     | CMU=2     | AME_OU_CMU=2     | AME_ET_CMU=0
+
+Fichier : 071S_Z964_2025.csv
+Lignes lues    : 17
+Lignes matchées: 1
+071S_Z964_2025.csv        | GLOBAL             | TOTAL=1     | AME=0     | CMU=1     | AME_OU_CMU=1     | AME_ET_CMU=0
+071S_Z964_2025.csv        | 3_JOURS_ET_MOINS   | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
+071S_Z964_2025.csv        | 4_OU_5_JOURS       | TOTAL=1     | AME=0     | CMU=1     | AME_OU_CMU=1     | AME_ET_CMU=0
+
+Fichier : 979_Z451_2025.csv
+Lignes lues    : 359
+Lignes matchées: 29
+979_Z451_2025.csv         | GLOBAL             | TOTAL=27    | AME=0     | CMU=27    | AME_OU_CMU=27    | AME_ET_CMU=0
+
+Fichier : 979_Z964_Z092_2025.csv
+Lignes lues    : 52
+Lignes matchées: 4
+979_Z964_Z092_2025.csv    | GLOBAL             | TOTAL=4     | AME=0     | CMU=4     | AME_OU_CMU=4     | AME_ET_CMU=0
+
+Fichier : 979_Z469_2025.csv
+Lignes lues    : 23
+Lignes matchées: 2
+979_Z469_2025.csv         | GLOBAL             | TOTAL=2     | AME=0     | CMU=2     | AME_OU_CMU=2     | AME_ET_CMU=0
+
+Fichier : 979_Z468_2025.csv
+Lignes lues    : 233
+Lignes matchées: 20
+979_Z468_2025.csv         | GLOBAL             | TOTAL=19    | AME=0     | CMU=19    | AME_OU_CMU=19    | AME_ET_CMU=0
+
+========================================================================================================================
+TOTAL TOUS FICHIERS CONFONDUS
+TOUS_FICHIERS             | GLOBAL             | TOTAL=136   | AME=17    | CMU=119   | AME_OU_CMU=136   | AME_ET_CMU=0
