@@ -1,23 +1,35 @@
-979 — Z451 — file active
-SELECT COUNT(DISTINCT RSM.NOIP) AS FILE_ACTIVE_Z451
+979 — Z964 + Z092 — file active
+SELECT COUNT(DISTINCT RSM.NOIP) AS FILE_ACTIVE_Z964_Z092
 FROM RSM
 WHERE RSM.UE = '979'
   AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
   AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
   AND (
-       RSM.CDDNC9 LIKE 'Z451%'
-       OR RSM.CDRELIE LIKE 'Z451%'
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
        OR EXISTS (
             SELECT 1
             FROM DGN
             WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z451%'
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND (
+       RSM.CDDNC9 LIKE 'Z092%'
+       OR RSM.CDRELIE LIKE 'Z092%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z092%'
        )
   );
 
 
 
-979 — Z451 — tranches d’âge
+
+
+979 — Z964 + Z092 — tranches d’âge
 SELECT CASE
          WHEN TRUNC(MONTHS_BETWEEN(RSM.D8EEUE, SDO.DANAIS)/12) BETWEEN 15 AND 24 THEN '15_24'
          WHEN TRUNC(MONTHS_BETWEEN(RSM.D8EEUE, SDO.DANAIS)/12) BETWEEN 25 AND 64 THEN '25_64'
@@ -31,13 +43,23 @@ WHERE SDO.KYNODA = RSM.NODA
   AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
   AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
   AND (
-       RSM.CDDNC9 LIKE 'Z451%'
-       OR RSM.CDRELIE LIKE 'Z451%'
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
        OR EXISTS (
             SELECT 1
             FROM DGN
             WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z451%'
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND (
+       RSM.CDDNC9 LIKE 'Z092%'
+       OR RSM.CDRELIE LIKE 'Z092%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z092%'
        )
   )
 GROUP BY CASE
@@ -52,20 +74,30 @@ ORDER BY 1;
 
 
 
-979 — Z451 — grossesse
+979 — Z964 + Z092 — grossesse
 SELECT COUNT(DISTINCT RSM.NOIP) AS NB_PATIENTES_ENCEINTES
 FROM RSM
 WHERE RSM.UE = '979'
   AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
   AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
   AND (
-       RSM.CDDNC9 LIKE 'Z451%'
-       OR RSM.CDRELIE LIKE 'Z451%'
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
        OR EXISTS (
             SELECT 1
             FROM DGN
             WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z451%'
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND (
+       RSM.CDDNC9 LIKE 'Z092%'
+       OR RSM.CDRELIE LIKE 'Z092%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z092%'
        )
   )
   AND (
@@ -81,7 +113,9 @@ WHERE RSM.UE = '979'
 
 
 
-979 — Z451 — lieu de résidence
+
+
+979 — Z964 + Z092 — lieu de résidence
 SELECT CASE
          WHEN SUBSTR(SDO.CDRESI,1,2) = '99' THEN 'ETRANGER'
          WHEN SUBSTR(SDO.CDRESI,1,2) IN ('75','77','78','91','92','93','94','95','60')
@@ -95,13 +129,23 @@ WHERE SDO.KYNODA = RSM.NODA
   AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
   AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
   AND (
-       RSM.CDDNC9 LIKE 'Z451%'
-       OR RSM.CDRELIE LIKE 'Z451%'
+       RSM.CDDNC9 LIKE 'Z964%'
+       OR RSM.CDRELIE LIKE 'Z964%'
        OR EXISTS (
             SELECT 1
             FROM DGN
             WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z451%'
+              AND DGN.KYCDDG LIKE 'Z964%'
+       )
+  )
+  AND (
+       RSM.CDDNC9 LIKE 'Z092%'
+       OR RSM.CDRELIE LIKE 'Z092%'
+       OR EXISTS (
+            SELECT 1
+            FROM DGN
+            WHERE DGN.KYRES = RSM.KYRES
+              AND DGN.KYCDDG LIKE 'Z092%'
        )
   )
 GROUP BY CASE
