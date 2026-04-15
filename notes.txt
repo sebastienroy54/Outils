@@ -1,20 +1,10 @@
-Fichier : 071S_Z448_2025.csv
-Lignes lues    : 418
-Lignes matchées: 44
-071S_Z448_2025.csv        | GLOBAL             | TOTAL=42    | AME=1     | CMU=41    | AME_OU_CMU=42    | AME_ET_CMU=0
-071S_Z448_2025.csv        | 3_JOURS_ET_MOINS   | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
-071S_Z448_2025.csv        | 4_OU_5_JOURS       | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
-
-Fichier : 071S_Z469_2025.csv
-Lignes lues    : 246
-Lignes matchées: 19
-071S_Z469_2025.csv        | GLOBAL             | TOTAL=19    | AME=0     | CMU=19    | AME_OU_CMU=19    | AME_ET_CMU=0
-071S_Z469_2025.csv        | 3_JOURS_ET_MOINS   | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
-071S_Z469_2025.csv        | 4_OU_5_JOURS       | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
-
-Fichier : 071S_Z964_2025.csv
-Lignes lues    : 17
-Lignes matchées: 1
-071S_Z964_2025.csv        | GLOBAL             | TOTAL=1     | AME=0     | CMU=1     | AME_OU_CMU=1     | AME_ET_CMU=0
-071S_Z964_2025.csv        | 3_JOURS_ET_MOINS   | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
-071S_Z964_2025.csv        | 4_OU_5_JOURS       | TOTAL=0     | AME=0     | CMU=0     | AME_OU_CMU=0     | AME_ET_CMU=0
+def duration_bucket(value):
+    """
+    La 3e colonne des fichiers 071S contient déjà :
+    - '3_JOURS_ET_MOINS'
+    - '4_OU_5_JOURS'
+    """
+    value = value.strip()
+    if value in ("3_JOURS_ET_MOINS", "4_OU_5_JOURS"):
+        return value
+    return None
