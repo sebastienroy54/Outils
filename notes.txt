@@ -23,6 +23,6 @@ WHERE RUM.NORES = RSM.KYRES
             SELECT 1
             FROM DGN
             WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z5961%'
+              AND DGN.KYCDDG LIKE 'Z596%'
        )
   );
