@@ -1,375 +1,211 @@
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\DT1_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND RSS.DUSEJ IN (4,5)
-  AND (
-       RSM.CDDNC9 LIKE 'E10%'
-       OR RSM.CDRELIE LIKE 'E10%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E10%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\DT2_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'E11%'
-       OR RSM.CDRELIE LIKE 'E11%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'E11%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\071S_Z448_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA,
-       CASE
-         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
-         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
-         ELSE 'AUTRE_DUREE'
-       END
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z448%'
-       OR RSM.CDRELIE LIKE 'Z448%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z448%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\071S_Z469_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA,
-       CASE
-         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
-         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
-         ELSE 'AUTRE_DUREE'
-       END
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z469%'
-       OR RSM.CDRELIE LIKE 'Z469%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z469%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\071S_Z964_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA,
-       CASE
-         WHEN RSS.DUSEJ <= 3 THEN '3_JOURS_ET_MOINS'
-         WHEN RSS.DUSEJ IN (4,5) THEN '4_OU_5_JOURS'
-         ELSE 'AUTRE_DUREE'
-       END
-FROM RSM, RUM, RSS
-WHERE RUM.NORES = RSM.KYRES
-  AND RSS.KYRSS = RUM.KYRSS
-  AND RSM.CDURM_P = '071S'
-  AND RSS.D8DEB >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSS.D8DEB <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z964%'
-       OR RSM.CDRELIE LIKE 'Z964%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z964%'
-       )
-  )
-  AND NOT (
-       RSM.CDDNC9 LIKE 'Z448%'
-       OR RSM.CDRELIE LIKE 'Z448%'
-       OR RSM.CDDNC9 LIKE 'Z469%'
-       OR RSM.CDRELIE LIKE 'Z469%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND (DGN.KYCDDG LIKE 'Z448%' OR DGN.KYCDDG LIKE 'Z469%')
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z451_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA
-FROM RSM
-WHERE RSM.UE = '979'
-  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z451%'
-       OR RSM.CDRELIE LIKE 'Z451%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z451%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z964_Z092_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA
-FROM RSM
-WHERE RSM.UE = '979'
-  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z964%'
-       OR RSM.CDRELIE LIKE 'Z964%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z964%'
-       )
-  )
-  AND (
-       RSM.CDDNC9 LIKE 'Z092%'
-       OR RSM.CDRELIE LIKE 'Z092%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z092%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z469_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA
-FROM RSM
-WHERE RSM.UE = '979'
-  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z469%'
-       OR RSM.CDRELIE LIKE 'Z469%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z469%'
-       )
-  );
-
-SPOOL OFF
-
-
-
-
-
-
-
-SET HEADING OFF
-SET FEEDBACK OFF
-SET PAGESIZE 0
-SET LINESIZE 300
-SET COLSEP ';'
-SET TRIMSPOOL ON
-SET WRAP OFF
-SET TERMOUT OFF
-
-SPOOL C:\Users\4251352\Documents\Resultats_requetes\ETP\979_Z468_2025.csv
-
-SELECT DISTINCT
-       RSM.NOIP,
-       RSM.NODA
-FROM RSM
-WHERE RSM.UE = '979'
-  AND RSM.D8EEUE >= TO_DATE('01/01/2025','DD/MM/YYYY')
-  AND RSM.D8EEUE <  TO_DATE('01/01/2026','DD/MM/YYYY')
-  AND (
-       RSM.CDDNC9 LIKE 'Z468%'
-       OR RSM.CDRELIE LIKE 'Z468%'
-       OR EXISTS (
-            SELECT 1
-            FROM DGN
-            WHERE DGN.KYRES = RSM.KYRES
-              AND DGN.KYCDDG LIKE 'Z468%'
-       )
-  );
-
-SPOOL OFF
+import csv
+import os
+
+# =========================
+# PARAMÈTRES
+# =========================
+
+ame_cmu_file = "vidhosp_ame_cmu.csv"
+
+category_files = [
+    "DT1_2025.csv",
+    "DT2_2025.csv",
+    "071S_Z448_2025.csv",
+    "071S_Z469_2025.csv",
+    "071S_Z964_2025.csv",
+    "979_Z451_2025.csv",
+    "979_Z964_Z092_2025.csv",
+    "979_Z469_2025.csv",
+    "979_Z468_2025.csv",
+]
+
+output_file = "recap_patients_ame_cmu.csv"
+
+# séparateurs à adapter si besoin
+SEP_AME_CMU = ";"
+SEP_CATEGORY = ";"
+
+# =========================
+# CHARGEMENT AME / CMU
+# =========================
+
+# Dictionnaire NDA -> flags consolidés
+# Exemple:
+# nda_flags["123456789"] = {"ame": 1, "cmu": 0}
+nda_flags = {}
+
+with open(ame_cmu_file, "r", encoding="utf-8-sig", newline="") as f:
+    reader = csv.DictReader(f, delimiter=SEP_AME_CMU)
+
+    for row in reader:
+        nda = row["NDA"].strip()
+        ame = 1 if row["AME"].strip() == "1" else 0
+        cmu = 1 if row["CMU"].strip() == "1" else 0
+
+        if nda not in nda_flags:
+            nda_flags[nda] = {"ame": ame, "cmu": cmu}
+        else:
+            # consolidation si doublons de NDA
+            nda_flags[nda]["ame"] = max(nda_flags[nda]["ame"], ame)
+            nda_flags[nda]["cmu"] = max(nda_flags[nda]["cmu"], cmu)
+
+# =========================
+# OUTILS
+# =========================
+
+def normalize_value(value):
+    return value.strip()
+
+def duration_bucket(value):
+    """
+    Classe la durée pour les fichiers 071S.
+    Retourne:
+    - '3_JOURS_ET_MOINS'
+    - '4_OU_5_JOURS'
+    - None si hors périmètre / invalide
+    """
+    value = value.strip()
+    if not value:
+        return None
+
+    try:
+        d = int(value)
+    except ValueError:
+        return None
+
+    if d <= 3:
+        return "3_JOURS_ET_MOINS"
+    elif d in (4, 5):
+        return "4_OU_5_JOURS"
+    else:
+        return None
+
+def init_group():
+    return {
+        "patients_total": set(),
+        "patients_ame": set(),
+        "patients_cmu": set(),
+        "patients_ame_ou_cmu": set(),
+        "patients_ame_et_cmu": set(),
+    }
+
+def add_patient(group, ipp, ame, cmu):
+    group["patients_total"].add(ipp)
+
+    if ame == 1:
+        group["patients_ame"].add(ipp)
+    if cmu == 1:
+        group["patients_cmu"].add(ipp)
+    if ame == 1 or cmu == 1:
+        group["patients_ame_ou_cmu"].add(ipp)
+    if ame == 1 and cmu == 1:
+        group["patients_ame_et_cmu"].add(ipp)
+
+# =========================
+# TRAITEMENT DES FICHIERS
+# =========================
+
+results = []
+
+for filepath in category_files:
+    filename = os.path.basename(filepath)
+
+    # Structure globale pour le fichier
+    overall = init_group()
+
+    # Sous-groupes durée pour 071S uniquement
+    duration_groups = {
+        "3_JOURS_ET_MOINS": init_group(),
+        "4_OU_5_JOURS": init_group(),
+    }
+
+    with open(filepath, "r", encoding="utf-8-sig", newline="") as f:
+        reader = csv.reader(f, delimiter=SEP_CATEGORY)
+
+        for row in reader:
+            if not row:
+                continue
+
+            # Fichiers sans en-tête :
+            # col 0 = IPP
+            # col 1 = NDA
+            # col 2 = DUREE (seulement pour 071S)
+            if len(row) < 2:
+                continue
+
+            ipp = normalize_value(row[0])
+            nda = normalize_value(row[1])
+
+            if not ipp or not nda:
+                continue
+
+            # On ne garde que les lignes dont le NDA est dans la liste AME+CMU
+            flags = nda_flags.get(nda)
+            if not flags:
+                continue
+
+            ame = flags["ame"]
+            cmu = flags["cmu"]
+
+            # Ajout au global du fichier
+            add_patient(overall, ipp, ame, cmu)
+
+            # Ventilation durée pour les fichiers 071S
+            if filename.startswith("071S"):
+                duree = row[2] if len(row) > 2 else ""
+                bucket = duration_bucket(duree)
+                if bucket is not None:
+                    add_patient(duration_groups[bucket], ipp, ame, cmu)
+
+    # Ligne globale du fichier
+    results.append({
+        "fichier": filename,
+        "sous_categorie": "GLOBAL",
+        "patients_total": len(overall["patients_total"]),
+        "patients_ame": len(overall["patients_ame"]),
+        "patients_cmu": len(overall["patients_cmu"]),
+        "patients_ame_ou_cmu": len(overall["patients_ame_ou_cmu"]),
+        "patients_ame_et_cmu": len(overall["patients_ame_et_cmu"]),
+    })
+
+    # Lignes durée pour 071S
+    if filename.startswith("071S"):
+        for bucket_name, group in duration_groups.items():
+            results.append({
+                "fichier": filename,
+                "sous_categorie": bucket_name,
+                "patients_total": len(group["patients_total"]),
+                "patients_ame": len(group["patients_ame"]),
+                "patients_cmu": len(group["patients_cmu"]),
+                "patients_ame_ou_cmu": len(group["patients_ame_ou_cmu"]),
+                "patients_ame_et_cmu": len(group["patients_ame_et_cmu"]),
+            })
+
+# =========================
+# ÉCRITURE DU RÉCAP
+# =========================
+
+with open(output_file, "w", encoding="utf-8", newline="") as f:
+    writer = csv.writer(f, delimiter=";")
+    writer.writerow([
+        "fichier",
+        "sous_categorie",
+        "patients_total",
+        "patients_ame",
+        "patients_cmu",
+        "patients_ame_ou_cmu",
+        "patients_ame_et_cmu",
+    ])
+
+    for r in results:
+        writer.writerow([
+            r["fichier"],
+            r["sous_categorie"],
+            r["patients_total"],
+            r["patients_ame"],
+            r["patients_cmu"],
+            r["patients_ame_ou_cmu"],
+            r["patients_ame_et_cmu"],
+        ])
+
+print(f"Fichier récapitulatif créé : {output_file}")
