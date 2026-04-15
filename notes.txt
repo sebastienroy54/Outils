@@ -18,7 +18,7 @@ WHERE RUM.NORES = RSM.KYRES
   )
   AND (
        RSM.CDDNC9 LIKE 'Z5961%'
-       OR RSM.CDRELIE LIKE 'Z5961%'
+       OR RSM.CDRELIE LIKE 'Z596%'
        OR EXISTS (
             SELECT 1
             FROM DGN
