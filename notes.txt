@@ -1,14 +1,49 @@
+import csv
+
 input_file = "MCO21_Vidhosp.txt"
-output_file = "AME_lignes.txt"
+output_file = "vidhosp_ame_cmu.csv"
+
+# Positions Python = colonne Notepad++ - 1
+AME_INDEX = 83   # colonne 84 Notepad++
+CMU_INDEX = 138   # exemple : si CMU est colonne 77 Notepad++, laisser 76
+                 # sinon remplace par la bonne valeur
+
+rows_written = 0
+ame_count = 0
+cmu_count = 0
+both_count = 0
 
 with open(input_file, "r", encoding="utf-8") as f_in, \
-     open(output_file, "w", encoding="utf-8") as f_out:
+     open(output_file, "w", encoding="utf-8", newline="") as f_out:
+
+    writer = csv.writer(f_out, delimiter=";")
+    writer.writerow(["ame", "cmu", "ligne_complete"])
 
     for line in f_in:
-        line_clean = line.rstrip("\n")
+        line_clean = line.rstrip("\n\r")
 
-        if len(line_clean) >= 84:
-            if line_clean[83] == '1':
-                f_out.write(line)
+        ame = 0
+        cmu = 0
 
-print("Extraction terminée.")
+        if len(line_clean) > AME_INDEX and line_clean[AME_INDEX] == "1":
+            ame = 1
+
+        if len(line_clean) > CMU_INDEX and line_clean[CMU_INDEX] == "1":
+            cmu = 1
+
+        # On ne garde que les lignes AME ou CMU
+        if ame == 1 or cmu == 1:
+            writer.writerow([ame, cmu, line_clean])
+            rows_written += 1
+
+            if ame == 1:
+                ame_count += 1
+            if cmu == 1:
+                cmu_count += 1
+            if ame == 1 and cmu == 1:
+                both_count += 1
+
+print(f"Extraction terminée : {rows_written} lignes écrites dans {output_file}")
+print(f"AME : {ame_count}")
+print(f"CMU : {cmu_count}")
+print(f"AME + CMU : {both_count}")
