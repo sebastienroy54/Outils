@@ -1,10 +1,3 @@
-•	What’s driving your evaluation of GitHub right now?
-
-•	How many developers will be part of this evaluation?
-We only have 3 developers for now.
-•	Are there any specific integrations or security requirements you need? (On-Premise, SAML, SSO, LDAP, Auditing/Compliance, SAST)
-We deal with patient’s data like id or name in our codes so we need to secure those data and because of the laws in France, we have to store data in France.
-•	What timeline are you targeting for going live?
-If we can start in june, it’ll be perfect.
-•	Have you allocated budget and resources for a project like this?
-We have the budget for seats for our developers and our future projects.
+snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do
+    sudo snap remove "$snapname" --revision="$revision"
+done
