@@ -1,6 +1,36 @@
-sudo swapoff /swapfile
+vitrygtr@Pro:~$ sudo rm -rf /var/lib/snapd/cache/*
+vitrygtr@Pro:~$ sudo du -sh /var/lib/snapd
+5,5G	/var/lib/snapd
+vitrygtr@Pro:~$ ^[[200~sudo swapoff /swapfile
+sudo : commande introuvable
+vitrygtr@Pro:~$ sudo rm /swapfile
+sudo fallocate -l 1G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile^[[201~rm: impossible de supprimer '/swapfile': Opération non permise
+vitrygtr@Pro:~$ sudo swapoff /swapfile
 sudo rm /swapfile
 sudo fallocate -l 1G /swapfile
 sudo chmod 600 /swapfile
 sudo mkswap /swapfile
 sudo swapon /swapfile
+
+Configure l'espace d'échange (swap) en version 1, taille = 1024 MiB (1073737728 octets)
+pas d'étiquette, UUID=4c22e188-02f6-4da4-9990-0b2fe832a485
+vitrygtr@Pro:~$ free -h
+               total       utilisé      libre     partagé tamp/cache   disponible
+Mem:           3,8Gi       2,1Gi       114Mi        87Mi       1,6Gi       1,6Gi
+Échange:      1,0Gi          0B       1,0Gi
+vitrygtr@Pro:~$ df -h
+Sys. de fichiers Taille Utilisé Dispo Uti% Monté sur
+tmpfs              392M    2,2M  390M   1% /run
+/dev/sda3           24G     20G  3,5G  85% /
+tmpfs              2,0G       0  2,0G   0% /dev/shm
+tmpfs              5,0M    4,0K  5,0M   1% /run/lock
+/dev/sda2          512M    6,1M  506M   2% /boot/efi
+Portail_outils     238G    146G   93G  62% /media/sf_Portail_outils
+python             238G    146G   93G  62% /media/sf_python
+tmpfs              392M    128K  392M   1% /run/user/1000
+/dev/sr0            51M     51M     0 100% /media/vitrygtr/VBox_GAs_7.2.4
+vitrygtr@Pro:~$ 
+
