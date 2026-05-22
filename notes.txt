@@ -1,11 +1,31 @@
-itrygtr@Pro:/media/sf_Portail_outils$ df -h
-Sys. de fichiers Taille Utilisé Dispo Uti% Monté sur
-tmpfs              392M    2,2M  390M   1% /run
-/dev/sda3           24G     20G  2,8G  89% /
-tmpfs              2,0G       0  2,0G   0% /dev/shm
-tmpfs              5,0M    4,0K  5,0M   1% /run/lock
-/dev/sda2          512M    6,1M  506M   2% /boot/efi
-Portail_outils     238G    149G   90G  63% /media/sf_Portail_outils
-python             238G    149G   90G  63% /media/sf_python
-tmpfs              392M    120K  392M   1% /run/user/1000
-/dev/sr0            51M     51M     0 100% /media/vitrygtr/VBox_GAs_7.2.4
+vitrygtr@Pro:~$ lsblk
+NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0    7:0    0 346,1M  1 loop /snap/code/230
+loop1    7:1    0     4K  1 loop /snap/bare/5
+loop2    7:2    0  63,8M  1 loop /snap/core20/2769
+loop3    7:3    0 358,2M  1 loop /snap/code/231
+loop4    7:4    0  63,8M  1 loop /snap/core20/2866
+loop5    7:5    0    74M  1 loop /snap/core22/2339
+loop6    7:6    0 274,8M  1 loop /snap/firefox/8191
+loop7    7:7    0 252,8M  1 loop /snap/firefox/8247
+loop8    7:8    0  66,8M  1 loop /snap/core24/1643
+loop9    7:9    0    74M  1 loop /snap/core22/2411
+loop10   7:10   0 349,7M  1 loop /snap/gnome-3-38-2004/143
+loop11   7:11   0 531,4M  1 loop /snap/gnome-42-2204/247
+loop12   7:12   0  66,8M  1 loop /snap/core24/1587
+loop13   7:13   0  91,7M  1 loop /snap/gtk-common-themes/1535
+loop14   7:14   0 516,2M  1 loop /snap/gnome-42-2204/226
+loop15   7:15   0  48,4M  1 loop /snap/snapd/26382
+loop16   7:16   0  12,2M  1 loop /snap/snap-store/1216
+loop17   7:17   0   576K  1 loop /snap/snapd-desktop-integration/343
+loop18   7:18   0   395M  1 loop /snap/mesa-2404/1165
+loop19   7:19   0  49,3M  1 loop /snap/snapd/26865
+loop20   7:20   0   580K  1 loop /snap/snapd-desktop-integration/361
+loop21   7:21   0  12,3M  1 loop /snap/snap-store/959
+loop22   7:22   0 606,1M  1 loop /snap/gnome-46-2404/153
+sda      8:0    0  58,6G  0 disk 
+├─sda1   8:1    0     1M  0 part 
+├─sda2   8:2    0   513M  0 part /boot/efi
+└─sda3   8:3    0  24,5G  0 part /var/snap/firefox/common/host-hunspell
+                                 /
+sr0     11:0    1  50,7M  0 rom  /media/vitrygtr/VBox_GAs_7.2.4
