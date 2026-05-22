@@ -1,6 +1,5 @@
-RETURN CODE = 1
+Connexion MWB échouée sur CCH
 
-STDOUT:
 ERROR:
 ORA-12154: TNS:could not resolve the connect identifier specified
 
@@ -13,18 +12,3 @@ SP2-0306: Invalid option.
 Usage: CONN[ECT] [logon] [AS {SYSDBA|SYSOPER}]
 where <logon>  ::= <username>[/<password>][@<connect_identifier>] | /
 SP2-0157: unable to CONNECT to ORACLE after 3 attempts, exiting SQL*Plus
-
-
-STDERR:
-
-Erreur pendant l'extraction : RETURN CODE = 1
-
-STDOUT: ERROR: ORA-12154: TNS
-not resolve the connect identifier specified
-
-ERROR: ORA-12162: TNS
-service name is incorrectly specified
-
-SP2-0306: Invalid option. Usage: CONN[ECT] [logon] [AS {SYSDBA|SYSOPER}] where <logon> ::= <username>[/<password>][@<connect_identifier>] | / SP2-0157: unable to CONNECT to ORACLE after 3 attempts, exiting SQL*Plus
-
-STDERR:
