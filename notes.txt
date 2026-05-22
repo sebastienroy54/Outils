@@ -1,14 +1,15 @@
-Connexion MWB échouée sur CCH
+Recherche des documents — CCH
 
-ERROR:
-ORA-12154: TNS:could not resolve the connect identifier specified
+1		     SELECT
+ 2			 DOCUMENT.ID_DOCUMENT || ';' ||
+ 3			 DOCUMENT.NDA || ';' ||
+ 4			 DOCUMENT.NOIP || ';' ||
+ 5			 DOCUMENT.TYPE || ';' ||
+ 6			 REPLACE(TYPE_DOCUMENT.LIBELLE, ';', ',') || ';' ||
+ 7			 REPLACE(NVL(DOCUMENT.FICHIER, ''), ';', ',')
+ 8		     FROM DOCUMENT, TYPE_DOCUMENT
+ 9		     WHERE TYPE_DOCUMENT.ID_TYPE_DOCUMENT = DOCUMENT.TYPE
+10		     AND DOCUMENT.VALIDE IN ('1')
+11*		     AND DOCUMENT.NDA IN ('213456789')
 
-
-ERROR:
-ORA-12162: TNS:net service name is incorrectly specified
-
-
-SP2-0306: Invalid option.
-Usage: CONN[ECT] [logon] [AS {SYSDBA|SYSOPER}]
-where <logon>  ::= <username>[/<password>][@<connect_identifier>] | /
-SP2-0157: unable to CONNECT to ORACLE after 3 attempts, exiting SQL*Plus
+Extraction terminée : 0 document(s) exporté(s).
