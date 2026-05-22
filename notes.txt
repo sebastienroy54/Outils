@@ -1,1 +1,11 @@
-0	NDA	xxxxxxxxx	xxxxxxxxx	xxxxxxxxx	CCH	3370561076758516186	120	 CR de sejour hospitalier			XXXX_CRH_15_au_28_avril_06.doc		Erreur document vide	PDF et/ou CONTENU_FICHIER vide
+itrygtr@Pro:/media/sf_Portail_outils$ df -h
+Sys. de fichiers Taille Utilisé Dispo Uti% Monté sur
+tmpfs              392M    2,2M  390M   1% /run
+/dev/sda3           24G     20G  2,8G  89% /
+tmpfs              2,0G       0  2,0G   0% /dev/shm
+tmpfs              5,0M    4,0K  5,0M   1% /run/lock
+/dev/sda2          512M    6,1M  506M   2% /boot/efi
+Portail_outils     238G    149G   90G  63% /media/sf_Portail_outils
+python             238G    149G   90G  63% /media/sf_python
+tmpfs              392M    120K  392M   1% /run/user/1000
+/dev/sr0            51M     51M     0 100% /media/vitrygtr/VBox_GAs_7.2.4
