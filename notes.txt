@@ -1,15 +1,1 @@
-Recherche des documents — CCH
-
-1		     SELECT
- 2			 DOCUMENT.ID_DOCUMENT || ';' ||
- 3			 DOCUMENT.NDA || ';' ||
- 4			 DOCUMENT.NOIP || ';' ||
- 5			 DOCUMENT.TYPE || ';' ||
- 6			 REPLACE(TYPE_DOCUMENT.LIBELLE, ';', ',') || ';' ||
- 7			 REPLACE(NVL(DOCUMENT.FICHIER, ''), ';', ',')
- 8		     FROM DOCUMENT, TYPE_DOCUMENT
- 9		     WHERE TYPE_DOCUMENT.ID_TYPE_DOCUMENT = DOCUMENT.TYPE
-10		     AND DOCUMENT.VALIDE IN ('1')
-11*		     AND DOCUMENT.NDA IN ('213456789')
-
-Extraction terminée : 0 document(s) exporté(s).
+3370561076758516186;213456978;8019992555;120; CR de sejour hospitalier;XXXXXXX_CRH_15_au_28_avril_06.doc
