@@ -1,1 +1,4 @@
-DPI-1050: Oracle Client library must be at version 11.2 or higher
+PHP Fatal error:  Uncaught Error: Call to undefined function oci_connect() in /app/outils/extract_mwb.php:91
+Stack trace:
+#0 {main}
+  thrown in /app/outils/extract_mwb.php on line 91
