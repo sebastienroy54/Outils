@@ -1,1 +1,1 @@
-3370561076758516186;213456978;8019992555;120; CR de sejour hospitalier;XXXXXXX_CRH_15_au_28_avril_06.doc
+0	NDA	xxxxxxxxx	xxxxxxxxx	xxxxxxxxx	CCH	3370561076758516186	120	 CR de sejour hospitalier			XXXX_CRH_15_au_28_avril_06.doc		Erreur document vide	PDF et/ou CONTENU_FICHIER vide
