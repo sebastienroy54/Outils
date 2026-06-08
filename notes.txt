@@ -1,3 +1,13 @@
-(psycopg2.errors.NotNullViolation) null value in column "created_at" of relation "users" violates not-null constraint DETAIL: Failing row contains (2, test1, 2b2b12$qNwC7I/uvNM6iUtoaFWIWe2.naruwgQd1Vh7bTRkLKqaSZGUCkzpK, test1, test1, LECTURE, f, null, null, null, 0, null).
+streamlit.errors.StreamlitAPIException: st.button() can't be used in an st.form().
 
-[SQL: INSERT INTO users (username, password_hash, nom, prenom, role, is_active, created_at, updated_at, last_login, failed_login_attempts, locked_until) VALUES (%(username)s, %(password_hash)s, %(nom)s, %(prenom)s, %(role)s, %(is_active)s, %(created_at)s, %(updated_at)s, %(last_login)s, %(failed_login_attempts)s, %(locked_until)s) RETURNING users.id_user] [parameters: {'username': 'test1', 'password_hash': '2b2b12$qNwC7I/uvNM6iUtoaFWIWe2.naruwgQd1Vh7bTRkLKqaSZGUCkzpK', 'nom': 'test1', 'prenom': 'test1', 'role': 'LECTURE', 'is_active': False, 'created_at': None, 'updated_at': None, 'last_login': None, 'failed_login_attempts': 0, 'locked_until': None}] (Background on this error at: https://sqlalche.me/e/20/gkpj)
+For more information, refer to the documentation for forms.
+Traceback:
+
+File "/media/sf_DREAM/app/pages/inscription.py", line 74, in <module>
+    if st.button("Retour écran de connexion"):
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/runtime/metrics_util.py", line 443, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/widgets/button.py", line 243, in button
+    return self.dg._button(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/widgets/button.py", line 1034, in _button
+    raise StreamlitAPIException(
