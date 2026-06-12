@@ -1,23 +1,23 @@
-dream_bdd=# DROP TABLE IF EXISTS soins_pall CASCADE;
-DROP TABLE IF EXISTS diag CASCADE;
-DROP TABLE IF EXISTS sejours CASCADE;
-DROP TABLE IF EXISTS patients CASCADE;
-DROP TABLE
-DROP TABLE
-DROP TABLE
-DROP TABLE
-dream_bdd=# \i /queries/03_create_dream.sql 
-CREATE TABLE
-CREATE TABLE
-CREATE TABLE
-CREATE TABLE
-dream_bdd=# \i /queries/04_insert_dream.sql 
-psql:/queries/04_insert_dream.sql:108: ERROR:  new row for relation "patients" violates check constraint "patients_sexe_check"
-DETAIL:  Failing row contains (1, 8000000001, Andre, Philippe, 1952-11-29, M, f, null).
-psql:/queries/04_insert_dream.sql:213: ERROR:  insert or update on table "sejours" violates foreign key constraint "sejours_id_patient_fkey"
-DETAIL:  Key (id_patient)=(1) is not present in table "patients".
-psql:/queries/04_insert_dream.sql:318: ERROR:  insert or update on table "soins_pall" violates foreign key constraint "soins_pall_id_patient_fkey"
-DETAIL:  Key (id_patient)=(1) is not present in table "patients".
-psql:/queries/04_insert_dream.sql:423: ERROR:  insert or update on table "diag" violates foreign key constraint "diag_id_patient_fkey"
-DETAIL:  Key (id_patient)=(1) is not present in table "patients".
-dream_bdd=# 
+2026-06-12 16:43:58.557 File changed in watched directory: /media/sf_DREAM/app/services/__pycache__/ajout_patient.cpython-310.pyc.129272360303280
+2026-06-12 16:43:58.661 File changed in watched directory: /media/sf_DREAM/app/services/__pycache__
+Exception in thread Thread-1:
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+    self.run()
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/watchdog/observers/api.py", line 213, in run
+    self.dispatch_events(self.event_queue)
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/watchdog/observers/api.py", line 391, in dispatch_events
+    handler.dispatch(event)
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/watchdog/events.py", line 217, in dispatch
+    getattr(self, f"on_{event.event_type}")(event)
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/event_based_path_watcher.py", line 417, in on_modified
+    self.handle_path_change_event(event)
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/event_based_path_watcher.py", line 385, in handle_path_change_event
+    modification_time = util.path_modification_time(
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 94, in path_modification_time
+    return _do_with_retries(
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 175, in _do_with_retries
+    return orig_fn()
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 95, in <lambda>
+    lambda: os.stat(path).st_mtime,
+FileNotFoundError: [Errno 2] No such file or directory: '/media/sf_DREAM/app/services/__pycache__/ajout_patient.cpython-310.pyc.129272360303280'
