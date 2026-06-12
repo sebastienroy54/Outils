@@ -1,13 +1,23 @@
-streamlit.errors.StreamlitAPIException: st.button() can't be used in an st.form().
-
-For more information, refer to the documentation for forms.
-Traceback:
-
-File "/media/sf_DREAM/app/pages/inscription.py", line 74, in <module>
-    if st.button("Retour écran de connexion"):
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/runtime/metrics_util.py", line 443, in wrapped_func
-    result = non_optional_func(*args, **kwargs)
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/widgets/button.py", line 243, in button
-    return self.dg._button(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/widgets/button.py", line 1034, in _button
-    raise StreamlitAPIException(
+dream_bdd=# DROP TABLE IF EXISTS soins_pall CASCADE;
+DROP TABLE IF EXISTS diag CASCADE;
+DROP TABLE IF EXISTS sejours CASCADE;
+DROP TABLE IF EXISTS patients CASCADE;
+DROP TABLE
+DROP TABLE
+DROP TABLE
+DROP TABLE
+dream_bdd=# \i /queries/03_create_dream.sql 
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+dream_bdd=# \i /queries/04_insert_dream.sql 
+psql:/queries/04_insert_dream.sql:108: ERROR:  new row for relation "patients" violates check constraint "patients_sexe_check"
+DETAIL:  Failing row contains (1, 8000000001, Andre, Philippe, 1952-11-29, M, f, null).
+psql:/queries/04_insert_dream.sql:213: ERROR:  insert or update on table "sejours" violates foreign key constraint "sejours_id_patient_fkey"
+DETAIL:  Key (id_patient)=(1) is not present in table "patients".
+psql:/queries/04_insert_dream.sql:318: ERROR:  insert or update on table "soins_pall" violates foreign key constraint "soins_pall_id_patient_fkey"
+DETAIL:  Key (id_patient)=(1) is not present in table "patients".
+psql:/queries/04_insert_dream.sql:423: ERROR:  insert or update on table "diag" violates foreign key constraint "diag_id_patient_fkey"
+DETAIL:  Key (id_patient)=(1) is not present in table "patients".
+dream_bdd=# 
