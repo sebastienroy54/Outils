@@ -1,5 +1,3 @@
-2026-06-12 16:43:58.557 File changed in watched directory: /media/sf_DREAM/app/services/__pycache__/ajout_patient.cpython-310.pyc.129272360303280
-2026-06-12 16:43:58.661 File changed in watched directory: /media/sf_DREAM/app/services/__pycache__
 Exception in thread Thread-1:
 Traceback (most recent call last):
   File "/usr/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
@@ -10,14 +8,16 @@ Traceback (most recent call last):
     handler.dispatch(event)
   File "/home/vitrygtr/.local/lib/python3.10/site-packages/watchdog/events.py", line 217, in dispatch
     getattr(self, f"on_{event.event_type}")(event)
-  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/event_based_path_watcher.py", line 417, in on_modified
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/event_based_path_watcher.py", line 414, in on_created
     self.handle_path_change_event(event)
-  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/event_based_path_watcher.py", line 385, in handle_path_change_event
-    modification_time = util.path_modification_time(
-  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 94, in path_modification_time
-    return _do_with_retries(
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/event_based_path_watcher.py", line 400, in handle_path_change_event
+    new_md5 = util.calc_md5_with_blocking_retries(
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 66, in calc_md5_with_blocking_retries
+    content = _do_with_retries(
   File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 175, in _do_with_retries
     return orig_fn()
-  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 95, in <lambda>
-    lambda: os.stat(path).st_mtime,
-FileNotFoundError: [Errno 2] No such file or directory: '/media/sf_DREAM/app/services/__pycache__/ajout_patient.cpython-310.pyc.129272360303280'
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 67, in <lambda>
+    lambda: _get_file_content(path),
+  File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/watcher/util.py", line 102, in _get_file_content
+    with open(file_path, "rb") as f:
+FileNotFoundError: [Errno 2] No such file or directory: '/media/sf_DREAM/app/models/__pycache__/diagnostic.cpython-310.pyc.130389027871280'
