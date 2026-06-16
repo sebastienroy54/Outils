@@ -1,36 +1,28 @@
-ream_bdd=# drop table if exists soins_pall cascade;
-DROP TABLE
-dream_bdd=# drop table if exists diag cascade;
-DROP TABLE
-dream_bdd=# drop table if exists sejours cascade;
-DROP TABLE
-dream_bdd=# drop table if exists patients cascade;
-DROP TABLE
-dream_bdd=# \i /queries/03_create_dream.sql 
-CREATE TABLE
-CREATE TABLE
-CREATE TABLE
-CREATE TABLE
-dream_bdd=# \i /queries/04_insert_dream.sql 
-INSERT 0 100
-psql:/queries/04_insert_dream.sql:207: ERROR:  INSERT has more expressions than target columns
-LINE 3: ... '503J', 'HDJ BILAN CASPER REH MCO', TRUE, FALSE, 'HAD AP-HP...
-                                                             ^
-psql:/queries/04_insert_dream.sql:310: ERROR:  INSERT has more expressions than target columns
-LINE 3: ...ein', 'Cancer', '2025-09-18', '2026-09-06', 'CR', 'EHPAD Les...
-                                                             ^
-psql:/queries/04_insert_dream.sql:413: ERROR:  INSERT has more expressions than target columns
-LINE 3: ...RUE, TRUE, FALSE, 'Patient fictif 1', 'NON CODE', 'Maison de...
-                                                             ^
-psql:/queries/04_insert_dream.sql:416: ERROR:  invalid input syntax for type boolean: "EHPAD Les Tilleuls"
-LINE 1: ...ent_seq', (SELECT MAX(id_patient) FROM patients), 'EHPAD Les...
-                                                             ^
-psql:/queries/04_insert_dream.sql:417: ERROR:  invalid input syntax for type boolean: "Service oncologie"
-LINE 1: ...ejour_seq', (SELECT MAX(id_sejour) FROM sejours), 'Service o...
-                                                             ^
-psql:/queries/04_insert_dream.sql:418: ERROR:  invalid input syntax for type boolean: "USP Cochin"
-LINE 1: ...ag_id_diag_seq', (SELECT MAX(id_diag) FROM diag), 'USP Cochi...
-                                                             ^
-psql:/queries/04_insert_dream.sql:419: ERROR:  invalid input syntax for type boolean: "USP Cochin"
-LINE 1: ...eq', (SELECT MAX(id_soins_pall) FROM soins_pall), 'USP Cochi...
-                                                             ^
+DEBUG IPP envoyé : 800
+exec(code, module.__dict__) # noqa: S102classbuiltins.int(...)
+int([x]) -> integer
+int(x, base=10) -> integer
+
+Convert a number or string to an integer, or return 0 if no arguments
+are given.  If x is a number, return x.__int__().  For floating point
+numbers, this truncates towards zero.
+
+If x is not a number or if base is given, then x must be a string,
+bytes, or bytearray instance representing an integer literal in the
+given base.  The literal can be preceded by '+' or '-' and be surrounded
+by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
+Base 0 means to interpret the base from the string as an integer literal.
+>>> int('0b100', base=0)
+4
+denominatorgetset_descriptor	<attribute 'denominator' of 'int' objects>
+imaggetset_descriptor	<attribute 'imag' of 'int' objects>
+numeratorgetset_descriptor	<attribute 'numerator' of 'int' objects>
+realgetset_descriptor	<attribute 'real' of 'int' objects>
+as_integer_ratiomethod_descriptor	Return integer ratio.
+bit_countmethod_descriptor	Number of ones in the binary representation of the absolute value of self.
+bit_lengthmethod_descriptor	Number of bits necessary to represent self in binary.
+conjugatemethod_descriptor	Returns self, the complex conjugate of any int.
+from_bytesbuiltin_function_or_method	Return the integer represented by the given array of bytes.
+to_bytesmethod_descriptor	Return an array of bytes representing an integer.
+
+Aucun patient trouvé.
