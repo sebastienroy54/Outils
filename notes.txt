@@ -1,3 +1,32 @@
-Erreur lors de l'enregistrement : (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "patients_pkey" DETAIL: Key (id_patient)=(1) already exists.
+dream_bdd=# \i /queries/03_create_dream.sql 
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+dream_bdd=# \i /queries//04_insert_dream.sql 
+INSERT 0 100
+psql:/queries/04_insert_dream.sql:204: ERROR:  value too long for type character varying(4)
+psql:/queries/04_insert_dream.sql:307: ERROR:  column "code_cim10" of relation "diag" does not exist
+LINE 1: ... diag (id_diag, id_patient, id_sejour, type_diag, code_cim10...
+                                                             ^
+psql:/queries/04_insert_dream.sql:410: ERROR:  insert or update on table "soins_pall" violates foreign key constraint "soins_pall_id_sejour_fkey"
+DETAIL:  Key (id_sejour)=(1) is not present in table "sejours".
+ setval 
+--------
+    100
+(1 row)
 
-[SQL: INSERT INTO patients (ipp, nom, prenom, date_naissance, sexe, date_deces) VALUES (%(ipp)s, %(nom)s, %(prenom)s, %(date_naissance)s, %(sexe)s, %(date_deces)s) RETURNING patients.id_patient] [parameters: {'ipp': '8005479821', 'nom': 'TEST', 'prenom': 'Test', 'date_naissance': datetime.date(1948, 6, 15), 'sexe': 'M', 'date_deces': None}] (Background on this error at: https://sqlalche.me/e/20/gkpj)
+ setval 
+--------
+       
+(1 row)
+
+ setval 
+--------
+       
+(1 row)
+
+ setval 
+--------
+       
+(1 row)
