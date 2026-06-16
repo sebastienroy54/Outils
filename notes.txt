@@ -1,32 +1,36 @@
+ream_bdd=# drop table if exists soins_pall cascade;
+DROP TABLE
+dream_bdd=# drop table if exists diag cascade;
+DROP TABLE
+dream_bdd=# drop table if exists sejours cascade;
+DROP TABLE
+dream_bdd=# drop table if exists patients cascade;
+DROP TABLE
 dream_bdd=# \i /queries/03_create_dream.sql 
 CREATE TABLE
 CREATE TABLE
 CREATE TABLE
 CREATE TABLE
-dream_bdd=# \i /queries//04_insert_dream.sql 
+dream_bdd=# \i /queries/04_insert_dream.sql 
 INSERT 0 100
-psql:/queries/04_insert_dream.sql:204: ERROR:  value too long for type character varying(4)
-psql:/queries/04_insert_dream.sql:307: ERROR:  column "code_cim10" of relation "diag" does not exist
-LINE 1: ... diag (id_diag, id_patient, id_sejour, type_diag, code_cim10...
+psql:/queries/04_insert_dream.sql:207: ERROR:  INSERT has more expressions than target columns
+LINE 3: ... '503J', 'HDJ BILAN CASPER REH MCO', TRUE, FALSE, 'HAD AP-HP...
                                                              ^
-psql:/queries/04_insert_dream.sql:410: ERROR:  insert or update on table "soins_pall" violates foreign key constraint "soins_pall_id_sejour_fkey"
-DETAIL:  Key (id_sejour)=(1) is not present in table "sejours".
- setval 
---------
-    100
-(1 row)
-
- setval 
---------
-       
-(1 row)
-
- setval 
---------
-       
-(1 row)
-
- setval 
---------
-       
-(1 row)
+psql:/queries/04_insert_dream.sql:310: ERROR:  INSERT has more expressions than target columns
+LINE 3: ...ein', 'Cancer', '2025-09-18', '2026-09-06', 'CR', 'EHPAD Les...
+                                                             ^
+psql:/queries/04_insert_dream.sql:413: ERROR:  INSERT has more expressions than target columns
+LINE 3: ...RUE, TRUE, FALSE, 'Patient fictif 1', 'NON CODE', 'Maison de...
+                                                             ^
+psql:/queries/04_insert_dream.sql:416: ERROR:  invalid input syntax for type boolean: "EHPAD Les Tilleuls"
+LINE 1: ...ent_seq', (SELECT MAX(id_patient) FROM patients), 'EHPAD Les...
+                                                             ^
+psql:/queries/04_insert_dream.sql:417: ERROR:  invalid input syntax for type boolean: "Service oncologie"
+LINE 1: ...ejour_seq', (SELECT MAX(id_sejour) FROM sejours), 'Service o...
+                                                             ^
+psql:/queries/04_insert_dream.sql:418: ERROR:  invalid input syntax for type boolean: "USP Cochin"
+LINE 1: ...ag_id_diag_seq', (SELECT MAX(id_diag) FROM diag), 'USP Cochi...
+                                                             ^
+psql:/queries/04_insert_dream.sql:419: ERROR:  invalid input syntax for type boolean: "USP Cochin"
+LINE 1: ...eq', (SELECT MAX(id_soins_pall) FROM soins_pall), 'USP Cochi...
+                                                             ^
