@@ -1,28 +1,35 @@
-DEBUG IPP envoyé : 800
-exec(code, module.__dict__) # noqa: S102classbuiltins.int(...)
-int([x]) -> integer
-int(x, base=10) -> integer
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column sejours.pass_sau does not exist LINE 3: ...T patients.id_patient AS id_patient, coalesce(sum(sejours.pa... ^ [SQL: SELECT count(*) AS count_1 FROM (SELECT anon_2.id_patient AS anon_2_id_patient, anon_2.nb AS anon_2_nb FROM (SELECT patients.id_patient AS id_patient, coalesce(sum(sejours.pass_sau), %(coalesce_1)s) AS nb FROM patients JOIN sejours ON sejours.id_patient = patients.id_patient WHERE patients.date_deces IS NOT NULL AND patients.date_deces <= %(date_deces_1)s AND sejours.date_pass_sau IS NOT NULL AND sejours.pass_sau IS NOT NULL AND patients.date_deces - sejours.date_pass_sau >= %(param_1)s AND patients.date_deces - sejours.date_pass_sau <= %(param_2)s GROUP BY patients.id_patient) AS anon_2 WHERE anon_2.nb = %(nb_1)s) AS anon_1] [parameters: {'coalesce_1': 0, 'date_deces_1': datetime.date(2026, 6, 17), 'param_1': 0, 'param_2': 30, 'nb_1': 1}] (Background on this error at: https://sqlalche.me/e/20/f405)
+Traceback:
 
-Convert a number or string to an integer, or return 0 if no arguments
-are given.  If x is a number, return x.__int__().  For floating point
-numbers, this truncates towards zero.
-
-If x is not a number or if base is given, then x must be a string,
-bytes, or bytearray instance representing an integer literal in the
-given base.  The literal can be preceded by '+' or '-' and be surrounded
-by whitespace.  The base defaults to 10.  Valid bases are 0 and 2-36.
-Base 0 means to interpret the base from the string as an integer literal.
->>> int('0b100', base=0)
-4
-denominatorgetset_descriptor	<attribute 'denominator' of 'int' objects>
-imaggetset_descriptor	<attribute 'imag' of 'int' objects>
-numeratorgetset_descriptor	<attribute 'numerator' of 'int' objects>
-realgetset_descriptor	<attribute 'real' of 'int' objects>
-as_integer_ratiomethod_descriptor	Return integer ratio.
-bit_countmethod_descriptor	Number of ones in the binary representation of the absolute value of self.
-bit_lengthmethod_descriptor	Number of bits necessary to represent self in binary.
-conjugatemethod_descriptor	Returns self, the complex conjugate of any int.
-from_bytesbuiltin_function_or_method	Return the integer represented by the given array of bytes.
-to_bytesmethod_descriptor	Return an array of bytes representing an integer.
-
-Aucun patient trouvé.
+File "/media/sf_DREAM/app/pages/indic_dc.py", line 189, in <module>
+    .count()
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3113, in count
+    self._legacy_from_self(col).enable_eagerloads(False).scalar()
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2805, in scalar
+    ret = self.one()
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2778, in one
+    return self._iter().one()  # type: ignore
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2827, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2362, in execute
+    return self._execute_internal(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2247, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 305, in orm_execute_statement
+    result = conn.execute(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1418, in execute
+    return meth(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection
+    return connection._execute_clauseelement(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1640, in _execute_clauseelement
+    ret = self._execute_context(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute
+    cursor.execute(statement, parameters)
