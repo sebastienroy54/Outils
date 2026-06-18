@@ -1,7 +1,6 @@
-root@a188cf70d789:/app/pdg_mco/fg# cat /app/pdg_mco/RSS/RUM838714.fic.log
-Nombre d'enregistrements dans le fichier d'entr�e   : 11511 
-Nombre d'enregistrements ayant un format non trait� : 0 
-Nombre de RUM trait�s                               : 11511 
-Nombre de RUM en erreur (CM 90)                     : 0 
-Nombre de RSS trait�s                               : 10321 
-Nombre de RSS en erreur                             : 0 
+rm -f /app/pdg_mco/RSS/RUM838714.fic.grp
+rm -f /app/pdg_mco/RSS/RUM838714.fic.err
+rm -f /app/pdg_mco/RSS/RUM838714.fic.log
+rm -f /app/pdg_mco/RSS/RUM838714.fic.rds
+rm -f /app/pdg_mco/RSS/RUM838714.fic.stp.txt
+rm -f /app/pdg_mco/RSS/RUM838714.fic.sup
