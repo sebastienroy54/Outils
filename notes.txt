@@ -1,11 +1,26 @@
-root@a188cf70d789:/app/pdg_mco/fg# xvfb-run wine cmd /c dir C:\PdG-MCO\RSS
+root@a188cf70d789:/app/pdg_mco/fg# xvfb-run wine cmd /c "dir C:\\PdG-MCO\\RSS"
 0048:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
-00c4:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
+00c8:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
 Volume in drive C has no label.
 Volume Serial Number is 4300-0000
 
-Directory of C:
+Directory of C:\PdG-MCO\RSS
 
-File not found.
+06/17/2026  02:07 PM    <DIR>          .
+06/17/2026  02:07 PM    <DIR>          ..
+06/17/2026  02:07 PM             4,572 ficum.fg2025$.txt
+06/17/2026  02:07 PM             4,572 ficum.fg2026$.txt
+06/17/2026  02:07 PM             3,451 ficum021.txt
+06/17/2026  02:07 PM                 0 ficum021.txt.log
+06/17/2026  02:07 PM         3,386,385 RUM838714.fic
+06/17/2026  02:07 PM                 0 RUM838714.fic.err
+06/17/2026  02:07 PM         3,570,561 RUM838714.fic.grp
+06/17/2026  02:07 PM               360 RUM838714.fic.log
+06/17/2026  02:07 PM         3,507,660 RUM838714.fic.rds
+06/17/2026  02:07 PM           567,655 RUM838714.fic.stp.txt
+06/17/2026  02:07 PM           501,519 RUM838714.fic.sup
+06/17/2026  02:07 PM    <DIR>          test1
+      11 files               11,546,735 bytes
+       3 directories    331,383,480,320 bytes free
 
 X connection to :99 broken (explicit kill or server shutdown).
