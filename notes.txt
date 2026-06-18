@@ -1,5 +1,2 @@
-root@560e29f7c4dd:/app/pdg_mco/fg# apt list --installed | grep xvfb
-
-WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
-
-root@560e29f7c4dd:/app/pdg_mco/fg# 
+root@401c29ac1805:/app# xvfb-run wineboot
+xvfb-run: error: xauth command not found
