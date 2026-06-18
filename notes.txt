@@ -1,26 +1,2 @@
-root@a188cf70d789:/app# xvfb-run wine cmd /c "dir C:\PdG-MCO\fg\tables\V2026"
-0048:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
-00c8:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
-Volume in drive C has no label.
-Volume Serial Number is 4300-0000
-
-Directory of C:\PdG-MCO\fg\tables\V2026
-
-06/17/2026  02:07 PM    <DIR>          .
-06/17/2026  02:07 PM    <DIR>          ..
-06/17/2026  02:07 PM            19,391 arbredec.tab
-06/17/2026  02:07 PM               314 autorefs.tab
-06/17/2026  02:07 PM           677,764 ccamcara.tab
-06/17/2026  02:07 PM           366,107 ccamdesc.tab
-06/17/2026  02:07 PM         1,532,139 diag10cr.tab
-06/17/2026  02:07 PM           509,618 gestcomp.tab
-06/17/2026  02:07 PM           256,121 ghsinfo.tab
-06/17/2026  02:07 PM               215 ghsminor.tab
-06/17/2026  02:07 PM               953 innova.tab
-06/17/2026  02:07 PM            19,227 rghminfo.tab
-06/17/2026  02:07 PM             2,361 srcdgact.tab
-06/17/2026  02:07 PM            10,213 tabcombi.tab
-      12 files                3,394,423 bytes
-       2 directories    331,379,564,544 bytes free
-
-X connection to :99 broken (explicit kill or server shutdown).
+wine ~/.wine/drive_c/PdG-MCO/fg/grpmco.exe ~/.wine/drive_c/PdG-MCO/fg/mcofg.ini
+echo $?
