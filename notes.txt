@@ -10,3 +10,21 @@ drwxrwxrwx 1 root root    4096 juin  18 10:59 fg
 drwxrwxrwx 1 root root    4096 juin  18 13:32 RSS
 drwxrwxrwx 1 root root       0 juin  17 16:07 UM
 -rwxrwxrwx 1 root root   51405 juin  17 16:07 uninst.exe
+anonymeaskip@Lasalle:/mnt/partage$ sudo docker exec -it rss_mco_streamlit bash
+root@963be3e7515b:/app# ls -la /app/pdg_mco/
+total 8
+drwxr-xr-x 2 root root 4096 Jun 18 12:31 .
+drwxr-xr-x 1 root root 4096 Jun 18 12:10 ..
+root@963be3e7515b:/app# exit
+exit
+anonymeaskip@Lasalle:/mnt/partage$ sudo docker-compose down
+ERROR: 
+        Can't find a suitable configuration file in this directory or any
+        parent. Are you in the right directory?
+
+        Supported filenames: docker-compose.yml, docker-compose.yaml, compose.yml, compose.yaml
+        
+anonymeaskip@Lasalle:/mnt/partage$ ls
+data  pdg_mco  work
+anonymeaskip@Lasalle:/mnt/partage$ ls pdg_mco/
+anonymeaskip@Lasalle:/mnt/partage$ 
