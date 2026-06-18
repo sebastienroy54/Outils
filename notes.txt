@@ -1,4 +1,10 @@
-export DISPLAY=:99
+root@a188cf70d789:/app# export DISPLAY=:99
 Xvfb :99 -screen 0 1024x768x24 &
 sleep 3
 wine cmd /c "echo %DISPLAY%"
+[1] 3135
+
+
+0048:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
+00c4:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
+:99
