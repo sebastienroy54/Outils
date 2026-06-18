@@ -1,9 +1,13 @@
-anonymeaskip@Lasalle:/mnt/partage$ ls -la /mnt/partage/
-total 20
-drwxr-xr-x 5 root root 4096 juin  18 14:31 .
-drwxr-xr-x 4 root root 4096 juin  18 09:24 ..
-drwxr-xr-x 3 root root 4096 juin  18 14:32 data
-drwxr-xr-x 2 root root 4096 juin  18 14:31 pdg_mco
-drwxr-xr-x 6 root root 4096 juin  18 14:32 work
-anonymeaskip@Lasalle:/mnt/partage$ mount | grep partage
-anonymeaskip@Lasalle:/mnt/partage$ 
+anonymeaskip@Lasalle:/mnt/partage$ cat /etc/fstab 
+# /etc/fstab: static file system information.
+#
+# Use 'blkid' to print the universally unique identifier for a
+# device; this may be used with UUID= as a more robust way to name devices
+# that works even if disks are added and removed. See fstab(5).
+#
+# <file system> <mount point>   <type>  <options>       <dump>  <pass>
+# / was on /dev/sda3 during installation
+UUID=ff871df4-487d-4a82-b77c-2ffdfbc1bf9f /               ext4    errors=remount-ro 0       1
+# /boot/efi was on /dev/sda2 during installation
+UUID=58EA-678F  /boot/efi       vfat    umask=0077      0       1
+/swapfile                                 none            swap    sw              0       0
