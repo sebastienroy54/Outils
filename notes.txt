@@ -1,2 +1,3 @@
-anonymeaskip@Lasalle:/mnt/partage$ wine /mnt/partage/pdg_mco/fg/grpmco.exe /mnt/partage/pdg_mco/fg/mcofg.ini
-impossible de crÚer le fichier C:\PdG-MCO\RSS\ficum021.txt.log
+mkdir -p ~/.wine/drive_c/PdG-MCO
+cp -r /mnt/partage/pdg_mco/RSS ~/.wine/drive_c/PdG-MCO/
+cp -r /mnt/partage/pdg_mco/fg  ~/.wine/drive_c/PdG-MCO/
