@@ -1,30 +1,30 @@
-anonymeaskip@Lasalle:/mnt/partage$ ls -la /mnt/partage/pdg_mco/
-total 1485
-drwxrwxrwx 1 root root    4096 juin  17 16:07 .
-drwxrwxrwx 1 root root    4096 juin  18 13:42 ..
-drwxrwxrwx 1 root root    4096 juin  18 10:59 fg
--rwxrwxrwx 1 root root       0 juin  17 16:07 .gitkeep
--rwxrwxrwx 1 root root 1018608 juin  17 16:07 manuel_v2026.pdf
--rwxrwxrwx 1 root root  426328 juin  17 16:07 PdGMCO.exe
--rwxrwxrwx 1 root root      50 juin  17 16:07 PdG-MCO.url
-drwxrwxrwx 1 root root    4096 juin  18 13:32 RSS
-drwxrwxrwx 1 root root       0 juin  17 16:07 UM
--rwxrwxrwx 1 root root   51405 juin  17 16:07 uninst.exe
-anonymeaskip@Lasalle:/mnt/partage$ sudo docker exec -it rss_mco_streamlit bash
-root@963be3e7515b:/app# ls -la /app/pdg_mco/
-total 8
-drwxr-xr-x 2 root root 4096 Jun 18 12:31 .
-drwxr-xr-x 1 root root 4096 Jun 18 12:10 ..
-root@963be3e7515b:/app# exit
-exit
-anonymeaskip@Lasalle:/mnt/partage$ sudo docker-compose down
-ERROR: 
-        Can't find a suitable configuration file in this directory or any
-        parent. Are you in the right directory?
-
-        Supported filenames: docker-compose.yml, docker-compose.yaml, compose.yml, compose.yaml
-        
 anonymeaskip@Lasalle:/mnt/partage$ ls
 data  pdg_mco  work
 anonymeaskip@Lasalle:/mnt/partage$ ls pdg_mco/
-anonymeaskip@Lasalle:/mnt/partage$ 
+anonymeaskip@Lasalle:/mnt/partage$ pwd
+/mnt/partage
+anonymeaskip@Lasalle:/mnt/partage$ ls -la /mnt/partage/
+total 42
+drwxrwxrwx 1 root root 4096 juin  18 13:42 .
+drwxr-xr-x 4 root root 4096 juin  18 09:24 ..
+drwxrwxrwx 1 root root 4096 juin  17 16:07 app
+drwxrwxrwx 1 root root    0 juin  17 16:07 data
+-rwxrwxrwx 1 root root 1029 juin  17 16:07 docker-compose.yml
+-rwxrwxrwx 1 root root  699 juin  18 13:47 Dockerfile
+-rwxrwxrwx 1 root root  252 juin  17 16:07 dockerignore
+-rwxrwxrwx 1 root root  273 juin  18 14:04 entrypoint.sh
+-rwxrwxrwx 1 root root  712 juin  17 16:07 .env
+-rwxrwxrwx 1 root root 3512 juin  17 16:07 interface.py
+drwxrwxrwx 1 root root 4096 juin  17 16:07 pdg_mco
+drwxrwxrwx 1 root root    0 juin  17 16:07 __pycache__
+-rwxrwxrwx 1 root root  573 juin  17 16:07 README_DOCKER.md
+-rwxrwxrwx 1 root root 2745 juin  17 16:07 README.md
+-rwxrwxrwx 1 root root  125 juin  17 16:07 requirements.txt
+drwxrwxrwx 1 root root    0 juin  17 16:07 sql
+drwxrwxrwx 1 root root    0 juin  17 16:07 work
+anonymeaskip@Lasalle:/mnt/partage$ cd ..
+anonymeaskip@Lasalle:/mnt$ cd ..
+anonymeaskip@Lasalle:/$ cd /mnt/partage/
+anonymeaskip@Lasalle:/mnt/partage$ ls
+app   docker-compose.yml  dockerignore   interface.py  __pycache__       README.md         sql
+data  Dockerfile          entrypoint.sh  pdg_mco       README_DOCKER.md  requirements.txt  work
