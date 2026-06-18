@@ -1,7 +1,22 @@
-root@a188cf70d789:/app# ls -l /app/pdg_mco/RSS/RUM838714.fic.*
--rwxrwxrwx 1 root root       0 Jun 18 11:32 /app/pdg_mco/RSS/RUM838714.fic.err
--rwxrwxrwx 1 root root 3570561 Jun 18 11:32 /app/pdg_mco/RSS/RUM838714.fic.grp
--rwxrwxrwx 1 root root     360 Jun 18 11:32 /app/pdg_mco/RSS/RUM838714.fic.log
--rwxrwxrwx 1 root root 3507660 Jun 18 11:32 /app/pdg_mco/RSS/RUM838714.fic.rds
--rwxrwxrwx 1 root root  567655 Jun 18 11:32 /app/pdg_mco/RSS/RUM838714.fic.stp.txt
--rwxrwxrwx 1 root root  501519 Jun 18 11:32 /app/pdg_mco/RSS/RUM838714.fic.sup
+def find_grpmco_exe() -> Path:
+    """
+    Cherche grpmco.exe sans dépendre d'un chemin absolu unique.
+
+    À long terme :
+    - privilégier stage/pdg_mco/fg/grpmco.exe
+
+    Actuellement :
+    """
+
+    candidates = [
+        BASE_DIR / "pdg_mco" / "fg" / "grpmco.exe",
+    ]
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    searched = "\n".join(str(c) for c in candidates)
+    raise FileNotFoundError(
+        "grpmco.exe introuvable. Chemins testés :\n" + searched
+    )
