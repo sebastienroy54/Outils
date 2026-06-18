@@ -1,8 +1,3 @@
-root@a188cf70d789:/app/pdg_mco/fg# ls -la /root/.wine/drive_c
-total 24
-drwxr-xr-x  6 root root 4096 Jun 18 09:26  .
-drwxr-xr-x  4 root root 4096 Jun 18 09:28  ..
-drwxr-xr-x  6 root root 4096 Jun 18 09:26 'Program Files'
-drwxr-xr-x  3 root root 4096 Jun 18 09:26  ProgramData
-drwxr-xr-x  4 root root 4096 Jun 18 09:26  users
-drwxr-xr-x 17 root root 4096 Jun 18 09:28  windows
+mkdir -p /root/.wine/drive_c/PdG-MCO
+ln -s /app/pdg_mco/RSS /root/.wine/drive_c/PdG-MCO/RSS
+ln -s /app/pdg_mco/fg  /root/.wine/drive_c/PdG-MCO/fg
