@@ -1,3 +1,6 @@
-mkdir -p /root/.wine/drive_c/PdG-MCO
-ln -s /app/pdg_mco/RSS /root/.wine/drive_c/PdG-MCO/RSS
-ln -s /app/pdg_mco/fg  /root/.wine/drive_c/PdG-MCO/fg
+root@a188cf70d789:/app/pdg_mco/fg# ls -la /root/.wine/drive_c/PdG-MCO
+total 8
+drwxr-xr-x 2 root root 4096 Jun 18 09:47 .
+drwxr-xr-x 7 root root 4096 Jun 18 09:47 ..
+lrwxrwxrwx 1 root root   16 Jun 18 09:47 RSS -> /app/pdg_mco/RSS
+lrwxrwxrwx 1 root root   15 Jun 18 09:47 fg -> /app/pdg_mco/fg
