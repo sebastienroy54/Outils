@@ -1,2 +1,21 @@
-root@401c29ac1805:/app# xvfb-run wineboot
-xvfb-run: error: xauth command not found
+anonymeaskip@Lasalle:/mnt/partage$ sudo docker-compose exec app bash
+root@a188cf70d789:/app# xvfb-run wineboot
+wine: created the configuration directory '/root/.wine'
+0054:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
+004c:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
+0054:err:ole:StdMarshalImpl_MarshalInterface Failed to create ifstub, hr 0x80004002
+0054:err:ole:CoMarshalInterface Failed to marshal the interface {6d5140c1-7436-11ce-8034-00aa006009fa}, hr 0x80004002
+0054:err:ole:apartment_get_local_server_stream Failed: 0x80004002
+0054:err:ole:start_rpcss Failed to open RpcSs service
+004c:err:ole:StdMarshalImpl_MarshalInterface Failed to create ifstub, hr 0x80004002
+004c:err:ole:CoMarshalInterface Failed to marshal the interface {6d5140c1-7436-11ce-8034-00aa006009fa}, hr 0x80004002
+004c:err:ole:apartment_get_local_server_stream Failed: 0x80004002
+002c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
+00fc:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
+002c:err:setupapi:SetupDiInstallDevice Failed to start service L"winebth" for device L"ROOT\\WINE\\WINEBTH", error 1359.
+002c:err:setupapi:SetupDiInstallDevice Failed to control service L"winebth" for device L"ROOT\\WINE\\WINEBTH", error 1062.
+002c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
+012c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
+002c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
+012c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
+X connection to :99 broken (explicit kill or server shutdown).
