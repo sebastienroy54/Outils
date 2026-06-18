@@ -1,48 +1,57 @@
-anonymeaskip@Lasalle:/mnt/partage$ sudo docker-compose run --rm app bash
-Creating partage_app_run ... done
-root@560e29f7c4dd:/app# wine --version
-wine-10.0 (Debian 10.0~repack-6)
-root@560e29f7c4dd:/app# ls -l /app/pdg_mco/PdGMCO.exe 
--rwxrwxrwx 1 root root 426328 Jun 17 14:07 /app/pdg_mco/PdGMCO.exe
-root@560e29f7c4dd:/app# wine /app/pdg_mco/PdGMCO.exe /?
-wine: created the configuration directory '/root/.wine'
-error: XDG_RUNTIME_DIR is invalid or not set in the environment.
-error: XDG_RUNTIME_DIR is invalid or not set in the environment.
-004c:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
-004c:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-004c:err:winediag:nodrv_CreateWindow L"The explorer process failed to start."
-004c:err:systray:initialize_systray Could not create tray window
-004c:err:ole:StdMarshalImpl_MarshalInterface Failed to create ifstub, hr 0x80004002
-004c:err:ole:CoMarshalInterface Failed to marshal the interface {6d5140c1-7436-11ce-8034-00aa006009fa}, hr 0x80004002
-004c:err:ole:apartment_get_local_server_stream Failed: 0x80004002
-002c:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-002c:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-0054:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-0054:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-0054:err:ole:apartment_createwindowifneeded CreateWindow failed with error 1400
-0054:err:ole:apartment_createwindowifneeded CreateWindow failed with error 1400
-0054:err:ole:apartment_createwindowifneeded CreateWindow failed with error 1400
-0054:err:ole:StdMarshalImpl_MarshalInterface Failed to create ifstub, hr 0x80070578
-0054:err:ole:CoMarshalInterface Failed to marshal the interface {6d5140c1-7436-11ce-8034-00aa006009fa}, hr 0x80070578
-0054:err:ole:apartment_get_local_server_stream Failed: 0x80070578
-0054:err:ole:start_rpcss Failed to open RpcSs service
-0044:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-0044:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-0098:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-0098:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-002c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
-00f4:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
-002c:err:setupapi:SetupDiInstallDevice Failed to start service L"winebth" for device L"ROOT\\WINE\\WINEBTH", error 1359.
-002c:err:setupapi:SetupDiInstallDevice Failed to control service L"winebth" for device L"ROOT\\WINE\\WINEBTH", error 1062.
-002c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
-0124:err:setupapi:do_file_copyW Unsupported style(s) 0x10
-002c:err:setupapi:do_file_copyW Unsupported style(s) 0x10
-0124:err:setupapi:do_file_copyW Unsupported style(s) 0x10
-0024:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-0024:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-wine: Unhandled exception 0x0eedfade in thread 24 at address 7B6474E8 (thread 0024), starting debugger...
-0154:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-0154:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-0144:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
-0144:err:winediag:nodrv_CreateWindow L"Make sure that your display server is running and that its variables are set."
-0144:fixme:dbghelp:elf_search_auxv can't find symbol in module
+def run_groupage(
+    rss_input_path: Path,
+    year: int,
+    typ_etab: int = 1
+) -> dict:
+    year_dirs = get_year_dirs(year)
+    grpmco_exe = find_grpmco_exe()
+
+    mcofg_path = write_mcofg_ini(
+        rss_input_path=rss_input_path,
+        year=year,
+        typ_etab=typ_etab
+    )
+
+    result = subprocess.run(
+        [str(grpmco_exe), str(mcofg_path)],
+        cwd=str(grpmco_exe.parent),
+        capture_output=True,
+        text=True,
+        shell=False
+    )
+
+    stdout_log = year_dirs["logs"] / f"{rss_input_path.stem}_stdout.txt"
+    stderr_log = year_dirs["logs"] / f"{rss_input_path.stem}_stderr.txt"
+
+    stdout_log.write_text(result.stdout or "", encoding="utf-8", errors="ignore")
+    stderr_log.write_text(result.stderr or "", encoding="utf-8", errors="ignore")
+
+    expected_outputs = {
+        "grp": year_dirs["output"] / f"{rss_input_path.name}.grp",
+        "err": year_dirs["output"] / f"{rss_input_path.name}.err",
+        "log": year_dirs["output"] / f"{rss_input_path.name}.log",
+        "sup": year_dirs["output"] / f"{rss_input_path.name}.sup",
+        "rds": year_dirs["output"] / f"{rss_input_path.name}.rds",
+        "stp": year_dirs["output"] / f"{rss_input_path.name}.stp.txt",
+    }
+
+    existing_outputs = {
+        name: path
+        for name, path in expected_outputs.items()
+        if path.exists()
+    }
+
+    mcofg_results = read_mcofg_results(mcofg_path)
+
+    return {
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "grpmco_exe": grpmco_exe,
+        "mcofg_path": mcofg_path,
+        "mcofg_results": mcofg_results,
+        "stdout_log": stdout_log,
+        "stderr_log": stderr_log,
+        "outputs": existing_outputs,
+    }
+
