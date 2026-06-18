@@ -1,5 +1,2 @@
-mkdir -p ~/.wine/drive_c/PdG-MCO
-cp -r /mnt/partage/pdg_mco/RSS ~/.wine/drive_c/PdG-MCO/
-cp -r /mnt/partage/pdg_mco/fg  ~/.wine/drive_c/PdG-MCO/
-
-wine ~/.wine/drive_c/PdG-MCO/fg/grpmco.exe ~/.wine/drive_c/PdG-MCO/fg/mcofg.ini
+anonymeaskip@Lasalle:/mnt/partage$ ls -l ~/.wine/drive_c/PdG-MCO/RSS/*.grp
+-rw-rw-r-- 1 anonymeaskip anonymeaskip 3570561 juin  18 12:01 /home/anonymeaskip/.wine/drive_c/PdG-MCO/RSS/RUM838714.fic.grp
