@@ -1,22 +1,94 @@
-def find_grpmco_exe() -> Path:
-    """
-    Cherche grpmco.exe sans dépendre d'un chemin absolu unique.
+anonymeaskip@Lasalle:/mnt/partage$ sudo docker logs rss_mco_streamlit --tail=100
+(EE) 
 
-    À long terme :
-    - privilégier stage/pdg_mco/fg/grpmco.exe
+      👋 Welcome to Streamlit!
 
-    Actuellement :
-    """
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
 
-    candidates = [
-        BASE_DIR / "pdg_mco" / "fg" / "grpmco.exe",
-    ]
+2026-06-18 11:55:50.599 
+      Email: (EE) 
+Fatal server error:
+(EE) Server is already active for display 99
+	If this server is no longer running, remove /tmp/.X99-lock
+	and start again.
+(EE) 
 
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
+      👋 Welcome to Streamlit!
 
-    searched = "\n".join(str(c) for c in candidates)
-    raise FileNotFoundError(
-        "grpmco.exe introuvable. Chemins testés :\n" + searched
-    )
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 11:55:54.877 
+      Email: (EE) 
+Fatal server error:
+(EE) Server is already active for display 99
+	If this server is no longer running, remove /tmp/.X99-lock
+	and start again.
+(EE) 
+
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 11:56:02.388 
+      Email: (EE) 
+Fatal server error:
+(EE) Server is already active for display 99
+	If this server is no longer running, remove /tmp/.X99-lock
+	and start again.
+(EE) 
+
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 11:56:16.231 
+      Email: (EE) 
+Fatal server error:
+(EE) Server is already active for display 99
+	If this server is no longer running, remove /tmp/.X99-lock
+	and start again.
+(EE) 
+
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 11:56:42.762 
+      Email: (EE) 
+Fatal server error:
+(EE) Server is already active for display 99
+	If this server is no longer running, remove /tmp/.X99-lock
+	and start again.
+(EE) 
+
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 11:57:34.904 
+      Email: (EE) 
+Fatal server error:
+(EE) Server is already active for display 99
+	If this server is no longer running, remove /tmp/.X99-lock
+	and start again.
+(EE) 
+
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 11:58:36.003 
