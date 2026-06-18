@@ -1,22 +1,9 @@
-anonymeaskip@Lasalle:/mnt/partage$ ls /media/
-anonymeaskip@Lasalle:/mnt/partage$ ls /media
-anonymeaskip@Lasalle:/mnt/partage$ mount | grep vboxsf
-anonymeaskip@Lasalle:/mnt/partage$ lsmod | grep vboxsf
-vboxsf                 45056  0
-vboxguest              57344  1 vboxsf
-anonymeaskip@Lasalle:/mnt/partage$ VBoxControl sharedfolder list
-La commande « VBoxControl » n'a pas été trouvée, mais peut être installée avec :
-sudo apt install virtualbox-guest-utils      # version 6.1.50-dfsg-1~ubuntu1.22.04.3, or
-sudo apt install virtualbox-guest-utils-hwe  # version 6.1.50-dfsg-1~ubuntu1.22.04.3
-anonymeaskip@Lasalle:/mnt/partage$ vboxcontrol sharedfolder list
-vboxcontrol : commande introuvable
-anonymeaskip@Lasalle:/mnt/partage$ ls /
-bin    dev   lib    libx32      mnt   root  snap      sys  var
-boot   etc   lib32  lost+found  opt   run   srv       tmp
-cdrom  home  lib64  media       proc  sbin  swapfile  usr
-anonymeaskip@Lasalle:/mnt/partage$ ls /mnt
-partage  test
-anonymeaskip@Lasalle:/mnt/partage$ ls /mnt/test/
-anonymeaskip@Lasalle:/mnt/partage$ ls /mnt/partage/
-data  pdg_mco  work
+anonymeaskip@Lasalle:/mnt/partage$ ls -la /mnt/partage/
+total 20
+drwxr-xr-x 5 root root 4096 juin  18 14:31 .
+drwxr-xr-x 4 root root 4096 juin  18 09:24 ..
+drwxr-xr-x 3 root root 4096 juin  18 14:32 data
+drwxr-xr-x 2 root root 4096 juin  18 14:31 pdg_mco
+drwxr-xr-x 6 root root 4096 juin  18 14:32 work
+anonymeaskip@Lasalle:/mnt/partage$ mount | grep partage
 anonymeaskip@Lasalle:/mnt/partage$ 
