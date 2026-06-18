@@ -1,35 +1,67 @@
-sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column sejours.pass_sau does not exist LINE 3: ...T patients.id_patient AS id_patient, coalesce(sum(sejours.pa... ^ [SQL: SELECT count(*) AS count_1 FROM (SELECT anon_2.id_patient AS anon_2_id_patient, anon_2.nb AS anon_2_nb FROM (SELECT patients.id_patient AS id_patient, coalesce(sum(sejours.pass_sau), %(coalesce_1)s) AS nb FROM patients JOIN sejours ON sejours.id_patient = patients.id_patient WHERE patients.date_deces IS NOT NULL AND patients.date_deces <= %(date_deces_1)s AND sejours.date_pass_sau IS NOT NULL AND sejours.pass_sau IS NOT NULL AND patients.date_deces - sejours.date_pass_sau >= %(param_1)s AND patients.date_deces - sejours.date_pass_sau <= %(param_2)s GROUP BY patients.id_patient) AS anon_2 WHERE anon_2.nb = %(nb_1)s) AS anon_1] [parameters: {'coalesce_1': 0, 'date_deces_1': datetime.date(2026, 6, 17), 'param_1': 0, 'param_2': 30, 'nb_1': 1}] (Background on this error at: https://sqlalche.me/e/20/f405)
-Traceback:
+Dockerfile :
+FROM python:3.12-slim
 
-File "/media/sf_DREAM/app/pages/indic_dc.py", line 189, in <module>
-    .count()
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3113, in count
-    self._legacy_from_self(col).enable_eagerloads(False).scalar()
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2805, in scalar
-    ret = self.one()
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2778, in one
-    return self._iter().one()  # type: ignore
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2827, in _iter
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2362, in execute
-    return self._execute_internal(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2247, in _execute_internal
-    result: Result[Any] = compile_state_cls.orm_execute_statement(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 305, in orm_execute_statement
-    result = conn.execute(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1418, in execute
-    return meth(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection
-    return connection._execute_clauseelement(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1640, in _execute_clauseelement
-    ret = self._execute_context(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute
-    cursor.execute(statement, parameters)
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN python -m pip install --upgrade pip \
+    && pip install -r requirements.txt
+
+COPY . .
+
+EXPOSE 8501
+
+HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health').read()" || exit 1
+
+CMD ["streamlit", "run", "interface.py", "--server.address=0.0.0.0", "--server.port=8501"]
+
+
+docker-compose :
+services:
+  postgres:
+    image: postgres:16
+    container_name: rss_mco_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rss_mco
+      POSTGRES_USER: rss_user
+      POSTGRES_PASSWORD: rss_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_rss_mco_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rss_mco_streamlit
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://rss_user:rss_password@postgres:5432/rss_mco
+      DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-admin}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin123}
+      DEFAULT_ADMIN_NOM: ${DEFAULT_ADMIN_NOM:-Administrateur}
+      DEFAULT_ADMIN_PRENOM: ${DEFAULT_ADMIN_PRENOM:-Principal}
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./work:/app/work
+      - ./pdg_mco:/app/pdg_mco
+      - ./data:/app/data
+
+volumes:
+  postgres_rss_mco_data:
