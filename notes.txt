@@ -1,2 +1,2 @@
-wine ~/.wine/drive_c/PdG-MCO/fg/grpmco.exe ~/.wine/drive_c/PdG-MCO/fg/mcofg.ini
+xvfb-run wine grpmco.exe mcofg.ini
 echo $?
