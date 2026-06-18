@@ -1,3 +1,20 @@
-sed -i 's#C:\\PdG-MCO\\RSS\\RUM838714.fic#Z:\\app\\pdg_mco\\RSS\\RUM838714.fic#' mcofg.ini
+root@560e29f7c4dd:/app/pdg_mco/fg# cat mcofg.ini
+[R�sultats]
+NbLus=11511
+NbErrForm=0
+NbRUM=11511
+NbRUMErr=0
+NbRSS=10321
+NbRSSErr=0
+ResCtrlUM=0
 
-sed -i 's#C:\\PdG-MCO\\RSS\\#Z:\\app\\pdg_mco\\RSS\\#g' mcofg.ini
+[Product]
+NoVer=2026.1.3 [V2026]
+
+[G�n�ral]
+RepTab=Z:\app\pdg_mco\fg\tables\
+TypEtab=1
+FicEnt=Z:\app\pdg_mco\RSS\RUM838714.fic
+RepSor=Z:\app\pdg_mco\RSS\
+FicUM=Z:\app\pdg_mco\RSS\ficum021.txt
+UtiliseUM=1
