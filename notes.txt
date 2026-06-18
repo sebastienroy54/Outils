@@ -1,6 +1,2 @@
-root@a188cf70d789:/app/pdg_mco/fg# xvfb-run wine grpmco.exe mcofg.ini
-0048:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
-00c4:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
-root@a188cf70d789:/app/pdg_mco/fg# X connection to :99 broken (explicit kill or server shutdown).
-
+root@a188cf70d789:/app/pdg_mco/fg#  find /app/pdg_mco -type f -newer /root/.wine/.update-timestamp
 root@a188cf70d789:/app/pdg_mco/fg# 
