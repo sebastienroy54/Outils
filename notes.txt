@@ -1,3 +1,5 @@
 mkdir -p ~/.wine/drive_c/PdG-MCO
 cp -r /mnt/partage/pdg_mco/RSS ~/.wine/drive_c/PdG-MCO/
 cp -r /mnt/partage/pdg_mco/fg  ~/.wine/drive_c/PdG-MCO/
+
+wine ~/.wine/drive_c/PdG-MCO/fg/grpmco.exe ~/.wine/drive_c/PdG-MCO/fg/mcofg.ini
