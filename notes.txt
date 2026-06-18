@@ -1,2 +1,154 @@
-xvfb-run wine grpmco.exe mcofg.ini
-echo $?
+docker :
+HOMEDRIVE=C:
+HOMEPATH=\users\root
+HOSTNAME=a188cf70d789
+LANG=C.UTF-8
+LOCALAPPDATA=C:\users\root\AppData\Local
+LOGONSERVER=\\A188CF70D789
+NUMBER_OF_PROCESSORS=1
+OS=Windows_NT
+PATH=C:\windows\system32;C:\windows;C:\windows\system32\wbem;C:\windows\system32\WindowsPowershell\v1.0
+PATHEXT=.com;.exe;.bat;.cmd;.vbs;.vbe;.js;.jse;.wsf;.wsh
+PIP_NO_CACHE_DIR=1
+PROCESSOR_ARCHITECTURE=x86
+PROCESSOR_IDENTIFIER=x86 Family 25 Model 120 Stepping 0, AuthenticAMD
+PROCESSOR_LEVEL=25
+PROCESSOR_REVISION=7800
+ProgramData=C:\ProgramData
+ProgramFiles=C:\Program Files
+PROMPT=$P$G
+PUBLIC=C:\users\Public
+PYTHON_SHA256=c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684
+PYTHON_VERSION=3.12.13
+PYTHONDONTWRITEBYTECODE=1
+PYTHONUNBUFFERED=1
+SESSIONNAME=Console
+SHLVL=1
+SystemDrive=C:
+SystemRoot=C:\windows
+TEMP=C:\users\root\AppData\Local\Temp
+TERM=xterm
+TMP=C:\users\root\AppData\Local\Temp
+USERDOMAIN=A188CF70D789
+USERNAME=root
+USERPROFILE=C:\users\root
+windir=C:\windows
+WINECONFIGDIR=\??\Z:\root\.wine
+WINEDATADIR=\??\Z:\usr\share\wine
+WINEDEBUG=fixme-all
+WINEDLLDIR0=\??\Z:\usr\lib\i386-linux-gnu\wine
+WINEHOMEDIR=\??\Z:\root
+WINELOADER=/usr/lib/wine/wine
+WINEUSERLOCALE=C
+WINEUSERNAME=root
+winsysdir=C:\windows\system32
+XAUTHORITY=/tmp/xvfb-run.iGylri/Xauthority
+X connection to :99 broken (explicit kill or server shutdown).
+
+
+ubuntu :
+anonymeaskip@Lasalle:/mnt/partage$ wine cmd /c "set"
+_=/usr/bin/wine
+ALLUSERSPROFILE=C:\ProgramData
+APPDATA=C:\users\anonymeaskip\Application Data
+CLIENTNAME=Console
+COLORTERM=truecolor
+CommonProgramFiles=C:\Program Files (x86)\Common Files
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+CommonProgramW6432=C:\Program Files\Common Files
+COMPUTERNAME=LASALLE
+ComSpec=C:\windows\system32\cmd.exe
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
+DESKTOP_SESSION=ubuntu-xorg
+DISPLAY=:0
+GDMSESSION=ubuntu-xorg
+GNOME_DESKTOP_SESSION_ID=this-is-deprecated
+GNOME_SHELL_SESSION_MODE=ubuntu
+GNOME_TERMINAL_SCREEN=/org/gnome/Terminal/screen/63f8232e_e492_4507_959f_adc16bb3e872
+GNOME_TERMINAL_SERVICE=:1.81
+GPG_AGENT_INFO=/run/user/1000/gnupg/S.gpg-agent:0:1
+GTK_IM_MODULE=ibus
+GTK_MODULES=gail:atk-bridge
+HOMEDRIVE=C:
+HOMEPATH=\users\anonymeaskip
+LANG=fr_FR.UTF-8
+LANGUAGE=fr_FR:en
+LC_ADDRESS=fr_FR.UTF-8
+LC_IDENTIFICATION=fr_FR.UTF-8
+LC_MEASUREMENT=fr_FR.UTF-8
+LC_MONETARY=fr_FR.UTF-8
+LC_NAME=fr_FR.UTF-8
+LC_NUMERIC=fr_FR.UTF-8
+LC_PAPER=fr_FR.UTF-8
+LC_TELEPHONE=fr_FR.UTF-8
+LC_TIME=fr_FR.UTF-8
+LESSCLOSE=/usr/bin/lesspipe %s %s
+LESSOPEN=| /usr/bin/lesspipe %s
+LOCALAPPDATA=C:\users\anonymeaskip\Local Settings\Application Data
+LOGNAME=anonymeaskip
+LOGONSERVER=\\LASALLE
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;4
+2:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;3
+1:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;3
+1:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=
+01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:
+*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.sv
+g=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=0
+1;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.
+flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36
+:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xsp
+f=00;36:
+NUMBER_OF_PROCESSORS=1
+OLDPWD=/mnt/partage/pdg_mco
+OS=Windows_NT
+PAPERSIZE=a4
+PATH=C:\windows\system32;C:\windows;C:\windows\system32\wbem;C:\windows\system32\WindowsPowershell\v1.0
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH
+PROCESSOR_ARCHITECTURE=x86
+PROCESSOR_ARCHITEW6432=AMD64
+PROCESSOR_IDENTIFIER=AMD64 Family 25 Model 120 Stepping 0, AuthenticAMD
+PROCESSOR_LEVEL=25
+PROCESSOR_REVISION=7800
+ProgramData=C:\ProgramData
+ProgramFiles=C:\Program Files (x86)
+ProgramFiles(x86)=C:\Program Files (x86)
+ProgramW6432=C:\Program Files
+PROMPT=$P$G
+PUBLIC=C:\users\Public
+SESSION_MANAGER=local/Lasalle:@/tmp/.ICE-unix/2326,unix/Lasalle:/tmp/.ICE-unix/2326
+SESSIONNAME=Console
+SHELL=/bin/bash
+SHLVL=1
+SSH_AGENT_LAUNCHER=gnome-keyring
+SSH_AUTH_SOCK=/run/user/1000/keyring/ssh
+SYSTEMD_EXEC_PID=2362
+SystemDrive=c:
+SYSTEMROOT=C:\windows
+TEMP=C:\users\anonymeaskip\Temp
+TERM=xterm-256color
+TMP=C:\users\anonymeaskip\Temp
+USER=anonymeaskip
+USERDOMAIN=LASALLE
+USERNAME=anonymeaskip
+USERPROFILE=C:\users\anonymeaskip
+VTE_VERSION=6800
+windir=C:\windows
+WINDOWPATH=2
+WINECONFIGDIR=\??\Z:\home\anonymeaskip\.wine
+WINEDATADIR=\??\Z:\usr\lib\wine\..\..\share\wine\wine
+WINEDEBUG=fixme-all
+WINEDLLDIR0=\??\Z:\usr\lib\i386-linux-gnu\wine
+WINEHOMEDIR=\??\Z:\home\anonymeaskip
+WINELOADERNOEXEC=1
+WINEUSERNAME=anonymeaskip
+winsysdir=C:\windows\system32
+XAUTHORITY=/run/user/1000/gdm/Xauthority
+XDG_CONFIG_DIRS=/etc/xdg/xdg-ubuntu-xorg:/etc/xdg
+XDG_CURRENT_DESKTOP=ubuntu:GNOME
+XDG_DATA_DIRS=/usr/share/ubuntu-xorg:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop
+XDG_MENU_PREFIX=gnome-
+XDG_RUNTIME_DIR=/run/user/1000
+XDG_SESSION_CLASS=user
+XDG_SESSION_DESKTOP=ubuntu-xorg
+XDG_SESSION_TYPE=x11
+XMODIFIERS=@im=ibus
