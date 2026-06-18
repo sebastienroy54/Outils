@@ -1,67 +1,12 @@
-Dockerfile :
-FROM python:3.12-slim
-
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PIP_NO_CACHE_DIR=1
-
-WORKDIR /app
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-
-RUN python -m pip install --upgrade pip \
-    && pip install -r requirements.txt
-
-COPY . .
-
-EXPOSE 8501
-
-HEALTHCHECK CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health').read()" || exit 1
-
-CMD ["streamlit", "run", "interface.py", "--server.address=0.0.0.0", "--server.port=8501"]
-
-
-docker-compose :
-services:
-  postgres:
-    image: postgres:16
-    container_name: rss_mco_postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: rss_mco
-      POSTGRES_USER: rss_user
-      POSTGRES_PASSWORD: rss_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_rss_mco_data:/var/lib/postgresql/data
-
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rss_mco_streamlit
-    restart: unless-stopped
-    depends_on:
-      - postgres
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql+psycopg2://rss_user:rss_password@postgres:5432/rss_mco
-      DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-admin}
-      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-admin123}
-      DEFAULT_ADMIN_NOM: ${DEFAULT_ADMIN_NOM:-Administrateur}
-      DEFAULT_ADMIN_PRENOM: ${DEFAULT_ADMIN_PRENOM:-Principal}
-    ports:
-      - "8501:8501"
-    volumes:
-      - ./work:/app/work
-      - ./pdg_mco:/app/pdg_mco
-      - ./data:/app/data
-
-volumes:
-  postgres_rss_mco_data:
+root@34865b737e82:/app# cd /app/pdg_mco
+root@34865b737e82:/app/pdg_mco# wine PdGMCO.exe 
+bash: wine: command not found
+root@34865b737e82:/app/pdg_mco# ls -l
+total 1477
+-rwxrwxrwx 1 root root      50 Jun 17 14:07 PdG-MCO.url
+-rwxrwxrwx 1 root root  426328 Jun 17 14:07 PdGMCO.exe
+drwxrwxrwx 1 root root    4096 Jun 17 14:07 RSS
+drwxrwxrwx 1 root root       0 Jun 17 14:07 UM
+drwxrwxrwx 1 root root    4096 Jun 17 14:07 fg
+-rwxrwxrwx 1 root root 1018608 Jun 17 14:07 manuel_v2026.pdf
+-rwxrwxrwx 1 root root   51405 Jun 17 14:07 uninst.exe
