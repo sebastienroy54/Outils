@@ -1,1 +1,11 @@
-xvfb-run wine cmd /c "dir C:\\PdG-MCO\\RSS\\*.grp"
+root@a188cf70d789:/app# xvfb-run wine cmd /c "dir C:\\PdG-MCO\\RSS\\*.grp"
+0048:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
+00c8:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
+Volume in drive C has no label.
+Volume Serial Number is 4300-0000
+
+Directory of C:\PdG-MCO\RSS
+
+File not found.
+
+X connection to :99 broken (explicit kill or server shutdown).
