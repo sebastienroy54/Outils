@@ -1,27 +1,12 @@
-anonymeaskip@Lasalle:/mnt/partage$ sudo mount -t vboxsf stage_ihm /mnt/partage
-anonymeaskip@Lasalle:/mnt/partage$ mount | grep vboxsf
-stage_ihm on /mnt/partage type vboxsf (rw,relatime)
-anonymeaskip@Lasalle:/mnt/partage$ ls
-data  pdg_mco  work
-anonymeaskip@Lasalle:/mnt/partage$ ls pdg_mco/
-anonymeaskip@Lasalle:/mnt/partage$ ls
-data  pdg_mco  work
-anonymeaskip@Lasalle:/mnt/partage$ ls -la /mnt/partage/
-total 42
-drwxrwxrwx 1 root root 4096 juin  18 13:42 .
-drwxr-xr-x 4 root root 4096 juin  18 09:24 ..
-drwxrwxrwx 1 root root 4096 juin  17 16:07 app
-drwxrwxrwx 1 root root    0 juin  17 16:07 data
--rwxrwxrwx 1 root root 1029 juin  17 16:07 docker-compose.yml
--rwxrwxrwx 1 root root  699 juin  18 13:47 Dockerfile
--rwxrwxrwx 1 root root  252 juin  17 16:07 dockerignore
--rwxrwxrwx 1 root root  273 juin  18 14:04 entrypoint.sh
--rwxrwxrwx 1 root root  712 juin  17 16:07 .env
--rwxrwxrwx 1 root root 3512 juin  17 16:07 interface.py
-drwxrwxrwx 1 root root 4096 juin  17 16:07 pdg_mco
-drwxrwxrwx 1 root root    0 juin  17 16:07 __pycache__
--rwxrwxrwx 1 root root  573 juin  17 16:07 README_DOCKER.md
--rwxrwxrwx 1 root root 2745 juin  17 16:07 README.md
--rwxrwxrwx 1 root root  125 juin  17 16:07 requirements.txt
-drwxrwxrwx 1 root root    0 juin  17 16:07 sql
-drwxrwxrwx 1 root root    0 juin  17 16:07 work
+anonymeaskip@Lasalle:/mnt/partage$ ls -la /mnt/partage/pdg_mco/
+total 1485
+drwxrwxrwx 1 root root    4096 juin  17 16:07 .
+drwxrwxrwx 1 root root    4096 juin  18 13:42 ..
+drwxrwxrwx 1 root root    4096 juin  18 10:59 fg
+-rwxrwxrwx 1 root root       0 juin  17 16:07 .gitkeep
+-rwxrwxrwx 1 root root 1018608 juin  17 16:07 manuel_v2026.pdf
+-rwxrwxrwx 1 root root  426328 juin  17 16:07 PdGMCO.exe
+-rwxrwxrwx 1 root root      50 juin  17 16:07 PdG-MCO.url
+drwxrwxrwx 1 root root    4096 juin  18 13:32 RSS
+drwxrwxrwx 1 root root       0 juin  17 16:07 UM
+-rwxrwxrwx 1 root root   51405 juin  17 16:07 uninst.exe
