@@ -1,7 +1,6 @@
-root@560e29f7c4dd:/app/pdg_mco/fg# wine grpmco.exe mcofg.ini
 error: XDG_RUNTIME_DIR is invalid or not set in the environment.
 0048:err:vulkan:vulkan_init_once Failed to load libvulkan.so.1
 0048:err:winediag:nodrv_CreateWindow Application tried to create a window, but no driver could be loaded.
 0048:err:winediag:nodrv_CreateWindow L"The explorer process failed to start."
 0048:err:systray:initialize_systray Could not create tray window
-00c8:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
+00c4:err:ntoskrnl:ZwLoadDriver failed to create driver L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\winebth": c00000e5
