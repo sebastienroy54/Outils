@@ -1,5 +1,4 @@
 anonymeaskip@Lasalle:/mnt/partage$ sudo docker logs rss_mco_streamlit --tail=100
-(EE) 
 
       👋 Welcome to Streamlit!
 
@@ -7,88 +6,68 @@ anonymeaskip@Lasalle:/mnt/partage$ sudo docker logs rss_mco_streamlit --tail=100
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:55:50.599 
-      Email: (EE) 
-Fatal server error:
-(EE) Server is already active for display 99
-	If this server is no longer running, remove /tmp/.X99-lock
-	and start again.
-(EE) 
-
+2026-06-18 12:01:32.106 
+      Email: 
       👋 Welcome to Streamlit!
 
       If you'd like to receive helpful onboarding emails, news, offers, promotions,
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:55:54.877 
-      Email: (EE) 
-Fatal server error:
-(EE) Server is already active for display 99
-	If this server is no longer running, remove /tmp/.X99-lock
-	and start again.
-(EE) 
-
+2026-06-18 12:01:33.339 
+      Email: 
       👋 Welcome to Streamlit!
 
       If you'd like to receive helpful onboarding emails, news, offers, promotions,
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:56:02.388 
-      Email: (EE) 
-Fatal server error:
-(EE) Server is already active for display 99
-	If this server is no longer running, remove /tmp/.X99-lock
-	and start again.
-(EE) 
-
+2026-06-18 12:01:34.530 
+      Email: 
       👋 Welcome to Streamlit!
 
       If you'd like to receive helpful onboarding emails, news, offers, promotions,
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:56:16.231 
-      Email: (EE) 
-Fatal server error:
-(EE) Server is already active for display 99
-	If this server is no longer running, remove /tmp/.X99-lock
-	and start again.
-(EE) 
-
+2026-06-18 12:01:35.927 
+      Email: 
       👋 Welcome to Streamlit!
 
       If you'd like to receive helpful onboarding emails, news, offers, promotions,
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:56:42.762 
-      Email: (EE) 
-Fatal server error:
-(EE) Server is already active for display 99
-	If this server is no longer running, remove /tmp/.X99-lock
-	and start again.
-(EE) 
-
+2026-06-18 12:01:37.779 
+      Email: 
       👋 Welcome to Streamlit!
 
       If you'd like to receive helpful onboarding emails, news, offers, promotions,
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:57:34.904 
-      Email: (EE) 
-Fatal server error:
-(EE) Server is already active for display 99
-	If this server is no longer running, remove /tmp/.X99-lock
-	and start again.
-(EE) 
-
+2026-06-18 12:01:40.309 
+      Email: 
       👋 Welcome to Streamlit!
 
       If you'd like to receive helpful onboarding emails, news, offers, promotions,
       and the occasional swag, please enter your email address below. Otherwise,
       leave this field blank.
 
-2026-06-18 11:58:36.003 
+2026-06-18 12:01:44.446 
+      Email: 
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 12:01:52.525 
+      Email: 
+      👋 Welcome to Streamlit!
+
+      If you'd like to receive helpful onboarding emails, news, offers, promotions,
+      and the occasional swag, please enter your email address below. Otherwise,
+      leave this field blank.
+
+2026-06-18 12:02:06.412 
