@@ -1,2 +1,1 @@
-nonymeaskip@Lasalle:~$ hostname -I
-10.0.2.15 172.19.0.1 172.18.0.1 172.17.0.1 fd17:625c:f037:2:a781:5ef5:60ac:a2ca fd17:625c:f037:2:11bd:9213:2f41:d4f6 
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "postgres" (172.20.0.2), port 5432 failed: FATAL: password authentication failed for user "prism_user" (Background on this error at: https://sqlalche.me/e/20/e3q8)
