@@ -1,23 +1,10 @@
-exec(code, module.__dict__) # noqa: S102AgGridReturnst_aggrid.AgGridReturn.AgGridReturn(originalData, grid_response={}, data_return_mode=<DataReturnMode.AS_INPUT: 'AS_INPUT'>, conversion_errors='coerce', frame_dtypes=None) -> None
-Container for AgGrid component response data.
+{
+"type":"selectionChanged"
+"source":"rowClicked"
+"streamlitRerunEventTriggerName":"selectionChanged"
+}
+index	ID Patient	IPP	Nom	Prénom	Date naissance	Date 1er appel	Service référent	Nb suivis	Dernière intervention	Date décès
 
-Provides easy access to grid data, selected rows, grid state, and other
-information returned by the AgGrid component.
-columns_stateproperty	Gets the state of the columns. Typically used when saving column state.
-dataproperty	Data from the grid. If rows are grouped, return only the leaf rows.
-dataGroupsproperty	Returns grouped rows as a dictionary where keys are tuples of
-event_dataproperty	Returns information about the event that triggered AgGrid response.
-frame_dtypesSeries	ID Patient int64 IPP int64 Nom object Prénom object Date naissance object Date 1er appel object Service référent object Nb suivis int64 Dernière intervention object Date décès ...
-grid_optionsproperty	GridOptions as applied on the grid.
-grid_responseproperty	Raw response from component.
-grid_stateproperty	Gets the grid state. Tipically used on initialState option. (https://ag-grid.com/javascript-data-grid//grid-options/#reference-miscellaneous-initialState)
-rows_id_after_filterproperty	The filtered row indexes
-rows_id_after_sort_and_filterproperty	The row indexes after sort and filter is applied
-selected_dataproperty	Selected data from the grid.
-selected_dataGroupsproperty	Returns selected rows as a dictionary where keys are tuples of
-selected_rowsproperty	Returns selected rows as a DataFrame.
-selected_rows_idproperty	Ids of selected rows
-getmethod	D.get(k[,d]) -> D[k] if k in D, else d. d defaults to None.
-itemsmethod	D.items() -> a set-like object providing a view on D's items
-keysmethod	Return all available keys (attributes + grid_response keys).
-valuesmethod	Return all values for public attributes.
+et 
+s
+0	88	8073314129	Bernard	Claire	23/01/1973	13/09/2024	SAU	8	27/01/2026	
