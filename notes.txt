@@ -1,52 +1,17 @@
-[
-0:
-"columns_state"
-1:
-"data"
-2:
-"dataGroups"
-3:
-"event_data"
-4:
-"frame_dtypes"
-5:
-"get"
-6:
-"grid_options"
-7:
-"grid_response"
-8:
-"grid_state"
-9:
-"items"
-10:
-"keys"
-11:
-"rows_id_after_filter"
-12:
-"rows_id_after_sort_and_filter"
-13:
-"selected_data"
-14:
-"selected_dataGroups"
-15:
-"selected_rows"
-16:
-"selected_rows_id"
-17:
-"values"
-18:
-"originalDtypes"
-19:
-"nodes"
-20:
-"gridState"
-21:
-"columnsState"
-22:
-"rowIdsAfterFilter"
-23:
-"rowIdsAfterSortAndFilter"
-24:
-"eventData"
-]
+streamlit.errors.StreamlitDuplicateElementId: There are multiple number_input elements with the same auto-generated ID. When this element is created, it is assigned an internal ID based on the element type and provided parameters. Multiple elements with the same type and parameters will cause this error.
+
+To fix this error, please pass a unique key argument to the number_input element.
+Traceback:
+
+File "/media/sf_DREAM/app/pages/modif_patient.py", line 261, in <module>
+    pass_sau = st.number_input(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/runtime/metrics_util.py", line 443, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/widgets/number_input.py", line 401, in number_input
+    return self._number_input(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/widgets/number_input.py", line 452, in _number_input
+    element_id = compute_and_register_element_id(
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/lib/utils.py", line 254, in compute_and_register_element_id
+    _register_element_id(ctx, element_type, element_id)
+File "/home/vitrygtr/.local/lib/python3.10/site-packages/streamlit/elements/lib/utils.py", line 148, in _register_element_id
+    raise StreamlitDuplicateElementId(element_type)
