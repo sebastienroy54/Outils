@@ -1,9 +1,9 @@
-sqlalchemy.exc.ProgrammingError: (psycopg2.errors.InvalidColumnReference) SELECT DISTINCT ON expressions must match initial ORDER BY expressions LINE 1: SELECT DISTINCT ON (patients.id_patient) patients.id_patient... ^ [SQL: SELECT DISTINCT ON (patients.id_patient) patients.id_patient AS patients_id_patient, patients.ipp AS patients_ipp, patients.nom AS patients_nom, patients.prenom AS patients_prenom, patients.date_naissance AS patients_date_naissance FROM patients JOIN soins_pall ON patients.id_patient = soins_pall.id_patient LEFT OUTER JOIN sejours ON soins_pall.id_sejour = sejours.id_sejour LEFT OUTER JOIN diag ON patients.id_patient = diag.id_patient WHERE soins_pall.date_intervention >= %(date_intervention_1)s AND soins_pall.date_intervention <= %(date_intervention_2)s ORDER BY patients.nom, patients.prenom] [parameters: {'date_intervention_1': datetime.date(2026, 1, 1), 'date_intervention_2': datetime.date(2026, 6, 26)}] (Background on this error at: https://sqlalche.me/e/20/f405)
+sqlalchemy.exc.ProgrammingError: (psycopg2.errors.GroupingError) column "patients.id_patient" must appear in the GROUP BY clause or be used in an aggregate function LINE 1: ...hologie_principale AS diag_pathologie_principale, patients.i... ^ [SQL: SELECT diag.pathologie_principale AS diag_pathologie_principale, patients.id_patient AS patients_id_patient FROM patients JOIN soins_pall ON patients.id_patient = soins_pall.id_patient LEFT OUTER JOIN sejours ON soins_pall.id_sejour = sejours.id_sejour LEFT OUTER JOIN diag ON patients.id_patient = diag.id_patient WHERE soins_pall.date_intervention >= %(date_intervention_1)s AND soins_pall.date_intervention <= %(date_intervention_2)s GROUP BY diag.pathologie_principale ORDER BY diag.pathologie_principale] [parameters: {'date_intervention_1': datetime.date(2026, 1, 1), 'date_intervention_2': datetime.date(2026, 6, 26)}] (Background on this error at: https://sqlalche.me/e/20/f405)
 Traceback:
 
-File "/media/sf_DREAM/app/pages/bilan.py", line 163, in <module>
-    resultat = get_indicateurs_file_active(
-File "/media/sf_DREAM/app/services/ars/file_active.py", line 53, in get_indicateurs_file_active
+File "/media/sf_DREAM/app/pages/bilan.py", line 190, in <module>
+    get_indicateurs_pathologies(
+File "/media/sf_DREAM/app/services/ars/pathologies.py", line 35, in get_indicateurs_pathologies
     .all()
 File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2673, in all
     return self._iter().all()  # type: ignore
