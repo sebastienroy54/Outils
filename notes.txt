@@ -1,1 +1,5 @@
-Erreur pendant l'extraction : 'utf-8' codec can't decode byte 0x9c in position 156: invalid start byte
+Erreur extraction PHP sur CCH
+
+PHP Parse error:  syntax error, unexpected '}', expecting end of file in /app/outils/extract_mwb.php on line 264
+
+Extraction terminée : 0 document(s) exporté(s).
