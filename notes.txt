@@ -1,34 +1,49 @@
-vitrygtr@Pro:/media/sf_Portail_outils$ docker exec -it portail-outils bash
-root@18377d785a26:/app# php -v
-PHP 7.0.33-0+deb9u12 (cli) (built: Oct 26 2021 17:51:39) ( NTS )
-Copyright (c) 1997-2017 The PHP Group
-Zend Engine v3.0.0, Copyright (c) 1998-2017 Zend Technologies
-    with Zend OPcache v7.0.33-0+deb9u12, Copyright (c) 1999-2017, by Zend Technologies
-root@18377d785a26:/app# php -m | grep -i oci
-root@18377d785a26:/app# php -r "var_dump(function_exists('oci_connect'));"
-bool(false)
-root@18377d785a26:/app# php --ini
-Configuration File (php.ini) Path: /etc/php/7.0/cli
-Loaded Configuration File:         /etc/php/7.0/cli/php.ini
-Scan for additional .ini files in: /etc/php/7.0/cli/conf.d
-Additional .ini files parsed:      /etc/php/7.0/cli/conf.d/10-opcache.ini,
-/etc/php/7.0/cli/conf.d/10-pdo.ini,
-/etc/php/7.0/cli/conf.d/20-calendar.ini,
-/etc/php/7.0/cli/conf.d/20-ctype.ini,
-/etc/php/7.0/cli/conf.d/20-exif.ini,
-/etc/php/7.0/cli/conf.d/20-fileinfo.ini,
-/etc/php/7.0/cli/conf.d/20-ftp.ini,
-/etc/php/7.0/cli/conf.d/20-gettext.ini,
-/etc/php/7.0/cli/conf.d/20-iconv.ini,
-/etc/php/7.0/cli/conf.d/20-json.ini,
-/etc/php/7.0/cli/conf.d/20-phar.ini,
-/etc/php/7.0/cli/conf.d/20-posix.ini,
-/etc/php/7.0/cli/conf.d/20-readline.ini,
-/etc/php/7.0/cli/conf.d/20-shmop.ini,
-/etc/php/7.0/cli/conf.d/20-sockets.ini,
-/etc/php/7.0/cli/conf.d/20-sysvmsg.ini,
-/etc/php/7.0/cli/conf.d/20-sysvsem.ini,
-/etc/php/7.0/cli/conf.d/20-sysvshm.ini,
-/etc/php/7.0/cli/conf.d/20-tokenizer.ini
+ecreating portail-outils ... 
 
-root@18377d785a26:/app# 
+ERROR: for portail-outils  'ContainerConfig'
+
+ERROR: for streamlit  'ContainerConfig'
+Traceback (most recent call last):
+  File "/usr/bin/docker-compose", line 33, in <module>
+    sys.exit(load_entry_point('docker-compose==1.29.2', 'console_scripts', 'docker-compose')())
+  File "/usr/lib/python3/dist-packages/compose/cli/main.py", line 81, in main
+    command_func()
+  File "/usr/lib/python3/dist-packages/compose/cli/main.py", line 203, in perform_command
+    handler(command, command_options)
+  File "/usr/lib/python3/dist-packages/compose/metrics/decorator.py", line 18, in wrapper
+    result = fn(*args, **kwargs)
+  File "/usr/lib/python3/dist-packages/compose/cli/main.py", line 1186, in up
+    to_attach = up(False)
+  File "/usr/lib/python3/dist-packages/compose/cli/main.py", line 1166, in up
+    return self.project.up(
+  File "/usr/lib/python3/dist-packages/compose/project.py", line 697, in up
+    results, errors = parallel.parallel_execute(
+  File "/usr/lib/python3/dist-packages/compose/parallel.py", line 108, in parallel_execute
+    raise error_to_reraise
+  File "/usr/lib/python3/dist-packages/compose/parallel.py", line 206, in producer
+    result = func(obj)
+  File "/usr/lib/python3/dist-packages/compose/project.py", line 679, in do
+    return service.execute_convergence_plan(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 579, in execute_convergence_plan
+    return self._execute_convergence_recreate(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 499, in _execute_convergence_recreate
+    containers, errors = parallel_execute(
+  File "/usr/lib/python3/dist-packages/compose/parallel.py", line 108, in parallel_execute
+    raise error_to_reraise
+  File "/usr/lib/python3/dist-packages/compose/parallel.py", line 206, in producer
+    result = func(obj)
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 494, in recreate
+    return self.recreate_container(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 612, in recreate_container
+    new_container = self.create_container(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 330, in create_container
+    container_options = self._get_container_create_options(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 921, in _get_container_create_options
+    container_options, override_options = self._build_container_volume_options(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 960, in _build_container_volume_options
+    binds, affinity = merge_volume_bindings(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 1548, in merge_volume_bindings
+    old_volumes, old_mounts = get_container_data_volumes(
+  File "/usr/lib/python3/dist-packages/compose/service.py", line 1579, in get_container_data_volumes
+    container.image_config['ContainerConfig'].get('Volumes') or {}
+KeyError: 'ContainerConfig'
