@@ -1,39 +1,34 @@
-sqlalchemy.exc.ProgrammingError: (psycopg2.errors.UndefinedColumn) column patients.derniere_chimio does not exist LINE 2: ...inistree, patients.pass_sau AS patients_pass_sau, patients.d... ^ [SQL: SELECT count(*) AS count_1 FROM (SELECT patients.id_patient AS patients_id_patient, patients.ipp AS patients_ipp, patients.nom AS patients_nom, patients.prenom AS patients_prenom, patients.date_naissance AS patients_date_naissance, patients.sexe AS patients_sexe, patients.precarite AS patients_precarite, patients.admission_rea AS patients_admission_rea, patients.chimio_administree AS patients_chimio_administree, patients.pass_sau AS patients_pass_sau, patients.derniere_chimio AS patients_derniere_chimio, patients.date_deces AS patients_date_deces, patients.lieu_dc AS patients_lieu_dc, patients.pronostic AS patients_pronostic, soins_pall.id_soins_pall AS soins_pall_id_soins_pall, soins_pall.id_patient AS soins_pall_id_patient, soins_pall.id_sejour AS soins_pall_id_sejour, soins_pall.date_intervention AS soins_pall_date_intervention, soins_pall.type_intervention AS soins_pall_type_intervention, soins_pall.cadre_intervention AS soins_pall_cadre_intervention, soins_pall.service_appelant AS soins_pall_service_appelant, soins_pall.date_appel AS soins_pall_date_appel, soins_pall.origine_appel AS soins_pall_origine_appel, soins_pall.date_evaluation AS soins_pall_date_evaluation, soins_pall.ps AS soins_pall_ps, soins_pall.ldh AS soins_pall_ldh, soins_pall.albumine AS soins_pall_albumine, soins_pall.sites_metastatiques AS soins_pall_sites_metastatiques, soins_pall.traitement_anti_tumoral AS soins_pall_traitement_anti_tumoral, soins_pall.cible_patient AS soins_pall_cible_patient, soins_pall.cible_famille AS soins_pall_cible_famille, soins_pall.cible_equipe AS soins_pall_cible_equipe, soins_pall.notes AS soins_pall_notes, soins_pall.statut_codage AS soins_pall_statut_codage, soins_pall.acte_clin AS soins_pall_acte_clin, sejours.id_sejour AS sejours_id_sejour, sejours.id_patient AS sejours_id_patient, sejours.nda AS sejours_nda, sejours.date_entree AS sejours_date_entree, sejours.date_sortie AS sejours_date_sortie, sejours.uf AS sejours_uf, sejours.mode_entree AS sejours_mode_entree, sejours.mode_sortie AS sejours_mode_sortie, sejours.um AS sejours_um, sejours.lib_um AS sejours_lib_um, sejours.telecons AS sejours_telecons, sejours.consult_ext AS sejours_consult_ext, sejours.avis_dossier AS sejours_avis_dossier, sejours.lieu_usp AS sejours_lieu_usp, sejours.date_entree_usp AS sejours_date_entree_usp, sejours.date_sortie_usp AS sejours_date_sortie_usp, sejours.service_referent AS sejours_service_referent, sejours.transfert AS sejours_transfert, diag.id_diag AS diag_id_diag, diag.id_patient AS diag_id_patient, diag.id_sejour AS diag_id_sejour, diag.cd_dp AS diag_cd_dp, diag.cd_dr AS diag_cd_dr, diag.cd_das AS diag_cd_das, diag.lib_diag AS diag_lib_diag, diag.pathologie_principale AS diag_pathologie_principale, diag.localisation_tumeur AS diag_localisation_tumeur, diag.date_diag_initial AS diag_date_diag_initial, diag.date_diag_incurabilite AS diag_date_diag_incurabilite, diag.source AS diag_source FROM patients JOIN soins_pall ON patients.id_patient = soins_pall.id_patient LEFT OUTER JOIN sejours ON soins_pall.id_sejour = sejours.id_sejour LEFT OUTER JOIN diag ON patients.id_patient = diag.id_patient WHERE soins_pall.date_intervention >= %(date_intervention_1)s AND soins_pall.date_intervention <= %(date_intervention_2)s AND NOT (sejours.um ILIKE %(um_1)s OR sejours.um ILIKE %(um_2)s OR sejours.um ILIKE %(um_3)s) AND %(cible_patient_1)s = ANY (soins_pall.cible_patient)) AS anon_1] [parameters: {'date_intervention_1': datetime.date(2026, 1, 1), 'date_intervention_2': datetime.date(2026, 6, 29), 'um_1': '%J', 'um_2': '%C', 'um_3': '%X', 'cible_patient_1': 'MED'}] (Background on this error at: https://sqlalche.me/e/20/f405)
-Traceback:
+vitrygtr@Pro:/media/sf_Portail_outils$ docker exec -it portail-outils bash
+root@18377d785a26:/app# php -v
+PHP 7.0.33-0+deb9u12 (cli) (built: Oct 26 2021 17:51:39) ( NTS )
+Copyright (c) 1997-2017 The PHP Group
+Zend Engine v3.0.0, Copyright (c) 1998-2017 Zend Technologies
+    with Zend OPcache v7.0.33-0+deb9u12, Copyright (c) 1999-2017, by Zend Technologies
+root@18377d785a26:/app# php -m | grep -i oci
+root@18377d785a26:/app# php -r "var_dump(function_exists('oci_connect'));"
+bool(false)
+root@18377d785a26:/app# php --ini
+Configuration File (php.ini) Path: /etc/php/7.0/cli
+Loaded Configuration File:         /etc/php/7.0/cli/php.ini
+Scan for additional .ini files in: /etc/php/7.0/cli/conf.d
+Additional .ini files parsed:      /etc/php/7.0/cli/conf.d/10-opcache.ini,
+/etc/php/7.0/cli/conf.d/10-pdo.ini,
+/etc/php/7.0/cli/conf.d/20-calendar.ini,
+/etc/php/7.0/cli/conf.d/20-ctype.ini,
+/etc/php/7.0/cli/conf.d/20-exif.ini,
+/etc/php/7.0/cli/conf.d/20-fileinfo.ini,
+/etc/php/7.0/cli/conf.d/20-ftp.ini,
+/etc/php/7.0/cli/conf.d/20-gettext.ini,
+/etc/php/7.0/cli/conf.d/20-iconv.ini,
+/etc/php/7.0/cli/conf.d/20-json.ini,
+/etc/php/7.0/cli/conf.d/20-phar.ini,
+/etc/php/7.0/cli/conf.d/20-posix.ini,
+/etc/php/7.0/cli/conf.d/20-readline.ini,
+/etc/php/7.0/cli/conf.d/20-shmop.ini,
+/etc/php/7.0/cli/conf.d/20-sockets.ini,
+/etc/php/7.0/cli/conf.d/20-sysvmsg.ini,
+/etc/php/7.0/cli/conf.d/20-sysvsem.ini,
+/etc/php/7.0/cli/conf.d/20-sysvshm.ini,
+/etc/php/7.0/cli/conf.d/20-tokenizer.ini
 
-File "/media/sf_DREAM/app/pages/bilan.py", line 213, in <module>
-    get_indicateurs_activite(
-File "/media/sf_DREAM/app/services/ars/activite.py", line 88, in get_indicateurs_activite
-    patient = compter(
-File "/media/sf_DREAM/app/services/ars/activite.py", line 74, in compter
-    .count()
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 3113, in count
-    self._legacy_from_self(col).enable_eagerloads(False).scalar()
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2805, in scalar
-    ret = self.one()
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2778, in one
-    return self._iter().one()  # type: ignore
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/query.py", line 2827, in _iter
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2362, in execute
-    return self._execute_internal(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/session.py", line 2247, in _execute_internal
-    result: Result[Any] = compile_state_cls.orm_execute_statement(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/context.py", line 305, in orm_execute_statement
-    result = conn.execute(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1418, in execute
-    return meth(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection
-    return connection._execute_clauseelement(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1640, in _execute_clauseelement
-    ret = self._execute_context(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute
-    cursor.execute(statement, parameters)
+root@18377d785a26:/app# 
