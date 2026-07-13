@@ -1,16 +1,27 @@
-SELECT
-    COUNT(*) FILTER (WHERE 'MED' = ANY(cible_patient))  AS med_patient,
-    COUNT(*) FILTER (WHERE 'MED' = ANY(cible_famille)) AS med_famille,
-    COUNT(*) FILTER (WHERE 'MED' = ANY(cible_equipe))  AS med_equipe,
+resultat requete :
+ med_patient | med_famille | med_equipe | ide_patient | ide_famille | ide_equipe | psy_patient | psy_famille | psy_equipe 
+-------------+-------------+------------+-------------+-------------+------------+-------------+-------------+------------
+          32 |          30 |         28 |          27 |          33 |         36 |          33 |          29 |         30
+(1 row)
 
-    COUNT(*) FILTER (WHERE 'IDE' = ANY(cible_patient))  AS ide_patient,
-    COUNT(*) FILTER (WHERE 'IDE' = ANY(cible_famille)) AS ide_famille,
-    COUNT(*) FILTER (WHERE 'IDE' = ANY(cible_equipe))  AS ide_equipe,
 
-    COUNT(*) FILTER (WHERE 'PSY' = ANY(cible_patient))  AS psy_patient,
-    COUNT(*) FILTER (WHERE 'PSY' = ANY(cible_famille)) AS psy_famille,
-    COUNT(*) FILTER (WHERE 'PSY' = ANY(cible_equipe))  AS psy_equipe
-
-FROM soins_pall
-WHERE date_intervention >= '2016-01-01'
-  AND cadre_intervention = 'HDJ';
+resultat tableau :
+Type d'activité	Patient	Famille	Équipe	Total
+Activité médicale
+Hospitalisation	80	110	76	266
+HDJ	108	103	95	306
+Consultation externe	122	118	114	354
+Téléconsultation	87	78	105	270
+TOTAL	397	409	390	1196
+Activité IDE
+Hospitalisation	112	81	105	298
+HDJ	87	114	123	324
+Consultation externe	111	100	116	327
+Téléconsultation	85	103	98	286
+TOTAL	395	398	442	1235
+Activité psychologue
+Hospitalisation	98	87	73	258
+HDJ	113	94	102	309
+Consultation externe	111	125	115	351
+Téléconsultation	77	89	86	252
+TOTAL	399	395	376	1170
