@@ -1,8 +1,10 @@
-Hospitalisation	42
-HDJ	45
-Consultation externe	51
-TOTAL HORS TEL	138
-Téléconsultation	42
-Téléphone	33
-Staff	70
-TOTAL	283
+SELECT COUNT(*)
+FROM soins_pall
+WHERE date_intervention >= '2016-01-01'
+  AND 'LAT' = ANY(acte_clin);
+
+
+SELECT COUNT(*)
+FROM soins_pall
+WHERE date_intervention >= '2016-01-01'
+  AND 'Suivi de deuil' = ANY(acte_clin);
