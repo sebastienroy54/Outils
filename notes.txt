@@ -1,8 +1,44 @@
-auth_bdd=# select token, expires_at, used from password_reset_tokens;
-                                         token                                          |         expires_at         | used 
-----------------------------------------------------------------------------------------+----------------------------+------
- hNW_lDo_V0fdxv4jMV3UZiSCeA1P_TK2Bek1cGy3QmzMT5TWJ-N-KTiv7j55l4LfdC1Bh-yX7Zh4zYZcu3ZvkQ | 2026-07-06 15:09:40.650709 | f
- o6SQZP2Pwk5r0Ohzyf4HCbheA88bc6EBDw2YZ74L40YKUQCB7wtLhBvXbk1qSzY7yfZPq0gCWJHBnDR6LOHQ0A | 2026-07-07 15:53:40.395872 | f
-(2 rows)
+dream_bdd=# select count(*) from soins_pall;
+ count 
+-------
+   546
+(1 row)
 
-auth_bdd=# 
+dream_bdd=# select cadre_intervention, count(*) as nb from soins_pall group by cadre_intervention order by cadre_intervention;
+ cadre_intervention | nb 
+--------------------+----
+ C ext              | 68
+ HDJ                | 69
+ Hospi              | 61
+ RCP-OP             | 64
+ SAU                | 62
+ Staff autre        | 56
+ Staff EMSP         | 51
+ Tél                | 51
+ TéléCS             | 64
+(9 rows)
+
+dream_bdd=# select unnest(acte_clin) as acte, count(*) as nb from soins_pall group by acte order by acte;
+           acte           | nb  
+--------------------------+-----
+ Discussions Anticipées   | 148
+ LAT                      | 153
+ Prescriptions anticipées | 158
+ Réunions collégiale      | 151
+ Sedation proportionne    | 163
+ SPCMD                    | 147
+ Suivi de deuil           |   5
+ Titration                | 146
+(8 rows)
+
+dream_bdd=# select count(*) from soins_pall where 'MED' = ANY(cible_patient);
+ count 
+-------
+   356
+(1 row)
+
+dream_bdd=# select count(*) from soins_pall where 'MED' = ANY(cible_equipe);
+ count 
+-------
+   372
+(1 row)
