@@ -1,10 +1,17 @@
 SELECT
-    COUNT(DISTINCT CASE WHEN 'HAD' = ANY(s.transfert) THEN sp.id_patient END) AS had,
-    COUNT(DISTINCT CASE WHEN 'EMSPT' = ANY(s.transfert) THEN sp.id_patient END) AS emspt,
-    COUNT(DISTINCT CASE WHEN 'PALLIDOM/ERI' = ANY(s.transfert) THEN sp.id_patient END) AS pallidom,
-    COUNT(DISTINCT CASE WHEN 'USP' = ANY(s.transfert) THEN sp.id_patient END) AS usp,
-    COUNT(DISTINCT CASE WHEN 'DAC' = ANY(s.transfert) THEN sp.id_patient END) AS dac
-FROM soins_pall sp
-JOIN sejours s
-  ON sp.id_sejour = s.id_sejour
-WHERE sp.date_intervention >= '2016-01-01';
+    cadre_intervention,
+    COUNT(*) AS patients
+FROM (
+    SELECT DISTINCT ON (id_patient)
+        id_patient,
+        cadre_intervention,
+        date_intervention
+    FROM soins_pall
+    WHERE date_intervention >= '2016-01-01'
+    ORDER BY
+        id_patient,
+        date_intervention,
+        id_soins_pall
+) t
+GROUP BY cadre_intervention
+ORDER BY cadre_intervention;
