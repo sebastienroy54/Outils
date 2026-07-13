@@ -1,27 +1,19 @@
-resultat requete :
- med_patient | med_famille | med_equipe | ide_patient | ide_famille | ide_equipe | psy_patient | psy_famille | psy_equipe 
--------------+-------------+------------+-------------+-------------+------------+-------------+-------------+------------
-          32 |          30 |         28 |          27 |          33 |         36 |          33 |          29 |         30
-(1 row)
-
-
-resultat tableau :
 Type d'activité	Patient	Famille	Équipe	Total
 Activité médicale
-Hospitalisation	80	110	76	266
-HDJ	108	103	95	306
-Consultation externe	122	118	114	354
-Téléconsultation	87	78	105	270
-TOTAL	397	409	390	1196
+Hospitalisation	25	33	24	82
+HDJ	32	30	28	90
+Consultation externe	37	36	35	108
+Téléconsultation	26	24	32	82
+TOTAL	120	123	119	362
 Activité IDE
-Hospitalisation	112	81	105	298
-HDJ	87	114	123	324
-Consultation externe	111	100	116	327
-Téléconsultation	85	103	98	286
-TOTAL	395	398	442	1235
+Hospitalisation	34	26	33	93
+HDJ	27	33	36	96
+Consultation externe	35	30	33	98
+Téléconsultation	26	31	32	89
+TOTAL	122	120	134	376
 Activité psychologue
-Hospitalisation	98	87	73	258
-HDJ	113	94	102	309
-Consultation externe	111	125	115	351
-Téléconsultation	77	89	86	252
-TOTAL	399	395	376	1170
+Hospitalisation	29	27	23	79
+HDJ	33	29	30	92
+Consultation externe	34	38	35	107
+Téléconsultation	22	28	25	75
+TOTAL	118	122	113	353
