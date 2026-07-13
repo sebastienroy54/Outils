@@ -1,24 +1,7 @@
-Activité	Nombre
-Activités spécifiques
-LAT	1
-Suivi de deuil	5
-
-
-Libellé	Nombre
-Répartition des services appelants
-Autre	4
-Diabétologie	4
-Hématologie	3
-Hépatologie	4
-Orthopédie	3
-Réanimation chirurgicale	2
-Urologie	4
-TOTAL	24
-Répartition des services référents
-Autre	1
-Hépatologie	1
-TOTAL	2
-Répartition des origines des appels
-Famille	4
-IDE	4
-TOTAL	8
+SELECT
+    COUNT(DISTINCT CASE WHEN 'HAD' = ANY(transfert) THEN id_patient END) AS had,
+    COUNT(DISTINCT CASE WHEN 'EMSPT' = ANY(transfert) THEN id_patient END) AS emspt,
+    COUNT(DISTINCT CASE WHEN 'PALLIDOM/ERI' = ANY(transfert) THEN id_patient END) AS pallidom,
+    COUNT(DISTINCT CASE WHEN 'USP' = ANY(transfert) THEN id_patient END) AS usp,
+    COUNT(DISTINCT CASE WHEN 'DAC' = ANY(transfert) THEN id_patient END) AS dac
+FROM sejours;
