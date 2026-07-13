@@ -1,13 +1,8 @@
-dream_bdd=# select cadre_intervention, count(*) as nb from soins_pall where date_intervention >= '2016-01-01' group by cadre_intervention order by cadre_intervention;
- cadre_intervention | nb 
---------------------+----
- C ext              | 51
- HDJ                | 45
- Hospi              | 42
- RCP-OP             | 47
- SAU                | 41
- Staff autre        | 35
- Staff EMSP         | 35
- Tél                | 33
- TéléCS             | 42
-(9 rows)
+Hospitalisation	42
+HDJ	45
+Consultation externe	51
+TOTAL HORS TEL	138
+Téléconsultation	42
+Téléphone	33
+Staff	70
+TOTAL	283
