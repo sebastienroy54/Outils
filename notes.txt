@@ -1,17 +1,25 @@
-SELECT
-    cadre_intervention,
-    COUNT(*) AS patients
-FROM (
-    SELECT DISTINCT ON (id_patient)
-        id_patient,
-        cadre_intervention,
-        date_intervention
-    FROM soins_pall
-    WHERE date_intervention >= '2016-01-01'
-    ORDER BY
-        id_patient,
-        date_intervention,
-        id_soins_pall
-) t
-GROUP BY cadre_intervention
-ORDER BY cadre_intervention;
+ cadre_intervention | patients 
+--------------------+----------
+ C ext              |       14
+ HDJ                |        9
+ Hospi              |        9
+ RCP-OP             |       13
+ SAU                |        7
+ Staff autre        |       10
+ Staff EMSP         |        5
+ Tél                |        6
+ TéléCS             |        8
+
+
+Première intervention	Patients	%
+Typologie de la première intervention
+C ext	12	14.8 %
+HDJ	8	9.9 %
+Hospi	11	13.6 %
+RCP-OP	15	18.5 %
+SAU	6	7.4 %
+Staff EMSP	6	7.4 %
+Staff autre	8	9.9 %
+Tél	6	7.4 %
+TéléCS	9	11.1 %
+TOTAL	81	100 %
