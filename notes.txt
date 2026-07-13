@@ -1,16 +1,4 @@
-SELECT
-    COUNT(*) FILTER (WHERE 'MED' = ANY(cible_patient))  AS med_patient,
-    COUNT(*) FILTER (WHERE 'MED' = ANY(cible_famille)) AS med_famille,
-    COUNT(*) FILTER (WHERE 'MED' = ANY(cible_equipe))  AS med_equipe,
-
-    COUNT(*) FILTER (WHERE 'IDE' = ANY(cible_patient))  AS ide_patient,
-    COUNT(*) FILTER (WHERE 'IDE' = ANY(cible_famille)) AS ide_famille,
-    COUNT(*) FILTER (WHERE 'IDE' = ANY(cible_equipe))  AS ide_equipe,
-
-    COUNT(*) FILTER (WHERE 'PSY' = ANY(cible_patient))  AS psy_patient,
-    COUNT(*) FILTER (WHERE 'PSY' = ANY(cible_famille)) AS psy_famille,
-    COUNT(*) FILTER (WHERE 'PSY' = ANY(cible_equipe))  AS psy_equipe
-
-FROM soins_pall
-WHERE date_intervention >= '2016-01-01'
-  AND cadre_intervention = 'Hospi';
+ med_patient | med_famille | med_equipe | ide_patient | ide_famille | ide_equipe | psy_patient | psy_famille | psy_equipe 
+-------------+-------------+------------+-------------+-------------+------------+-------------+-------------+------------
+          25 |          33 |         24 |          34 |          26 |         33 |          29 |          27 |         23
+(1 row)
