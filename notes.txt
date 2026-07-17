@@ -1,29 +1,10 @@
-dream_bdd=# SELECT COUNT(DISTINCT sp.id_patient) nb_patients
+SELECT
+    sp.id_patient,
+    COUNT(DISTINCT s.service_referent) AS nb_services
 FROM soins_pall sp
 JOIN sejours s
-  ON sp.id_sejour = s.id_sejour
-WHERE s.service_referent IS NOT NULL;
- nb_patients 
--------------
-         102
-(1 row)
-
-dream_bdd=# SELECT COUNT(DISTINCT sp.id_patient) nb_patients
-FROM soins_pall sp
-WHERE sp.service_appelant IS NOT NULL;
- nb_patients 
--------------
-         102
-(1 row)
-
-dream_bdd=# SELECT
-    COUNT(DISTINCT sp.id_patient) AS total_patients,
-    COUNT(DISTINCT CASE WHEN sp.service_appelant IS NOT NULL THEN sp.id_patient END) AS avec_service_appelant,
-    COUNT(DISTINCT CASE WHEN s.service_referent IS NOT NULL THEN sp.id_patient END) AS avec_service_referent
-FROM soins_pall sp
-LEFT JOIN sejours s
-       ON sp.id_sejour = s.id_sejour;
- total_patients | avec_service_appelant | avec_service_referent 
-----------------+-----------------------+-----------------------
-            102 |                   102 |                   102
-(1 row)
+    ON sp.id_sejour = s.id_sejour
+WHERE s.service_referent IS NOT NULL
+GROUP BY sp.id_patient
+HAVING COUNT(DISTINCT s.service_referent) > 1
+ORDER BY nb_services DESC, sp.id_patient;
