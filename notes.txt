@@ -1,25 +1,17 @@
- cadre_intervention | patients 
---------------------+----------
- C ext              |       14
- HDJ                |        9
- Hospi              |        9
- RCP-OP             |       13
- SAU                |        7
- Staff autre        |       10
- Staff EMSP         |        5
- Tél                |        6
- TéléCS             |        8
+SELECT COUNT(DISTINCT sp.id_patient) nb_patients
+FROM soins_pall sp
+JOIN sejours s
+  ON sp.id_sejour = s.id_sejour
+WHERE s.service_referent IS NOT NULL;
 
+SELECT COUNT(DISTINCT sp.id_patient) nb_patients
+FROM soins_pall sp
+WHERE sp.service_appelant IS NOT NULL;
 
-Première intervention	Patients	%
-Typologie de la première intervention
-C ext	12	14.8 %
-HDJ	8	9.9 %
-Hospi	11	13.6 %
-RCP-OP	15	18.5 %
-SAU	6	7.4 %
-Staff EMSP	6	7.4 %
-Staff autre	8	9.9 %
-Tél	6	7.4 %
-TéléCS	9	11.1 %
-TOTAL	81	100 %
+SELECT
+    COUNT(DISTINCT sp.id_patient) AS total_patients,
+    COUNT(DISTINCT CASE WHEN sp.service_appelant IS NOT NULL THEN sp.id_patient END) AS avec_service_appelant,
+    COUNT(DISTINCT CASE WHEN s.service_referent IS NOT NULL THEN sp.id_patient END) AS avec_service_referent
+FROM soins_pall sp
+LEFT JOIN sejours s
+       ON sp.id_sejour = s.id_sejour;
