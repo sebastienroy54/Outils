@@ -1,15 +1,22 @@
-sqlalchemy.orm.exc.DetachedInstanceError: Instance <User at 0x73a9499f7460> is not bound to a Session; attribute refresh operation cannot proceed (Background on this error at: https://sqlalche.me/e/20/bhk3)
-Traceback:
+SELECT
+    sp.service_appelant,
+    COUNT(DISTINCT sp.id_patient) AS nb_patients,
+    COUNT(DISTINCT sp.id_soins_pall) AS nb_interventions
+FROM soins_pall sp
+WHERE sp.date_intervention BETWEEN '2016-01-01' AND CURRENT_DATE
+  AND sp.service_appelant IS NOT NULL
+GROUP BY sp.service_appelant
+ORDER BY sp.service_appelant;
 
-File "/media/sf_DREAM/app/pages/connexion.py", line 243, in <module>
-    id_user=user.id_user,
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/attributes.py", line 566, in __get__
-    return self.impl.get(state, dict_)  # type: ignore[no-any-return]
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/attributes.py", line 1086, in get
-    value = self._fire_loader_callables(state, key, passive)
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/attributes.py", line 1116, in _fire_loader_callables
-    return state._load_expired(state, passive)
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/state.py", line 803, in _load_expired
-    self.manager.expired_attribute_loader(self, toload, passive)
-File "/home/vitrygtr/.local/lib/python3.10/site-packages/sqlalchemy/orm/loading.py", line 1603, in load_scalar_attributes
-    raise orm_exc.DetachedInstanceError(
+
+SELECT
+    s.service_referent,
+    COUNT(DISTINCT sp.id_patient) AS nb_patients,
+    COUNT(DISTINCT sp.id_soins_pall) AS nb_interventions
+FROM soins_pall sp
+JOIN sejours s
+    ON sp.id_sejour = s.id_sejour
+WHERE sp.date_intervention BETWEEN '2016-01-01' AND CURRENT_DATE
+  AND s.service_referent IS NOT NULL
+GROUP BY s.service_referent
+ORDER BY s.service_referent;
